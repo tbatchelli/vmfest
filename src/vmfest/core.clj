@@ -48,6 +48,28 @@
     (.close session))) ; todo: wrap the above in a try-catch an make
                        ; sure the session is always closed
 
+
+(defn machine [^IWebsessionManager mgr ^IVirtualBox vbox machine-id]
+  (agent {:mgr mgr :vbox vbox :machine-id machine-id}))
+
+(defn vbox-task [task-fn] ;; task-fn must take ISession as first parameter
+  (fn [machine-agent]
+    (let [^IVirtualBox vbox (:vbox machine-agent)
+          ^IWebsessionManager mgr (:mgr machine-agent)
+          machine-id (:machine-id machine-agent)
+          ^ISession session (.getSessionObject mgr vbox)]
+      (try
+        (if (nil? session) (println "Couldn't create session!!!"))
+        (println "opening session for machine-id:" machine-id)
+        (.openSession vbox session machine-id)
+        (task-fn session)
+        (catch Exception e
+          (println "ERROR" e))
+        (finally ;; always make sure the session is closed!
+         (println "closing session for machine-id" machine-id)
+         (.close session))))
+    machine-agent))
+
 (comment
   "execute this at the command line to disable password checking
    $ VBoxManage setproperty websrvauthlibrary null
@@ -57,3 +79,30 @@
   (def vbox (create-vbox mgr "test" "test"))
   (map print-vm (vm-list vbox)) ; print available images
   (start-vm mgr vbox "CentOS Test"))
+
+(comment
+  "Agent-based access to machines"
+  (def mgr  (create-session-manager "localhost"))
+  (def vbox (create-vbox mgr "test" "test"))
+  (defn set-memory-task [n-megas]
+    (fn [session]
+      (let [^IMachine mutable-machine (.getMachine session)]
+        (println "setting the memory to" n-megas "for machine-id" (.getId mutable-machine))
+        (.setMemorySize mutable-machine (long n-megas))
+        (.saveSettings mutable-machine))))
+  (def my-centos-machine (machine mgr vbox "197c694b-fb56-43ed-88f5-f62769134442"))
+  (send my-centos-machine (vbox-task (set-memory-task 1024))))
+
+(comment
+  "resetting agent"
+  (restart-agent my-centos-machine
+                 {:mgr mgr
+                  :vbox vbox
+                  :machine-id "197c694b-fb56-43ed-88f5-f62769134442" }
+                 :clear-actions true))
+
+(comment
+  "TODO"
+  "mgr and vbox get garbage collected after a few minutes of not being used. Find a way of
+     recreating them when not valid anymore"
+  "the agent should contain the last task's status for query")

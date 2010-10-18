@@ -1,6 +1,4 @@
-(ns ^{:doc "Stubs for VirtualBox support."
-       :author "Antoni Batchelli"}
-    vmfest.virtualbox.vbox
+(ns vmfest.virtualbox.vbox
   (:use vmfest.machine
         clojure.contrib.logging)
   (:import [com.sun.xml.ws.commons.virtualbox_3_2
@@ -112,7 +110,7 @@ vm-string A String with either the ID or the name of the machine to find"
               (catch Exception e nil)))))
 
 
-(defn- is-vbox-machine-good?
+(defn- vbox-machine-in-valid-state?
   "Tests whether a virtualbox-machine is in valid state. It does that by
 trying to obtain an atribute from the machine."
   [vb-m]
@@ -125,6 +123,7 @@ trying to obtain an atribute from the machine."
 a good state, if possible, returning the machine itself. If it fails it will
 return a null."
   [vb-m]
+  ;; first try to reset the vbox, and then try with the session object. 
   (try (let [vbox (create-vbox (:mgr vb-m) (:username vb-m) (:password vb-m))]
          (swap! (:vbox-atom vb-m) (fn [_] vbox)))
        (try (let [session (.getSessionObject (:mgr vb-m) @(:vbox-atom vb-m))]
@@ -132,7 +131,7 @@ return a null."
             (catch Exception e
               (error (str "creating obtaining the session from " (:url vb-m)
                           " : " (.getMessage e)))))
-       vb-m ;; all is good
+       vb-m ;; all is good. The reset was successful.
        (catch Exception e
          (error (str "creating a virtualbox session with " (:url vb-m)
                      " : " (.getMessage e))))))
@@ -147,18 +146,26 @@ in good standing or it was correctly reconnected, and nil otherwise"
   (let [^ISession session @(:session-atom vb-m)]
     ;; try to access the machine, if it works, return the true.
     (try (.getState session)
-         true
+         true ;; the connection to the machine is good and has been refreshed
          (catch com.sun.xml.internal.ws.client.ClientTransportException e
+           ;; communication isssue. Giving up
            (error (str "Can't connect to the virtualbox at http://"
                        (:url vb-m) " with user " (:username vb-m))))
          (catch javax.xml.ws.WebServiceException e
+           ;; this could mean anything. Let's be more specific
            (let [cause (.getCause e)]
              (if (= (class cause)  org.virtualbox_3_2.InvalidObjectFaultMsg)
+               ;; either the managed objects have been garbage
+               ;; collected or the server has been restarted. Try
+               ;; recreating the connection.
                (do (warn "The machine is no longer valid, will attempt to recreate it")
                    (reset-vbox-machine vb-m)
-                   (if (is-vbox-machine-good? vb-m)
+                   (if (vbox-machine-in-valid-state? vb-m)
                      @(:session-atom vb-m)
+                     ;; recreating didn't work. It must be something
+                     ;; more serious. Giving up.
                      (error "the machine is not valid and can't be recreated")))
+               ;; the error wasn't recoverable after all. giving up.
                (error "The machine is not valid" e)))))))
 
 ;; the session might be stale. We before returning it to the user we
@@ -169,59 +176,58 @@ in good standing or it was correctly reconnected, and nil otherwise"
 then it will try to reset it to a fresh state. Will return nil if it fails to
 return a good session."
   [vb-m]
-  (if (refresh-machine vb-m)
-    @(:session-atom vb-m)
-    nil))
+  (when (refresh-machine vb-m)
+    @(:session-atom vb-m)))
 
 (defn- get-vbox
   "Tries to safely obtain the IVirtualBox of a machine. If the machine is stale
 then it will try to reset it to a fresh state. Will return nil if it fails to
 return a good VirtualBox"
   [vb-m]
-  (if (refresh-machine vb-m)
-    @(:vbox-atom vb-m)
-    nil))
+  (when (refresh-machine vb-m)
+    @(:vbox-atom vb-m)))
 
 (defn- vbox-task
   "Wraps a function to be executed on a machine so that it can be sent to the
 machine agent. The task-fn function must take ISession as its single parameter"
   [vbox-machine task-fn] ;; task-fn must take ISession as first parameter
   (fn [machine-agent]
-    (let [^ISession session (get-session vbox-machine) ; might force a refresh
-          ^IVirtualBox vbox @(:vbox-atom vbox-machine)
-          machine-id (:machine-id vbox-machine)]
-      (try
-        (if (nil? session)
-          (error (str "Couldn't create session for machine-id:" machine-id))
-          (do
-            (debug (str "opening session for machine-id:" machine-id))
-            (.openSession vbox session machine-id)
-            (task-fn session)))
-        (catch Exception e
-          (error "ERROR" e))
-        (finally ;; always make sure the session is closed!
-         (debug (str "closing session for machine-id:" machine-id))
-         (.close session)))))) 
+    (with-open [^ISession session (get-session vbox-machine)]  ; might force a refresh
+      (let [^IVirtualBox vbox (get-vbox vbox-machine)
+            machine-id (:machine-id vbox-machine)] 
+        (try (if (nil? session)
+               (error (str "Couldn't create session for machine-id:" machine-id))
+               (do
+                 (debug (str "opening session for machine-id:" machine-id))
+                 (.openSession vbox session machine-id)
+                 (task-fn session)))
+             (catch Exception e
+               (error "ERROR" e))
+             (finally ;; always make sure the session is closed!
+              (debug (str "closing session for machine-id:" machine-id)))))))) 
 
 (defrecord vbox-machine
-  [url                       ; the URL to connect to the VB server for
-                             ; this machine
-   ^IWebsessionManager mgr   ; IWebsessionManager used to connect to
-                             ; the machine
-   vbox-atom                 ; An atom holding the IVirtualBox object
-                             ; that contains the machine. NOTE: do not
-                             ; access this directly, use (get-vbox)
-   session-atom              ; An atom holding the ISession object
-                             ; corresponding to the VirtualBox.
-                             ; NOTE: do not access this field
-                             ; direclty, use (get-session) 
-   username                  ; The username used to log into this VirtualBox
-   password                  ; The password used to log into this VirtualBox
-   machine-id                ; the ID of the machine (UUID)
-   serializer-agent          ; An agent whose sole purpose is
-                             ; serialize access to this machine
+  [;; the URL to connect to the VB server for this machine
+   url                         
+   ;; IWebsessionManager used to connect to the machine
+   ^IWebsessionManager mgr 
+   ;; An atom holding the IVirtualBox object that contains the
+   ;; machine.  NOTE: do not access this directly, use (get-vbox)
+   vbox-atom
+   ;; An atom holding the ISession object corresponding to the
+   ;; VirtualBox.  NOTE: do not access this field direclty, use
+   ;; (get-session)
+   session-atom   
+   ;; The username used to log into this VirtualBox
+   username
+   ;; The password used to log into this VirtualBox
+   password
+   ;; the ID of the machine (UUID)
+   machine-id                
+   ;; An agent whose sole purpose is serialize access to this machine
+   serializer-agent
    ]         
-  machine
+  machine ;; the protocol it implements
   ;; Wraps the task-fn function and sends it to the agent to be
   ;; executed. This guarantees serialized access to this machine.
   (execute-task

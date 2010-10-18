@@ -171,7 +171,7 @@ in good standing or it was correctly reconnected, and nil otherwise"
 ;; the session might be stale. We before returning it to the user we
 ;; check it by queirying its status. We only really care if an
 ;; exception is thrown, and make sure the exception is recoverable.
-(defn- get-session
+(defn get-session
   "Tries to safely obtain the ISession of a machine. If the machine is stale
 then it will try to reset it to a fresh state. Will return nil if it fails to
 return a good session."
@@ -179,7 +179,7 @@ return a good session."
   (when (refresh-machine vb-m)
     @(:session-atom vb-m)))
 
-(defn- get-vbox
+(defn get-vbox
   "Tries to safely obtain the IVirtualBox of a machine. If the machine is stale
 then it will try to reset it to a fresh state. Will return nil if it fails to
 return a good VirtualBox"

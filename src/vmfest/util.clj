@@ -1,5 +1,6 @@
 (ns vmfest.util
-  (:import java.lang.Character))
+  (:import java.lang.Character)
+  (:use [clojure.contrib.str-utils2 :only [split]]))
 
 (defn case-type [c]
   (when-not (nil? c)
@@ -54,3 +55,37 @@ NOTE: Currently only works well when the name contains nonumbers or any valid se
         character-groups (camel-to-clojure-style* [] [] rest-of-name nil first-char)
         lowercased-words (map #(.toLowerCase (apply str %)) character-groups)]
     (apply str (interpose "-" lowercased-words))))
+
+
+(defn methods-starting-with
+  "Obtain a list of a methods whose name starts with 'starting'"
+  [^Class class starting]
+  (letfn [(is-clj-method?
+           [^java.lang.reflect.Method method]
+           (and (= 
+                 java.lang.reflect.Modifier/PUBLIC
+                 (.getModifiers method))
+                (not (.startsWith (.getName method) "__"))
+                (.startsWith (.getName method) starting)))]
+    (map
+     #(.getName ^java.lang.reflect.Method %)
+     (filter is-clj-method? (.getDeclaredMethods class)))))
+
+(defn remove-first-word-from-clojure-name [name]
+  "removes get- from the beginning of a clojure-style name"
+  (let [words (rest (split name #"-"))]
+    (apply str (interpose "-" words))))
+
+(defn gettable-attributes
+  "List of attributes for which there is a public getter"
+  [class]
+  (sort (map (comp remove-first-word-from-clojure-name
+                   camel-to-clojure-style)
+             (methods-starting-with class "get"))))
+
+(defn settable-attributes
+  "List of attributes for which there is a public setter"
+  [class]
+  (sort (map (comp remove-first-word-from-clojure-name
+                   camel-to-clojure-style)
+             (methods-starting-with class "set"))))

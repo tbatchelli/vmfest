@@ -60,16 +60,14 @@ NOTE: Currently only works well when the name contains nonumbers or any valid se
 (defn methods-starting-with
   "Obtain a list of a methods whose name starts with 'starting'"
   [^Class class starting]
-  (letfn [(is-clj-method?
+  (letfn [(valid-method?
            [^java.lang.reflect.Method method]
-           (and (= 
-                 java.lang.reflect.Modifier/PUBLIC
-                 (.getModifiers method))
-                (not (.startsWith (.getName method) "__"))
+           (and (= java.lang.reflect.Modifier/PUBLIC (.getModifiers method))
                 (.startsWith (.getName method) starting)))]
-    (map
-     #(.getName ^java.lang.reflect.Method %)
-     (filter is-clj-method? (.getDeclaredMethods class)))))
+    (let [methods (filter valid-method? (.getDeclaredMethods class))
+          name (fn [method] (.getName method))]
+      ;; create a map {method-name, method}
+      (into {} (for [method methods] [(name method) method])))))
 
 (defn remove-first-word-from-clojure-name [name]
   "removes the firts word from the beginning of a clojure-style name
@@ -81,16 +79,49 @@ e.g. get-cpu-name -> cpu-name"
   (comp remove-first-word-from-clojure-name
         camel-to-clojure-style))
 
+(defrecord method-signature
+  [method-name
+   return-type
+   parameter-types])
+
+(defn method-call-fn
+  ([method-name return-type parameter-types]
+     (let [method-symbol (read-string method-name)
+           args (map #(with-meta (symbol (str "x" %2)) {:tag %1}) parameter-types (range))]
+       ;;(println "producing: " `(fn [o# ~@args] (. o# ~method-symbol ~@args )))
+       (eval `(fn [o# ~@args] (. o# ~method-symbol ~@args )))))
+  ([^method-signature signature]
+     (let [{:keys [method-name return-type parameter-types]} signature]
+       (method-call-fn method-name return-type parameter-types))))
+
+(defn get-signature [^java.lang.reflect.Method method]
+  (let [method-name (.getName method)
+        return-type (.getReturnType method)
+        parameter-types (vec (.getParameterTypes method))]
+    {:method-name method-name
+     :return-type return-type
+     :parameter-types parameter-types}))
+
+(comment
+ (def eval-method-call (method-call-fn "equals" boolean [java.lang.Object]))
+ (eval-method-call "hello" "hello")
+ ;; true
+ (eval-method-call "hello" "goodbye")
+ ;; false
+ )
+
+
 (defn gettable-attribute-method-map
-  "List of attributes for which there is a public getter"
   [class]
-  (let [getters (methods-starting-with class "get")
-        keyed-attributes (map (comp keyword attribute-name-from-accessor) getters)]
-    (reduce conj {} (map (fn [a b] {a b}) keyed-attributes getters))))
+  (let [getters-map (methods-starting-with class "get")]
+    (into {} (for [[name method] getters-map]
+               [((comp keyword attribute-name-from-accessor) name)
+                ((comp method-call-fn get-signature) method)]))))
 
 (defn settable-attribute-method-map
-  "List of attributes for which there is a public setter"
   [class]
-  (let [getters (methods-starting-with class "set")
-        keyed-attributes (map (comp keyword attribute-name-from-accessor) getters)]
-    (reduce conj {} (map (fn [a b] {a b}) keyed-attributes getters))))
+  (let [getters-map (methods-starting-with class "set")]
+    (into {} (for [[name method] getters-map]
+               [((comp keyword attribute-name-from-accessor) name)
+                ((comp method-call-fn get-signature) method)]))))
+

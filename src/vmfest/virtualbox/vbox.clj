@@ -1,11 +1,13 @@
 (ns vmfest.virtualbox.vbox
   (:use vmfest.machine
-        clojure.contrib.logging)
+        clojure.contrib.logging
+        [vmfest.util :as util])
   (:import [com.sun.xml.ws.commons.virtualbox_3_2
             IWebsessionManager
             IVirtualBox
             ISession
-            IWebsessionManager]))
+            IWebsessionManager
+            IMachine]))
 
 ;;; README
 ;; Connecting to VirtualBox via the java.ws interfaces has a series of
@@ -82,21 +84,21 @@
 ;; time, each machine will have its own client, and any access to this
 ;; machine will have to take place via this client. 
 
-(defn- ^IWebsessionManager create-session-manager
+(defn ^IWebsessionManager create-session-manager
   "Creates a IWebsessionManager. Note that the default port is 18083"
   [host port]
   (let [url (str "http://" host ":" port)]
     (debug (str "Creating session manager for " url))
     (IWebsessionManager. url)))
 
-(defn- ^IVirtualBox create-vbox
+(defn ^IVirtualBox create-vbox
   "Creates a VirtualBox by logging in through the IWebsessionManager
 using 'username' and 'password' as credentials"
   [^IWebsessionManager mgr username password]
   (debug (str "creating new vbox with a logon for user " username))
   (.logon mgr username password))
 
-(defn- find-machine
+(defn find-machine
   "Finds where a machine exists from either its ID or its name. Returns
 the IMachine corresponding to the supplied name or ID, or null if such
 machine cannot be found.
@@ -110,7 +112,7 @@ vm-string A String with either the ID or the name of the machine to find"
               (catch Exception e nil)))))
 
 
-(defn- vbox-machine-in-valid-state?
+(defn vbox-machine-in-valid-state?
   "Tests whether a virtualbox-machine is in valid state. It does that by
 trying to obtain an atribute from the machine."
   [vb-m]
@@ -118,7 +120,7 @@ trying to obtain an atribute from the machine."
        true
        (catch Exception e false)))
 
-(defn- reset-vbox-machine
+(defn reset-vbox-machine
   "Recreates the necessary parts of the virtualbox-machine to return it to
 a good state, if possible, returning the machine itself. If it fails it will
 return a null."
@@ -171,7 +173,7 @@ in good standing or it was correctly reconnected, and nil otherwise"
 ;; the session might be stale. We before returning it to the user we
 ;; check it by queirying its status. We only really care if an
 ;; exception is thrown, and make sure the exception is recoverable.
-(defn- get-session
+(defn get-session
   "Tries to safely obtain the ISession of a machine. If the machine is stale
 then it will try to reset it to a fresh state. Will return nil if it fails to
 return a good session."
@@ -179,7 +181,7 @@ return a good session."
   (when (refresh-machine vb-m)
     @(:session-atom vb-m)))
 
-(defn- get-vbox
+(defn get-vbox
   "Tries to safely obtain the IVirtualBox of a machine. If the machine is stale
 then it will try to reset it to a fresh state. Will return nil if it fails to
 return a good VirtualBox"
@@ -187,14 +189,16 @@ return a good VirtualBox"
   (when (refresh-machine vb-m)
     @(:vbox-atom vb-m)))
 
-(defn- vbox-task
-  "Wraps a function to be executed on a machine so that it can be sent to the
-machine agent. The task-fn function must take ISession as its single parameter"
-  [vbox-machine task-fn] ;; task-fn must take ISession as first parameter
+(defn vbox-task
+  "Wraps a function to be executed on a machine so that it can be sent
+to the machine agent. The task-fn function must take ISession as its
+single parameter"
+  [vbox-machine task-fn]
+  ;; task-fn must take ISessionas first parameter
   (fn [machine-agent]
     (with-open [^ISession session (get-session vbox-machine)]  ; might force a refresh
       (let [^IVirtualBox vbox (get-vbox vbox-machine)
-            machine-id (:machine-id vbox-machine)] 
+            machine-id (:machine-id vbox-machine)]
         (try (if (nil? session)
                (error (str "Couldn't create session for machine-id:" machine-id))
                (do
@@ -265,3 +269,42 @@ machine agent. The task-fn function must take ISession as its single parameter"
   (execute-task my-machine (demo-set-memory-task 768)) ; observe it still works
   )
 
+(comment
+  (defn set-memory [size]
+    (fn [session]
+      (let [mutable-machine (.getMachine session)
+            method-call (:memory-size (util/settable-attribute-method-map
+                                       IMachine))]
+        (method-call mutable-machine (long size))
+        (.saveSettings mutable-machine)))))
+
+;; {:attribute function-to-set-the-attribute}
+;; contains all the settable attributes in IMachine with their setter functions
+(defonce *machine-settable-attributes* (util/settable-attribute-method-map IMachine))
+
+(defn set-attributes
+  "expecting {:attribute-name [val1 val2 ... valN]}, sets on the
+object all the attributes in the map passing the values as parameters
+to the setter"
+  [attribute-values-map object]
+  (let [set-attribute
+        (fn [[attribute values]]
+          (let [method-fn (attribute *machine-settable-attributes*)]
+            (trace (str "set " attribute " = " values))
+            (apply method-fn object values)))]
+    (doall (map set-attribute attribute-values-map))))
+
+(defn set-attributes-task
+  "A task sendable to a machine to set the attributes and values listed in the map"
+  [attribute-values-map]
+  (fn [session]
+    (let [mutable-machine (.getMachine session)]
+      (set-attributes attribute-values-map mutable-machine)
+      (.saveSettings mutable-machine))))
+
+(comment
+  (execute-task my-machine
+                (set-attributes-task
+                 {:memory-size [(long 1024)]
+                  :cpu-count [(long 2)]
+                  :name ["A new name"]})))

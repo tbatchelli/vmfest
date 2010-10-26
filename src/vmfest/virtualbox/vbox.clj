@@ -262,6 +262,14 @@ return a good VirtualBox"
   (use 'vmfest.machine)
   (execute-task my-machine (demo-set-memory-task 1024))
   ;; restart vboxwebsrv
-  (execute-task my-machine (demo-set-memory-task 768)) ; observe it still works
+  (execute-task my-machine (demo-set-memory-task 768)) ; observe it
+                            ; still works
+  (defn demo-get-memory-task []
+    (fn [session]
+      (let [mutable-machine (.getMachine session)]
+        (println "getting the assigned memory from machine-id" (.getId mutable-machine))
+        (.getMemorySize mutable-machine))))
+  (execute-task my-machine (demo-get-memory-task))
+  ;; should return the number of megas for that machine
   )
 

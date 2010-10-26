@@ -289,7 +289,7 @@ in the map passing the values as parameters to the setter"
   "A task sendable to a machine to set the attributes and values listed in the map"
   [attribute-values-map]
   (fn [session]
-    (let [mutable-machine (.getMachine session)]
+    (let [mutable-machine (.getMachine session)]G
       (set-attributes attribute-values-map mutable-machine)
       (.saveSettings mutable-machine))))
 
@@ -337,4 +337,6 @@ in the map passing the values as parameters to the setter"
                 (get-attributes-task
                  [:memory-size
                   :cpu-count 
-                  :name ])))
+                  :name ]))
+  ;; --> {:memory-size 1024, :cpu-count 1, :name "CentOS Minimal"}
+  )

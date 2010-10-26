@@ -192,7 +192,6 @@ return a good VirtualBox"
   machine is still avaliable onlinebefore executing the
   task-fn. task-fn must take ISession as its single parameter"
   [vbox-machine task-fn] ;; task-fn must take ISession as first
-  parameter
   (with-open [^ISession session (get-session vbox-machine)] ; might force a refresh
     (let [^IVirtualBox vbox (get-vbox vbox-machine)
           machine-id (:machine-id vbox-machine)] 

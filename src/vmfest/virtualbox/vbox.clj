@@ -253,7 +253,13 @@ return a good VirtualBox"
 
 ;; {:attribute function-to-set-the-attribute}
 ;; contains all the settable attributes in IMachine with their setter functions
-(defonce *machine-settable-attributes* (util/settable-attribute-method-map IMachine))
+(defonce *machine-settable-attributes*
+  (util/settable-attribute-method-map IMachine))
+
+;; {:attribute function-to-set-the-attribute}
+;; contains all the gettable attributes in IMachine with their setter functions
+(defonce *machine-gettable-attributes*
+  (util/gettable-attribute-method-map IMachine))
 
 (defn set-attributes
   "expecting {:attribute-name [val1 val2 ... valN]}, sets on the
@@ -267,6 +273,18 @@ to the setter"
             (apply method-fn object values)))]
     (doall (map set-attribute attribute-values-map))))
 
+(defn get-attributes
+  "expecting [:attribute-name], sets on the object all the attributes
+in the map passing the values as parameters to the setter"
+  [attribute-keys-vector object]
+  (let [get-attribute
+        (fn [key]
+          (let [method-fn (key *machine-gettable-attributes*)
+                value (method-fn object)]
+            (trace (str "get " key " = " value))
+            [key value]))]
+    (doall (into {} (map get-attribute attribute-keys-vector)))))
+
 (defn set-attributes-task
   "A task sendable to a machine to set the attributes and values listed in the map"
   [attribute-values-map]
@@ -275,7 +293,12 @@ to the setter"
       (set-attributes attribute-values-map mutable-machine)
       (.saveSettings mutable-machine))))
 
-
+(defn get-attributes-task
+  "A task sendable to a machine to set the attributes and values listed in the map"
+  [attribute-values-map]
+  (fn [session]
+    (let [mutable-machine (.getMachine session)]
+      (get-attributes attribute-values-map mutable-machine))))
 
 
 
@@ -303,17 +326,15 @@ to the setter"
   )
 
 (comment
-  (defn set-memory [size]
-    (fn [session]
-      (let [mutable-machine (.getMachine session)
-            method-call (:memory-size (util/settable-attribute-method-map
-                                       IMachine))]
-        (method-call mutable-machine (long size))
-        (.saveSettings mutable-machine)))))
-
-(comment
+  ;; setting a bunch of attributes
   (execute-task my-machine
                 (set-attributes-task
                  {:memory-size [(long 1024)]
                   :cpu-count [(long 2)]
-                  :name ["A new name"]})))
+                  :name ["A new name"]}))
+  ;; getting a bunch of attributes
+  (execute-task my-machine
+                (get-attributes-task
+                 [:memory-size
+                  :cpu-count 
+                  :name ])))

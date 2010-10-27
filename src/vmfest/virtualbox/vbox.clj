@@ -74,9 +74,9 @@
 ;;
 ;; Access to each machine will be guarded by this library in order to
 ;; ensure that there are no failed attempts at obtaining access to the
-;; machine at the server side. This is done via agents. A machine is
-;; partially represented by an agent and any attempt at updating a
-;; machine must be done by means of a function passed to this agent.
+;; machine at the server side. This is done via a monitor. Access to
+;; the machine is should be done only via execute-task to ensure that
+;; the proper lock is acquired.
 ;;
 ;; ENSURING PERFORMACE
 ;;
@@ -189,95 +189,53 @@ return a good VirtualBox"
   (when (refresh-machine vb-m)
     @(:vbox-atom vb-m)))
 
-(defn vbox-task
-  "Wraps a function to be executed on a machine so that it can be sent
-to the machine agent. The task-fn function must take ISession as its
-single parameter"
-  [vbox-machine task-fn]
-  ;; task-fn must take ISessionas first parameter
-  (let [^ISession session (get-session vbox-machine)]
-    (if (nil? session)
-      (error (str "No session for machine-id:" (:machine-id vbox-machine)))
-      (task-fn session))))
-
-(defn direct-session [vbox-machine]
-  (let [^ISession session (get-session vbox-machine)
-        ^IVirtualBox vbox (get-vbox vbox-machine)
-        machine-id (:machine-id vbox-machine)]
-    (try (if (nil? session)
-           (error (str "Couldn't create session for machine-id:" machine-id))
-           (do
-             (debug (str "opening session for machine-id:" machine-id))
-             (.openSession vbox session machine-id)))
-         (catch Exception e
-           (error "ERROR" e)
-           (throw e)))))
-
-(defn remote-session [vbox-machine]
-  (let [^ISession session (get-session vbox-machine)
-        ^IVirtualBox vbox (get-vbox vbox-machine)
-        machine-id (:machine-id vbox-machine)]
-    (try (if (nil? session)
-           (error (str "Couldn't create session for machine-id:" machine-id))
-           (do
-             (debug (str "opening session for machine-id:" machine-id))
-             (.openRemoteSession vbox session machine-id)))
-         (catch Exception e
-           (error "ERROR" e)
-           (throw e)))))
-
-(defmacro with-local-or-remote-session [vbox-machine & body]
-  `(let [vbox-machine# ~vbox-machine
-         ^ISession session# (get-session vbox-machine#)
-         ^IVirtualBox vbox# (get-vbox vbox-machine#)
-         machine-id# (:machine-id vbox-machine#)]
-     (try
-       (when (not= (.getState session#) org.virtualbox_3_2.SessionState/OPEN)
-         (try
-           (.openSession vbox# session# machine-id#)
-           (catch Throwable e#
-             (.openExistingSession vbox# session# machine-id#))))
-       (try
-         ~@body
-         (finally
-          (when
-              (and
-               (= (.getState session#) org.virtualbox_3_2.SessionState/OPEN)
-               (= (.getType session#) org.virtualbox_3_2.SessionType/DIRECT))
-            (.close session#))))
-       (catch Exception e#
-         (error "ERROR" e#)
-         (throw e#)))))
-
+(defn- vbox-task
+  "Wraps a function to be executed on a machine. It ensures that the
+  machine is still avaliable onlinebefore executing the
+  task-fn. task-fn must take ISession as its single parameter"
+  [vbox-machine task-fn] ;; task-fn must take ISession as first
+  (with-open [^ISession session (get-session vbox-machine)] ; might force a refresh
+    (let [^IVirtualBox vbox (get-vbox vbox-machine)
+          machine-id (:machine-id vbox-machine)]
+      (try (if (nil? session)
+             (error (str "Couldn't create session for machine-id:" machine-id))
+             (do
+               (debug (str "opening session for machine-id:" machine-id))
+               (.openSession vbox session machine-id)
+               (task-fn session)))
+           (catch Exception e
+             (error "ERROR" e))
+           (finally ;; always make sure the session is closed!
+            (debug (str "closing session for machine-id:" machine-id)))))))
 
 (defrecord vbox-machine
- [;; the URL to connect to the VB server for this machine
-  url
-  ;; IWebsessionManager used to connect to the machine
-  ^IWebsessionManager mgr
-  ;; An atom holding the IVirtualBox object that contains the
-  ;; machine.  NOTE: do not access this directly, use (get-vbox)
-  vbox-atom
-  ;; An atom holding the ISession object corresponding to the
-  ;; VirtualBox.  NOTE: do not access this field direclty, use
-  ;; (get-session)
-  session-atom
-  ;; The username used to log into this VirtualBox
-  username
-  ;; The password used to log into this VirtualBox
-  password
-  ;; the ID of the machine (UUID)
-  machine-id
-  ;; An agent whose sole purpose is serialize access to this machine
-  serializer-agent
-  ]
-    machine ;; the protocol it implements
-    ;; Wraps the task-fn function and sends it to the agent to be
-    ;; executed. This guarantees serialized access to this machine.
-    (execute-task
-     [this task-fn]
-     (locking serializer-agent
-       (vbox-task this task-fn))))
+  [;; the URL to connect to the VB server for this machine
+   url
+   ;; IWebsessionManager used to connect to the machine
+   ^IWebsessionManager mgr
+   ;; An atom holding the IVirtualBox object that contains the
+   ;; machine.  NOTE: do not access this directly, use (get-vbox)
+   vbox-atom
+   ;; An atom holding the ISession object corresponding to the
+   ;; VirtualBox.  NOTE: do not access this field direclty, use
+   ;; (get-session)
+   session-atom
+   ;; The username used to log into this VirtualBox
+   username
+   ;; The password used to log into this VirtualBox
+   password
+   ;; the ID of the machine (UUID)
+   machine-id
+   ;; A lock to serialize access to this machine
+   serializer
+   ]
+  machine ;; the protocol it implements Executes the task-fn function
+  ;; on this machine after obtaining a lock on it. This guarantees
+  ;; serialized access to this machine.
+  (execute-task
+   [this task-fn]
+   (locking serializer
+     (vbox-task this task-fn))))
 
 (defn build-vbox-machine [hostname port username password machine-name-or-id]
   (let [mgr (create-session-manager hostname port)
@@ -293,34 +251,15 @@ single parameter"
                      mgr vbox-atom session-atom
                      username password machine-id serializer-agent))))
 
-
-
-(comment
-  (defn demo-set-memory-task [n-megas]
-    (fn [session]
-      (let [mutable-machine (.getMachine session)]
-        (println  (str"setting the memory to" n-megas "for machine-id" (.getId mutable-machine)))
-        (.setMemorySize mutable-machine (long n-megas))
-        (.saveSettings mutable-machine))))
-  (use 'vmfest.virtualbox.vbox)
-  (def my-machine (build-vbox-machine "localhost" "18083" "test" "ttest" "CentOS Minimal"))
-  (execute-task my-machine (demo-set-memory-task 1024))
-  ;; restart vboxwebsrv
-  (execute-task my-machine (demo-set-memory-task 768)) ; observe it still works
-  )
-
-(comment
-  (defn set-memory [size]
-    (fn [session]
-      (let [mutable-machine (.getMachine session)
-            method-call (:memory-size (util/settable-attribute-method-map
-                                       IMachine))]
-        (method-call mutable-machine (long size))
-        (.saveSettings mutable-machine)))))
-
 ;; {:attribute function-to-set-the-attribute}
 ;; contains all the settable attributes in IMachine with their setter functions
-(defonce *machine-settable-attributes* (util/settable-attribute-method-map IMachine))
+(defonce *machine-settable-attributes*
+  (util/settable-attribute-method-map IMachine))
+
+;; {:attribute function-to-set-the-attribute}
+;; contains all the gettable attributes in IMachine with their setter functions
+(defonce *machine-gettable-attributes*
+  (util/gettable-attribute-method-map IMachine))
 
 (defn set-attributes
   "expecting {:attribute-name [val1 val2 ... valN]}, sets on the
@@ -334,17 +273,70 @@ to the setter"
             (apply method-fn object values)))]
     (doall (map set-attribute attribute-values-map))))
 
+(defn get-attributes
+  "expecting [:attribute-name], sets on the object all the attributes
+in the map passing the values as parameters to the setter"
+  [attribute-keys-vector object]
+  (let [get-attribute
+        (fn [key]
+          (let [method-fn (key *machine-gettable-attributes*)
+                value (method-fn object)]
+            (trace (str "get " key " = " value))
+            [key value]))]
+    (doall (into {} (map get-attribute attribute-keys-vector)))))
+
 (defn set-attributes-task
   "A task sendable to a machine to set the attributes and values listed in the map"
   [attribute-values-map]
   (fn [session]
-    (let [mutable-machine (.getMachine session)]
+    (let [mutable-machine (.getMachine session)]G
       (set-attributes attribute-values-map mutable-machine)
       (.saveSettings mutable-machine))))
 
+(defn get-attributes-task
+  "A task sendable to a machine to set the attributes and values listed in the map"
+  [attribute-values-map]
+  (fn [session]
+    (let [mutable-machine (.getMachine session)]
+      (get-attributes attribute-values-map mutable-machine))))
+
+
+
 (comment
+  (defn demo-set-memory-task [n-megas]
+    (fn [session]
+      (let [mutable-machine (.getMachine session)]
+        (println  (str"setting the memory to" n-megas "for machine-id" (.getId mutable-machine)))
+        (.setMemorySize mutable-machine (long n-megas))
+        (.saveSettings mutable-machine))))
+  (use 'vmfest.virtualbox.vbox)
+  (def my-machine (build-vbox-machine "localhost" "18083" "test" "ttest" "CentOS Minimal"))
+  (use 'vmfest.machine)
+  (execute-task my-machine (demo-set-memory-task 1024))
+  ;; restart vboxwebsrv
+  (execute-task my-machine (demo-set-memory-task 768)) ; observe it
+                            ; still works
+  (defn demo-get-memory-task []
+    (fn [session]
+      (let [mutable-machine (.getMachine session)]
+        (println "getting the assigned memory from machine-id" (.getId mutable-machine))
+        (.getMemorySize mutable-machine))))
+  (execute-task my-machine (demo-get-memory-task))
+  ;; should return the number of megas for that machine
+  )
+
+(comment
+  ;; setting a bunch of attributes
   (execute-task my-machine
                 (set-attributes-task
                  {:memory-size [(long 1024)]
                   :cpu-count [(long 2)]
-                  :name ["A new name"]})))
+                  :name ["A new name"]}))
+  ;; getting a bunch of attributes
+  (execute-task my-machine
+                (get-attributes-task
+                 [:memory-size
+                  :cpu-count
+                  :name ]))
+  ;; --> {:memory-size 1024, :cpu-count 1, :name "CentOS Minimal"}
+  )

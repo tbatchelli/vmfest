@@ -14,11 +14,11 @@
 ;; challenges. this code reflects these challenges and tries to hide
 ;; them from the module user.
 ;;
-;; 1) The VB api is stateful. In fact, for each object created at the
+;; 1. The VB api is stateful. In fact, for each object created at the
 ;; client side there is a counterpart object created at the server
 ;; side.
 ;;
-;; 2) There is no guarantee that at any time, for all the objects in
+;; 2. There is no guarantee that at any time, for all the objects in
 ;; the client side there will exists their server-side
 ;; counterpart. The serverside objects can be reclaimed on timout
 ;; Notice that this timeout is a configurable setting for vboxwebsrv
@@ -26,7 +26,7 @@
 ;; could be restarted at any time and all the couunterpart objects to
 ;; the objects in the client would be destroyed.
 ;;
-;; 3) Each client of a VM can only access one machine at a time. Also,
+;; 3. Each client of a VM can only access one machine at a time. Also,
 ;; each machine can only be accessed by one client at a time. The
 ;; limit of only allowing access to one machine at a time would mean
 ;; that this module can only interactue with machines one at a time,
@@ -58,16 +58,16 @@
 ;; ENSURING STABILITY
 ;;
 ;; To ensure stability of this VirtualBox client, this module has
-;; mechanisms in place to overcome the issues created by 1) and
-;; 2). Namely:
+;; mechanisms in place to overcome the issues created by 1 and
+;; 2. Namely:
 ;;
-;; a) Before utiliing any ISession or IVirtualBox object, the system
+;; a. Before utiliing any ISession or IVirtualBox object, the system
 ;; will test if the connection is still available and whether the
 ;; server counterparts still exist. In case one of the checks fails,
 ;; the system will re-create the objects ensuring that they are in
 ;; good standing before being used.
 ;;
-;; b) In order for a) to happen, the system stores the information
+;; b. In order for a. to happen, the system stores the information
 ;; necessary to re-create these objects
 ;;
 ;; ENSURING CORRECTNESS
@@ -82,7 +82,7 @@
 ;;
 ;; In order to allow this module access to more than one machine at a
 ;; time, each machine will have its own client, and any access to this
-;; machine will have to take place via this client. 
+;; machine will have to take place via this client.
 
 (defn ^IWebsessionManager create-session-manager
   "Creates a IWebsessionManager. Note that the default port is 18083"
@@ -125,7 +125,7 @@ trying to obtain an atribute from the machine."
 a good state, if possible, returning the machine itself. If it fails it will
 return a null."
   [vb-m]
-  ;; first try to reset the vbox, and then try with the session object. 
+  ;; first try to reset the vbox, and then try with the session object.
   (try (let [vbox (create-vbox (:mgr vb-m) (:username vb-m) (:password vb-m))]
          (swap! (:vbox-atom vb-m) (fn [_] vbox)))
        (try (let [session (.getSessionObject (:mgr vb-m) @(:vbox-atom vb-m))]
@@ -195,49 +195,89 @@ to the machine agent. The task-fn function must take ISession as its
 single parameter"
   [vbox-machine task-fn]
   ;; task-fn must take ISessionas first parameter
-  (fn [machine-agent]
-    (with-open [^ISession session (get-session vbox-machine)]  ; might force a refresh
-      (let [^IVirtualBox vbox (get-vbox vbox-machine)
-            machine-id (:machine-id vbox-machine)]
-        (try (if (nil? session)
-               (error (str "Couldn't create session for machine-id:" machine-id))
-               (do
-                 (debug (str "opening session for machine-id:" machine-id))
-                 (.openSession vbox session machine-id)
-                 (task-fn session)))
-             (catch Exception e
-               (error "ERROR" e))
-             (finally ;; always make sure the session is closed!
-              (debug (str "closing session for machine-id:" machine-id)))))))) 
+  (let [^ISession session (get-session vbox-machine)]
+    (if (nil? session)
+      (error (str "No session for machine-id:" (:machine-id vbox-machine)))
+      (task-fn session))))
+
+(defn direct-session [vbox-machine]
+  (let [^ISession session (get-session vbox-machine)
+        ^IVirtualBox vbox (get-vbox vbox-machine)
+        machine-id (:machine-id vbox-machine)]
+    (try (if (nil? session)
+           (error (str "Couldn't create session for machine-id:" machine-id))
+           (do
+             (debug (str "opening session for machine-id:" machine-id))
+             (.openSession vbox session machine-id)))
+         (catch Exception e
+           (error "ERROR" e)
+           (throw e)))))
+
+(defn remote-session [vbox-machine]
+  (let [^ISession session (get-session vbox-machine)
+        ^IVirtualBox vbox (get-vbox vbox-machine)
+        machine-id (:machine-id vbox-machine)]
+    (try (if (nil? session)
+           (error (str "Couldn't create session for machine-id:" machine-id))
+           (do
+             (debug (str "opening session for machine-id:" machine-id))
+             (.openRemoteSession vbox session machine-id)))
+         (catch Exception e
+           (error "ERROR" e)
+           (throw e)))))
+
+(defmacro with-local-or-remote-session [vbox-machine & body]
+  `(let [vbox-machine# ~vbox-machine
+         ^ISession session# (get-session vbox-machine#)
+         ^IVirtualBox vbox# (get-vbox vbox-machine#)
+         machine-id# (:machine-id vbox-machine#)]
+     (try
+       (when (not= (.getState session#) org.virtualbox_3_2.SessionState/OPEN)
+         (try
+           (.openSession vbox# session# machine-id#)
+           (catch Throwable e#
+             (.openExistingSession vbox# session# machine-id#))))
+       (try
+         ~@body
+         (finally
+          (when
+              (and
+               (= (.getState session#) org.virtualbox_3_2.SessionState/OPEN)
+               (= (.getType session#) org.virtualbox_3_2.SessionType/DIRECT))
+            (.close session#))))
+       (catch Exception e#
+         (error "ERROR" e#)
+         (throw e#)))))
+
 
 (defrecord vbox-machine
-  [;; the URL to connect to the VB server for this machine
-   url                         
-   ;; IWebsessionManager used to connect to the machine
-   ^IWebsessionManager mgr 
-   ;; An atom holding the IVirtualBox object that contains the
-   ;; machine.  NOTE: do not access this directly, use (get-vbox)
-   vbox-atom
-   ;; An atom holding the ISession object corresponding to the
-   ;; VirtualBox.  NOTE: do not access this field direclty, use
-   ;; (get-session)
-   session-atom   
-   ;; The username used to log into this VirtualBox
-   username
-   ;; The password used to log into this VirtualBox
-   password
-   ;; the ID of the machine (UUID)
-   machine-id                
-   ;; An agent whose sole purpose is serialize access to this machine
-   serializer-agent
-   ]         
-  machine ;; the protocol it implements
-  ;; Wraps the task-fn function and sends it to the agent to be
-  ;; executed. This guarantees serialized access to this machine.
-  (execute-task
-   [this task-fn]
-                (let [task (vbox-task this task-fn)]
-                  (send serializer-agent task))))
+ [;; the URL to connect to the VB server for this machine
+  url
+  ;; IWebsessionManager used to connect to the machine
+  ^IWebsessionManager mgr
+  ;; An atom holding the IVirtualBox object that contains the
+  ;; machine.  NOTE: do not access this directly, use (get-vbox)
+  vbox-atom
+  ;; An atom holding the ISession object corresponding to the
+  ;; VirtualBox.  NOTE: do not access this field direclty, use
+  ;; (get-session)
+  session-atom
+  ;; The username used to log into this VirtualBox
+  username
+  ;; The password used to log into this VirtualBox
+  password
+  ;; the ID of the machine (UUID)
+  machine-id
+  ;; An agent whose sole purpose is serialize access to this machine
+  serializer-agent
+  ]
+    machine ;; the protocol it implements
+    ;; Wraps the task-fn function and sends it to the agent to be
+    ;; executed. This guarantees serialized access to this machine.
+    (execute-task
+     [this task-fn]
+     (locking serializer-agent
+       (vbox-task this task-fn))))
 
 (defn build-vbox-machine [hostname port username password machine-name-or-id]
   (let [mgr (create-session-manager hostname port)

@@ -1,11 +1,13 @@
 (ns vmfest.virtualbox.vbox
   (:use vmfest.machine
-        clojure.contrib.logging)
+        clojure.contrib.logging
+        [vmfest.util :as util])
   (:import [com.sun.xml.ws.commons.virtualbox_3_2
             IWebsessionManager
             IVirtualBox
             ISession
-            IWebsessionManager]))
+            IWebsessionManager
+            IMachine]))
 
 ;;; README
 ;; Connecting to VirtualBox via the java.ws interfaces has a series of
@@ -82,21 +84,21 @@
 ;; time, each machine will have its own client, and any access to this
 ;; machine will have to take place via this client. 
 
-(defn- ^IWebsessionManager create-session-manager
+(defn ^IWebsessionManager create-session-manager
   "Creates a IWebsessionManager. Note that the default port is 18083"
   [host port]
   (let [url (str "http://" host ":" port)]
     (debug (str "Creating session manager for " url))
     (IWebsessionManager. url)))
 
-(defn- ^IVirtualBox create-vbox
+(defn ^IVirtualBox create-vbox
   "Creates a VirtualBox by logging in through the IWebsessionManager
 using 'username' and 'password' as credentials"
   [^IWebsessionManager mgr username password]
   (debug (str "creating new vbox with a logon for user " username))
   (.logon mgr username password))
 
-(defn- find-machine
+(defn find-machine
   "Finds where a machine exists from either its ID or its name. Returns
 the IMachine corresponding to the supplied name or ID, or null if such
 machine cannot be found.
@@ -110,7 +112,7 @@ vm-string A String with either the ID or the name of the machine to find"
               (catch Exception e nil)))))
 
 
-(defn- vbox-machine-in-valid-state?
+(defn vbox-machine-in-valid-state?
   "Tests whether a virtualbox-machine is in valid state. It does that by
 trying to obtain an atribute from the machine."
   [vb-m]
@@ -118,7 +120,7 @@ trying to obtain an atribute from the machine."
        true
        (catch Exception e false)))
 
-(defn- reset-vbox-machine
+(defn reset-vbox-machine
   "Recreates the necessary parts of the virtualbox-machine to return it to
 a good state, if possible, returning the machine itself. If it fails it will
 return a null."
@@ -249,6 +251,57 @@ return a good VirtualBox"
                      mgr vbox-atom session-atom
                      username password machine-id serializer-agent))))
 
+;; {:attribute function-to-set-the-attribute}
+;; contains all the settable attributes in IMachine with their setter functions
+(defonce *machine-settable-attributes*
+  (util/settable-attribute-method-map IMachine))
+
+;; {:attribute function-to-set-the-attribute}
+;; contains all the gettable attributes in IMachine with their setter functions
+(defonce *machine-gettable-attributes*
+  (util/gettable-attribute-method-map IMachine))
+
+(defn set-attributes
+  "expecting {:attribute-name [val1 val2 ... valN]}, sets on the
+object all the attributes in the map passing the values as parameters
+to the setter"
+  [attribute-values-map object]
+  (let [set-attribute
+        (fn [[attribute values]]
+          (let [method-fn (attribute *machine-settable-attributes*)]
+            (trace (str "set " attribute " = " values))
+            (apply method-fn object values)))]
+    (doall (map set-attribute attribute-values-map))))
+
+(defn get-attributes
+  "expecting [:attribute-name], sets on the object all the attributes
+in the map passing the values as parameters to the setter"
+  [attribute-keys-vector object]
+  (let [get-attribute
+        (fn [key]
+          (let [method-fn (key *machine-gettable-attributes*)
+                value (method-fn object)]
+            (trace (str "get " key " = " value))
+            [key value]))]
+    (doall (into {} (map get-attribute attribute-keys-vector)))))
+
+(defn set-attributes-task
+  "A task sendable to a machine to set the attributes and values listed in the map"
+  [attribute-values-map]
+  (fn [session]
+    (let [mutable-machine (.getMachine session)]
+      (set-attributes attribute-values-map mutable-machine)
+      (.saveSettings mutable-machine))))
+
+(defn get-attributes-task
+  "A task sendable to a machine to set the attributes and values listed in the map"
+  [attribute-values-map]
+  (fn [session]
+    (let [mutable-machine (.getMachine session)]
+      (get-attributes attribute-values-map mutable-machine))))
+
+
+
 (comment
   (defn demo-set-memory-task [n-megas]
     (fn [session]
@@ -272,3 +325,18 @@ return a good VirtualBox"
   ;; should return the number of megas for that machine
   )
 
+(comment
+  ;; setting a bunch of attributes
+  (execute-task my-machine
+                (set-attributes-task
+                 {:memory-size [(long 1024)]
+                  :cpu-count [(long 2)]
+                  :name ["A new name"]}))
+  ;; getting a bunch of attributes
+  (execute-task my-machine
+                (get-attributes-task
+                 [:memory-size
+                  :cpu-count 
+                  :name ]))
+  ;; --> {:memory-size 1024, :cpu-count 1, :name "CentOS Minimal"}
+  )

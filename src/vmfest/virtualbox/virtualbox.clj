@@ -64,9 +64,13 @@ vm-string A String with either the ID or the name of the machine to find"
 ;;;;;;;
 
 (comment
+  ;; this is only necessary to obtain the machine-id for the target virtual machine
   (def mgr (create-session-manager "http://localhost:18083"))
   (def vbox (create-vbox mgr "" ""))
   (def machine-id (.getId (find-machine vbox "CentOS Minimal")))
+
+  ;; this is the only code actually needed to configure the virtual machine
+  (def vb-m (build-vbox-machine "http://localhost:18083" "" "" machine-id))
   (with-direct-session vb-m [session machine] (.getMemorySize machine))
   (with-direct-session vb-m [session machine]
     (.setMemorySize machine (long 2048))

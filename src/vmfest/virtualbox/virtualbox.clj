@@ -1,5 +1,6 @@
 (ns vmfest.virtualbox.virtualbox
-  (:use clojure.contrib.logging)
+  (:use [clojure.contrib.logging :as log]
+        clojure.contrib.condition)
   (:import [com.sun.xml.ws.commons.virtualbox_3_2
             IWebsessionManager
             IVirtualBox]))
@@ -16,15 +17,20 @@
 (defn ^IWebsessionManager create-session-manager
    "Creates a IWebsessionManager. Note that the default port is 18083"
    [url]
-   (debug (str "Creating session manager for " url))
+   (log/debug (str "Creating session manager for " url))
    (IWebsessionManager. url))
 
 (defn ^IVirtualBox create-vbox
  "Creates a VirtualBox by logging in through the IWebsessionManager
 using 'username' and 'password' as credentials"
  ([^IWebsessionManager mgr username password]
-     (debug (str "creating new vbox with a logon for user " username))
-     (.logon mgr username password))
+    (log/debug (str "creating new vbox with a logon for user " username))
+    (try 
+      (.logon mgr username password)
+      (catch com.sun.xml.internal.ws.client.ClientTransportException e
+        (let [message (format "Cannot connect to virtualbox server: '%s'" (.getMessage e))]
+          (log/error message)
+          (raise :type :connection-error :message message)))))
  ([^vbox-machine vb-m]
     (let [{:keys [url username password]} vb-m
           mgr (create-session-manager url)]
@@ -33,7 +39,7 @@ using 'username' and 'password' as credentials"
 (defn create-mgr-vbox [vb-m]
   (let [{:keys [url username password]} vb-m
         mgr (create-session-manager url)
-        vbox (create-vbox mgr username password)]
+        vbox (create-vbox mgr username password)] 
     [mgr vbox]))
 
 (defn find-machine
@@ -44,10 +50,64 @@ machine cannot be found.
 vbox - A VirtualBox
 vm-string A String with either the ID or the name of the machine to find"
   [vbox vm-string]
-  (try (.getMachine vbox vm-string)
+  (try
+    (.getMachine vbox vm-string)
        (catch Exception e
-         (try (.findMachine vbox vm-string)
-              (catch Exception e nil)))))
+         (try
+           (.findMachine vbox vm-string)
+              (catch Exception e
+                (log/warn (format "There is no machine identified by '%s'" vm-string)))))))
+
+(defn unsigned-int-to-long [ui]
+  (bit-and (long ui) 0xffffffff))
+
+;; from http://forums.virtualbox.org/viewtopic.php?f=7&t=30273
+(defonce *error-code-map*
+  {0 :VBOX_E_UNKNOWN,
+   2159738881 :VBOX_E_OBJECT_NOT_FOUND,
+   2147500033 :VBOX_E_NOTIMPL,
+   2159738882 :VBOX_E_INVALID_VM_STATE,
+   2159738883 :VBOX_E_VM_ERROR,
+   2147500035 :VBOX_E_POINTER,
+   2159738884 :VBOX_E_FILE_ERROR,
+   2147942405 :VBOX_E_ACCESSDENIED,
+   2159738885 :VBOX_E_IPRT_ERROR,
+   2147500037 :VBOX_E_FAIL,
+   2159738886 :VBOX_E_PDM_ERROR,
+   2159738887 :VBOX_E_INVALID_OBJECT_STATE,
+   2159738888 :VBOX_E_HOST_ERROR,
+   2159738889 :VBOX_E_NOT_SUPPORTED,
+   2159738890 :VBOX_E_XML_ERROR,
+   2159738891 :VBOX_E_INVALID_SESSION_STATE,
+   2159738892 :VBOX_E_OBJECT_IN_USE,
+   2147942414 :VBOX_E_OUTOFMEMORY,
+   2147942487 :VBOX_E_INVALIDARG,
+   2147549183 :VBOX_E_UNEXPECTED})
+
+(defn condition-from-webservice-exception [e]
+  (when (instance? javax.xml.ws.WebServiceException e)
+    (let [rfm (.getCause e) ;;runtime fault message
+          message (.getMessage rfm)
+          rf (.getFaultInfo rfm) ;; runtime fault
+          interface-id (.getInterfaceID rf)
+          component (.getComponent rf)
+          result-code (unsigned-int-to-long (int (.getResultCode rf))) ;; originally an unsigned int
+          text (.getText rf)]
+      {:original-message message
+       :origin-id interface-id
+       :origin-component component
+       :error-code result-code
+       :original-error-type (*error-code-map* result-code)
+       :text text})))
+
+(defn log-and-raise [exception log-level message type & kvs]
+  (let [optional-keys (apply hash-map kvs)
+        full-message (str message ":" (.getMessage exception))]
+    (log/log log-level message)
+    (raise (merge (assoc optional-keys :type type
+                         :message full-message
+                         :cause exception)
+                  (condition-from-webservice-exception exception)))))
 
 (defmacro with-direct-session
   [vb-m names & body]
@@ -57,14 +117,19 @@ vm-string A String with either the ID or the name of the machine to find"
              [mgr# vbox#] (create-mgr-vbox ~vb-m)]
          (with-open [~session (.getSessionObject mgr# vbox#)]
            (.openSession vbox# ~session machine-id#)
-           (trace (str "direct session is open for machine-id=" machine-id#))
+           (log/trace (format "direct session is open for machine-id='%s'" machine-id#))
            (let [~machine (.getMachine ~session)]
              (try
                ~@body
                (catch java.lang.IllegalArgumentException e#
-                 (error "Called a method that is not available with a direct session"))))))
+                 (log-and-raise e#
+                                (format "Called a method that is not available with a direct session in '%s'" '~body)
+                                :invalid-method))))))
        (catch Exception e#
-         (error "Something happened" e#)))))
+         (log-and-raise e# (format "Cannot open session with machine '%s' reason:%s"
+                                   (:machine-id ~vb-m)
+                                   (.getMessage e#))
+                        :connection-error)))))
 
 (defmacro with-no-session
   [vb-m names & body]
@@ -74,9 +139,10 @@ vm-string A String with either the ID or the name of the machine to find"
              ~machine (find-machine vbox# (:machine-id ~vb-m))]
          ~@body)
        (catch java.lang.IllegalArgumentException e#
-         (error "Called a method that is not available without a session"))
+         (log-and-raise e# :error "Called a method that is not available without a session"
+                        :method-not-available))
        (catch Exception e#
-         (error "An error occurred")))))
+         (log-and-raise e# :error "An error occurred" :unknown)))))
 
 (defmacro with-remote-session
   [vb-m names & body]
@@ -91,9 +157,10 @@ vm-string A String with either the ID or the name of the machine to find"
              (try
                ~@body
                (catch java.lang.IllegalArgumentException e#
-                 (error "Called a method that is not available with a remote session"))))))
+                 (log-and-raise e# :error "Called a method that is not available without a session"
+                                :method-not-available))))))
        (catch Exception e#
-         (error "Something happened" e#)))))
+         (log-and-raise e# :error "An error occurred" :unknown)))))
 
 (defn start
   [vb-m & {:keys [session-type env]}]
@@ -108,7 +175,9 @@ vm-string A String with either the ID or the name of the machine to find"
            (let [result-code (.getResultCode progress)]
              (if (zero? result-code)
                nil
-               true))))))
+               true)))
+         (catch Exception e#
+           (log-and-raise e# :error "An error occurred" :unknown)))))
 
 ;;;;;;;
 
@@ -139,5 +208,14 @@ vm-string A String with either the ID or the name of the machine to find"
 
   ;; read config values without a session
   (with-no-session vb-m [machine]
-    (.getMemorySize machine)))
+    (.getMemorySize machine))
+
+  ;; error handling using conditions
+  (def my-no-machine
+       (build-vbox-machine "http://localhost:18083" "" "" "bogus"))
+
+  ;; handle error based on original error type
+  (handler-case :original-error-type 
+                   (start my-no-machine)
+                   (handle :VBOX_E_OBJECT_NOT_FOUND (println "No such machine exists "))))
   

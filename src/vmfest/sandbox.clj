@@ -6,9 +6,6 @@
    execute this at the command line to start server
    $ vboxwebsrv -v")
 
-(comment
-  "TODO"
-  "the agent should contain the last task's status for query")
 
 
 

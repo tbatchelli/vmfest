@@ -1,18 +1,11 @@
 (ns vmfest.virtualbox.virtualbox
   (:use [clojure.contrib.logging :as log]
-        clojure.contrib.condition)
+        clojure.contrib.condition
+        [vmfest.virtualbox.model :as model])
   (:import [com.sun.xml.ws.commons.virtualbox_3_2
             IWebsessionManager
             IVirtualBox]))
 
-(defrecord vbox-machine
-  [url
-   username
-   password
-   machine-id])
-
-(defn build-vbox-machine [url username password machine-id]
-  (vbox-machine. url username password machine-id))
 
 (defn ^IWebsessionManager create-session-manager
    "Creates a IWebsessionManager. Note that the default port is 18083"
@@ -21,8 +14,7 @@
    (IWebsessionManager. url))
 
 (defn ^IVirtualBox create-vbox
- "Creates a VirtualBox by logging in through the IWebsessionManager
-using 'username' and 'password' as credentials"
+ "TODO"
  ([^IWebsessionManager mgr username password]
     (log/debug (str "creating new vbox with a logon for user " username))
     (try 
@@ -31,18 +23,22 @@ using 'username' and 'password' as credentials"
         (let [message (format "Cannot connect to virtualbox server: '%s'" (.getMessage e))]
           (log/error message)
           (raise :type :connection-error :message message)))))
- ([^vbox-machine vb-m]
-    (let [{:keys [url username password]} vb-m
+ ([^model/host host]
+    (let [{:keys [url username password]} host
           mgr (create-session-manager url)]
       (create-vbox mgr username password))))
 
-(defn create-mgr-vbox [vb-m]
-  (let [{:keys [url username password]} vb-m
-        mgr (create-session-manager url)
-        vbox (create-vbox mgr username password)] 
-    [mgr vbox]))
+(defn create-mgr-vbox
+  ([server]
+     (let [{:keys [url username password]} server]
+       (create-mgr-vbox url username password)))
+  ([url username password]
+     (let [mgr (create-session-manager url)
+           vbox (create-vbox mgr username password)]
+       [mgr vbox])))
 
 (defn find-machine
+  
   "Finds where a machine exists from either its ID or its name. Returns
 the IMachine corresponding to the supplied name or ID, or null if such
 machine cannot be found.
@@ -113,8 +109,8 @@ vm-string A String with either the ID or the name of the machine to find"
   [vb-m names & body]
   (let [[session machine] names]
     `(try
-       (let [machine-id# (:machine-id ~vb-m)
-             [mgr# vbox#] (create-mgr-vbox ~vb-m)]
+       (let [machine-id# (:uuid ~vb-m)
+             [mgr# vbox#] (create-mgr-vbox (:server ~vb-m))]
          (with-open [~session (.getSessionObject mgr# vbox#)]
            (.openSession vbox# ~session machine-id#)
            (log/trace (format "direct session is open for machine-id='%s'" machine-id#))
@@ -123,20 +119,22 @@ vm-string A String with either the ID or the name of the machine to find"
                ~@body
                (catch java.lang.IllegalArgumentException e#
                  (log-and-raise e#
+                                :error
                                 (format "Called a method that is not available with a direct session in '%s'" '~body)
                                 :invalid-method))))))
-       (catch Exception e#
-         (log-and-raise e# (format "Cannot open session with machine '%s' reason:%s"
-                                   (:machine-id ~vb-m)
+       (catch Exception e# 
+         (log-and-raise e# :error
+                        (format "Cannot open session with machine '%s' reason:%s"
+                                   (:uuid ~vb-m)
                                    (.getMessage e#))
                         :connection-error)))))
 
 (defmacro with-no-session
-  [vb-m names & body]
+  [^model/machine vb-m names & body]
   (let [machine (first names)]
     `(try
-       (let [[mgr# vbox#] (create-mgr-vbox ~vb-m)
-             ~machine (find-machine vbox# (:machine-id ~vb-m))]
+       (let [[mgr# vbox#] (create-mgr-vbox (:server ~vb-m))
+             ~machine (find-machine vbox# (:uuid ~vb-m))]
          ~@body)
        (catch java.lang.IllegalArgumentException e#
          (log-and-raise e# :error "Called a method that is not available without a session"
@@ -145,11 +143,11 @@ vm-string A String with either the ID or the name of the machine to find"
          (log-and-raise e# :error "An error occurred" :unknown)))))
 
 (defmacro with-remote-session
-  [vb-m names & body]
+  [^model/machine vb-m names & body]
   (let [[session console] names]
     `(try
-       (let [machine-id# (:machine-id ~vb-m)
-             [mgr# vbox#] (create-mgr-vbox ~vb-m)]
+       (let [machine-id# (:uuid ~vb-m)
+             [mgr# vbox#] (create-mgr-vbox (:server ~vb-m))]
          (with-open [~session (.getSessionObject mgr# vbox#)]
            (.openExistingSession vbox# ~session machine-id#)
            (trace (str "new remote session is open for machine-id=" machine-id#))
@@ -163,12 +161,12 @@ vm-string A String with either the ID or the name of the machine to find"
          (log-and-raise e# :error "An error occurred" :unknown)))))
 
 (defn start
-  [vb-m & {:keys [session-type env]}]
-  (let [machine-id (:machine-id vb-m)
-        [mgr vbox] (create-mgr-vbox vb-m)
+  [^model/machine vb-m]
+  (let [machine-id (:uuid vb-m)
+        [mgr vbox] (create-mgr-vbox (:server vb-m))
         session (.getSessionObject mgr vbox)
-        session-type (or session-type "gui")
-        env (or env "DISPLAY:0.0")]
+        session-type  "gui"
+        env "DISPLAY:0.0"]
     (try (let [progress (.openRemoteSession vbox session machine-id session-type env)]
            (debug (str "Starting session for VM " machine-id "..."))
            (.waitForCompletion progress 10000)
@@ -182,14 +180,19 @@ vm-string A String with either the ID or the name of the machine to find"
 ;;;;;;;
 
 (comment
+  (use 'vmfest.virtualbox.virtualbox)
+  
   ;; this is only necessary to obtain the machine-id for the target virtual machine
   (def mgr (create-session-manager "http://localhost:18083"))
   (def vbox (create-vbox mgr "" ""))
   (def machine-id (.getId (find-machine vbox "CentOS Minimal")))
 
-  ;; this is the only code actually needed to configure the virtual machine
-  (def vb-m (build-vbox-machine "http://localhost:18083" "" "" machine-id))
-
+  ;; this is the only code actually
+  ;; needed to configure the virtual
+;; machine
+  (def server (vmfest.virtualbox.model.server. "http://localhost:18083" "" ""))
+  (def vb-m (vmfest.virtualbox.model.machine. machine-id server nil))
+  
   ;; read config values with a session
   (with-direct-session vb-m [session machine]
     (.getMemorySize machine))
@@ -218,5 +221,5 @@ vm-string A String with either the ID or the name of the machine to find"
   (handler-case :original-error-type 
                    (start my-no-machine)
                    (handle :VBOX_E_OBJECT_NOT_FOUND (println "No such machine exists ")))
-  ;; -> No such machine exists)
-  
+  ;; -> No such machine exists
+  )

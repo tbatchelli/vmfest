@@ -1,7 +1,8 @@
 (ns vmfest.virtualbox.vbox
   (:use clojure.contrib.logging
         [vmfest.virtualbox.virtualbox :as vb]
-        [vmfest.util :as util])
+        [vmfest.util :as util]
+        [vmfest.virtualbox.model :as model])
   (:import [com.sun.xml.ws.commons.virtualbox_3_2 IMachine]))
 
 
@@ -39,14 +40,10 @@ in the map passing the values as parameters to the setter"
             [key value]))]
     (doall (into {} (map get-attribute attribute-keys-vector)))))
 
-(defprotocol vbox-object
-  (vbprint [this])
-  (as-map [this]))
-
 (defmacro with-server [server vbox-name & body]
   `(try
      (let [{:keys [url# username# password#]} ~server
-           [_# ~vbox-name (create-mgr-vbox url# username# password#)]]
+           [_# ~vbox-name] (create-mgr-vbox url# username# password#)]
        ~@body)
      (catch Exception e#
          (log-and-raise e# :error "while trying to operate a virtualbox" :unknown))))
@@ -59,12 +56,12 @@ in the map passing the values as parameters to the setter"
          (log-and-raise e# :error "while trying to operate a virtualbox" :unknown))))
 
 
-(defn hard-disks [vb-m]
-  (with-vbox vb-m vbox
+(defn hard-disks [server]
+  (with-vbox server vbox
     (seq (.getHardDisks vbox))))
 
-(defn machines [vb-m]
-  (with-vbox vb-m vbox
+(defn machines [server]
+  (with-vbox server vbox
     (seq (.getMachines vbox))))
 
 (comment

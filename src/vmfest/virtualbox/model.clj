@@ -2,8 +2,9 @@
 
 (defrecord server [url username password]) 
 (defrecord location [servers])
-(defrecord machine [uuid server location])
+(defrecord machine [id server location])
+(defrecord guest-os-type [id server])
 
 (defprotocol vbox-object
-  (pp-print [this])
-  (as-map [this]))
+  (as-map [this])
+  (soak [this]))

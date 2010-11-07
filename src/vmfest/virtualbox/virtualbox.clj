@@ -38,7 +38,6 @@
        [mgr vbox])))
 
 (defn find-machine
-  
   "Finds where a machine exists from either its ID or its name. Returns
 the IMachine corresponding to the supplied name or ID, or null if such
 machine cannot be found.

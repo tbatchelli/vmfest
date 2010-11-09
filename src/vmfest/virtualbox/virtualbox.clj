@@ -44,14 +44,24 @@ machine cannot be found.
 
 vbox - A VirtualBox
 vm-string A String with either the ID or the name of the machine to find"
-  [vbox vm-string]
-  (try
-    (.getMachine vbox vm-string)
-       (catch Exception e
-         (try
-           (.findMachine vbox vm-string)
-              (catch Exception e
-                (log/warn (format "There is no machine identified by '%s'" vm-string)))))))
+  ([vbox vm-string]
+      (try
+        (.getMachine vbox vm-string)
+        (catch Exception e
+          (try
+            (dry (.findMachine vbox vm-string) vbox)
+            (catch Exception e
+              (log/warn (format "There is no machine identified by '%s'" vm-string)))))))
+  ([url login password vm-string]
+     (let [[_ vbox] (create-mgr-vbox url login password)]
+       (try
+        (.getMachine vbox vm-string)
+        (catch Exception e
+          (try
+            (dry (.findMachine vbox vm-string)
+                 (vmfest.virtualbox.model.server. url login password))
+            (catch Exception e
+              (log/warn (format "There is no machine identified by '%s'" vm-string)))))))))
 
 (defn unsigned-int-to-long [ui]
   (bit-and (long ui) 0xffffffff))
@@ -236,3 +246,52 @@ vm-string A String with either the ID or the name of the machine to find"
                    (handle :VBOX_E_OBJECT_NOT_FOUND (println "No such machine exists ")))
   ;; -> No such machine exists
   )
+
+
+(comment
+  (use 'vmfest.virtualbox.virtualbox)
+  (use 'vmfest.virtualbox.machine)
+  (use 'vmfest.virtualbox.guest-os-type)
+
+  ;; find by name or UUID
+  (def my-machine  (find-machine "http://localhost:18083" "" "" "CentOS Minimal"))
+  ;; -> #:vmfest.virtualbox.model.machine{
+  ;;           :id "197c694b-fb56-43ed-88f5-f62769134442",
+  ;;           :server #:vmfest.virtualbox.model.server{
+  ;;                      :url "http://localhost:18083", 
+  ;;                      :username "",
+  ;;                      :password ""},
+  ;;           :location nil}
+
+  ;; operate the machine
+  (start my-machine)
+  (pause my-machine)
+  (resume my-machine)
+  (stop my-machine)
+
+  ;; all the statements in the body are run within a direct session
+  ;; with the machine
+  (with-direct-session my-machine [session machine]
+    (.setMemorySize machine (long 1024))
+    (.saveSettings machine))
+  
+  ;; as-map gives you a map with all the object's attributes
+  (pprint (as-map my-machine))
+  ;; -> {:id "197c694b-fb56-43ed-88f5-f62769134442",
+  ;;     :server {:url "http://localhost:18083", :username "", :password ""},
+  ;;     :location nil,
+  ;;     :current-snapshot nil,
+  ;;     :cpu-hot-plug-enabled? false,
+  ;;     :settings-file-path
+  ;;             "/Users/tbatchelli/Library/VirtualBox/Machines/CentOS Minimal/CentOS Minimal.xml",
+  ;;     :hpet-enabled false,
+  ;;     :teleporter-port 0,
+  ;;     :cpu-count 1,
+  ;;     :snapshot-folder
+  ;;             "/Users/tbatchelli/Library/VirtualBox/Machines/CentOS
+  ;;             Minimal/Snapshots",
+  ;; etc.... }
+  
+  ;; soak gets you the actual virtualbox object, without a session, so
+  ;; you can use the usual java methods with it
+  (.getMemorySize (soak my-machine)))

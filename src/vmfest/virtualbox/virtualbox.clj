@@ -108,7 +108,7 @@ vm-string A String with either the ID or the name of the machine to find"
   [vb-m names & body]
   (let [[session machine] names]
     `(try
-       (let [machine-id# (:uuid ~vb-m)
+       (let [machine-id# (:id ~vb-m)
              [mgr# vbox#] (create-mgr-vbox (:server ~vb-m))]
          (with-open [~session (.getSessionObject mgr# vbox#)]
            (.openSession vbox# ~session machine-id#)
@@ -124,7 +124,7 @@ vm-string A String with either the ID or the name of the machine to find"
        (catch Exception e# 
          (log-and-raise e# :error
                         (format "Cannot open session with machine '%s' reason:%s"
-                                   (:uuid ~vb-m)
+                                   (:id ~vb-m)
                                    (.getMessage e#))
                         :connection-error)))))
 
@@ -133,7 +133,7 @@ vm-string A String with either the ID or the name of the machine to find"
   (let [machine (first names)]
     `(try
        (let [[mgr# vbox#] (create-mgr-vbox (:server ~vb-m))
-             ~machine (find-machine vbox# (:uuid ~vb-m))]
+             ~machine (find-machine vbox# (:id ~vb-m))]
          ~@body)
        (catch java.lang.IllegalArgumentException e#
          (log-and-raise e# :error "Called a method that is not available without a session"
@@ -145,7 +145,7 @@ vm-string A String with either the ID or the name of the machine to find"
   [^model/machine vb-m names & body]
   (let [[session console] names]
     `(try
-       (let [machine-id# (:uuid ~vb-m)
+       (let [machine-id# (:id ~vb-m)
              [mgr# vbox#] (create-mgr-vbox (:server ~vb-m))]
          (with-open [~session (.getSessionObject mgr# vbox#)]
            (.openExistingSession vbox# ~session machine-id#)
@@ -161,7 +161,7 @@ vm-string A String with either the ID or the name of the machine to find"
 
 (defn start
   [^model/machine vb-m]
-  (let [machine-id (:uuid vb-m)
+  (let [machine-id (:id vb-m)
         [mgr vbox] (create-mgr-vbox (:server vb-m))
         session (.getSessionObject mgr vbox)
         session-type  "gui"
@@ -176,6 +176,20 @@ vm-string A String with either the ID or the name of the machine to find"
          (catch Exception e#
            (log-and-raise e# :error "An error occurred" :unknown)))))
 
+(defn stop 
+  [^model/machine m]
+  (with-remote-session m [_ machine]
+    (.powerButton machine)))
+
+(defn pause
+  [^model/machine m]
+  (with-remote-session m [_ machine]
+    (.pause machine)))
+
+(defn resume
+  [^model/machine m]
+  (with-remote-session m [_ machine]
+    (.resume machine)))
 ;;;;;;;
 
 (comment

@@ -8,16 +8,6 @@
   (:import [com.sun.xml.ws.commons.virtualbox_3_2 IMachine]
            [vmfest.virtualbox.model guest-os-type]))
 
-(defn machines* [server]
-  (vbox/with-server server vbox
-    (map as-map (seq (.getMachines vbox)))))
-
-(defn find-machine-in-server [machine-name-or-id server])
-
-(defn machines-in-server [server]
-  (let [{:keys [url username password]} server
-        [mgr vbox] (create-mgr-vbox url username password)]))
-
 (defn map-from-IMachine
   [^IMachine machine server]
   {:name (.getName machine)
@@ -88,3 +78,9 @@
           (let [machine (soak this)]
             (merge this
                    (map-from-IMachine machine (:server this))))))
+
+(extend-type IMachine
+  model/vbox-remote-object
+  (dry [this server]
+       (let [id (.getId this)]
+         (vmfest.virtualbox.model.machine. id server nil))))

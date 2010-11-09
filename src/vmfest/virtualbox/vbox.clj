@@ -48,9 +48,9 @@ in the map passing the values as parameters to the setter"
      (catch Exception e#
          (log-and-raise e# :error "while trying to operate a virtualbox" :unknown))))
 
-(defmacro with-vbox [vb-m vbox-name & body]
+(defmacro with-vbox [server vbox-name & body]
   `(try
-     (let [[_# ~vbox-name] (create-mgr-vbox (:server ~vb-m))]
+     (let [[_# ~vbox-name] (create-mgr-vbox ~server)]
        ~@body)
      (catch Exception e#
          (log-and-raise e# :error "while trying to operate a virtualbox" :unknown))))
@@ -58,11 +58,11 @@ in the map passing the values as parameters to the setter"
 
 (defn hard-disks [server]
   (with-vbox server vbox
-    (seq (.getHardDisks vbox))))
+    (map #(model/dry % server) (.getHardDisks vbox))))
 
 (defn machines [server]
   (with-vbox server vbox
-    (seq (.getMachines vbox))))
+    (map #(model/dry % server) (.getMachines vbox))))
 
 (comment
   ;; setting a bunch of attributes

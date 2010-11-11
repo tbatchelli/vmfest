@@ -7,7 +7,7 @@
 
 (defprotocol vbox-object
   (as-map [this])
-  (soak [this]))
+  (soak [this vbox]))
 
 (defprotocol vbox-remote-object
   (dry [this server]))

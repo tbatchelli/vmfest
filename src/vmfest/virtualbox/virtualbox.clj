@@ -37,31 +37,6 @@
            vbox (create-vbox mgr username password)]
        [mgr vbox])))
 
-(defn find-machine
-  "Finds where a machine exists from either its ID or its name. Returns
-the IMachine corresponding to the supplied name or ID, or null if such
-machine cannot be found.
-
-vbox - A VirtualBox
-vm-string A String with either the ID or the name of the machine to find"
-  ([vbox vm-string]
-      (try
-        (.getMachine vbox vm-string)
-        (catch Exception e
-          (try
-            (dry (.findMachine vbox vm-string) vbox)
-            (catch Exception e
-              (log/warn (format "There is no machine identified by '%s'" vm-string)))))))
-  ([url login password vm-string]
-     (let [[_ vbox] (create-mgr-vbox url login password)]
-       (try
-        (.getMachine vbox vm-string)
-        (catch Exception e
-          (try
-            (dry (.findMachine vbox vm-string)
-                 (vmfest.virtualbox.model.server. url login password))
-            (catch Exception e
-              (log/warn (format "There is no machine identified by '%s'" vm-string)))))))))
 
 (defn unsigned-int-to-long [ui]
   (bit-and (long ui) 0xffffffff))
@@ -114,12 +89,20 @@ vm-string A String with either the ID or the name of the machine to find"
                          :cause exception)
                   (condition-from-webservice-exception exception)))))
 
+(defmacro with-vbox [server [mgr vbox] & body]
+  `(let [[~mgr ~vbox] (create-mgr-vbox ~server)]
+     (try
+       ~@body
+       (finally (when ~vbox
+                  (try (.logoff ~mgr ~vbox)
+                       (catch Exception e#
+                         (log-and-raise e# :warn "unable to close session" :communication))))))))
+
 (defmacro with-direct-session
-  [vb-m names & body]
-  (let [[session machine] names]
-    `(try
-       (let [machine-id# (:id ~vb-m)
-             [mgr# vbox#] (create-mgr-vbox (:server ~vb-m))]
+  [vb-m [session machine] & body]
+  `(try
+     (let [machine-id# (:id ~vb-m)]
+       (with-vbox (:server ~vb-m) [mgr# vbox#]
          (with-open [~session (.getSessionObject mgr# vbox#)]
            (.openSession vbox# ~session machine-id#)
            (log/trace (format "direct session is open for machine-id='%s'" machine-id#))
@@ -130,33 +113,31 @@ vm-string A String with either the ID or the name of the machine to find"
                  (log-and-raise e#
                                 :error
                                 (format "Called a method that is not available with a direct session in '%s'" '~body)
-                                :invalid-method))))))
-       (catch Exception e# 
-         (log-and-raise e# :error
-                        (format "Cannot open session with machine '%s' reason:%s"
-                                   (:id ~vb-m)
-                                   (.getMessage e#))
-                        :connection-error)))))
+                                :invalid-method)))))))
+     (catch Exception e# 
+       (log-and-raise e# :error
+                      (format "Cannot open session with machine '%s' reason:%s"
+                              (:id ~vb-m)
+                              (.getMessage e#))
+                      :connection-error))))
 
 (defmacro with-no-session
-  [^model/machine vb-m names & body]
-  (let [machine (first names)]
-    `(try
-       (let [[mgr# vbox#] (create-mgr-vbox (:server ~vb-m))
-             ~machine (find-machine vbox# (:id ~vb-m))]
-         ~@body)
-       (catch java.lang.IllegalArgumentException e#
+  [^model/machine vb-m [machine] & body]
+  `(try
+     (with-vbox (:server ~vb-m) [_# vbox#]
+       (let [~machine (soak ~vb-m vbox#)] 
+         ~@body))
+      (catch java.lang.IllegalArgumentException e#
          (log-and-raise e# :error "Called a method that is not available without a session"
                         :method-not-available))
        (catch Exception e#
-         (log-and-raise e# :error "An error occurred" :unknown)))))
+         (log-and-raise e# :error "An error occurred" :unknown))))
 
 (defmacro with-remote-session
-  [^model/machine vb-m names & body]
-  (let [[session console] names]
-    `(try
-       (let [machine-id# (:id ~vb-m)
-             [mgr# vbox#] (create-mgr-vbox (:server ~vb-m))]
+  [^model/machine vb-m [session console] & body]
+  `(try
+     (let [machine-id# (:id ~vb-m)]
+       (with-vbox (:server ~vb-m) [mgr# vbox#]
          (with-open [~session (.getSessionObject mgr# vbox#)]
            (.openExistingSession vbox# ~session machine-id#)
            (trace (str "new remote session is open for machine-id=" machine-id#))
@@ -165,26 +146,65 @@ vm-string A String with either the ID or the name of the machine to find"
                ~@body
                (catch java.lang.IllegalArgumentException e#
                  (log-and-raise e# :error "Called a method that is not available without a session"
-                                :method-not-available))))))
-       (catch Exception e#
-         (log-and-raise e# :error "An error occurred" :unknown)))))
+                                :method-not-available)))))))
+     (catch Exception e#
+       (log-and-raise e# :error "An error occurred" :unknown))))
+
+
+
+(defn find-machine-obj
+  "Finds where a machine exists from either its ID or its name. Returns
+the IMachine corresponding to the supplied name or ID, or null if such
+machine cannot be found.
+
+vbox - A VirtualBox
+vm-string A String with either the ID or the name of the machine to find"
+  ([vbox vm-string]
+      (try
+        (.getMachine vbox vm-string)
+        (catch Exception e
+          (try
+            (.findMachine vbox vm-string)
+            (catch Exception e
+              (log/warn (format "There is no machine identified by '%s'" vm-string)))))))
+  ([url login password vm-string]
+     (let [server (vmfest.virtualbox.model.server. url login password)]
+       (with-vbox server [mgr vbox]
+         (try
+           (.getMachine vbox vm-string)
+           (catch Exception e
+             (try
+               (.findMachine vbox vm-string)
+               (catch Exception e
+                 (log/warn (format "There is no machine identified by '%s'" vm-string))))))))))
+
+(defn find-machine [url login password vm-string]
+  (let [server (vmfest.virtualbox.model.server. url login password)]
+       (with-vbox server [mgr vbox]
+         (try
+           (dry (.getMachine vbox vm-string) server)
+           (catch Exception e
+             (try
+               (dry (.findMachine vbox vm-string) server)
+               (catch Exception e
+                 (log/warn (format "There is no machine identified by '%s'" vm-string)))))))))
 
 (defn start
   [^model/machine vb-m]
-  (let [machine-id (:id vb-m)
-        [mgr vbox] (create-mgr-vbox (:server vb-m))
-        session (.getSessionObject mgr vbox)
-        session-type  "gui"
-        env "DISPLAY:0.0"]
-    (try (let [progress (.openRemoteSession vbox session machine-id session-type env)]
-           (debug (str "Starting session for VM " machine-id "..."))
-           (.waitForCompletion progress 10000)
-           (let [result-code (.getResultCode progress)]
-             (if (zero? result-code)
-               nil
-               true)))
-         (catch Exception e#
-           (log-and-raise e# :error "An error occurred" :unknown)))))
+  (with-vbox (:server vb-m) [mgr vbox]
+    (let [machine-id (:id vb-m)
+          session (.getSessionObject mgr vbox)
+          session-type  "gui"
+          env "DISPLAY:0.0"]
+      (try (let [progress (.openRemoteSession vbox session machine-id session-type env)]
+             (debug (str "Starting session for VM " machine-id "..."))
+             (.waitForCompletion progress 10000)
+             (let [result-code (.getResultCode progress)]
+               (if (zero? result-code)
+                 nil
+                 true)))
+           (catch Exception e#
+             (log-and-raise e# :error "An error occurred" :unknown))))))
 
 (defn stop 
   [^model/machine m]
@@ -258,7 +278,6 @@ vm-string A String with either the ID or the name of the machine to find"
   ;; -> #:vmfest.virtualbox.model.machine{
   ;;           :id "197c694b-fb56-43ed-88f5-f62769134442",
   ;;           :server #:vmfest.virtualbox.model.server{
-  ;;                      :url "http://localhost:18083", 
   ;;                      :username "",
   ;;                      :password ""},
   ;;           :location nil}
@@ -291,7 +310,8 @@ vm-string A String with either the ID or the name of the machine to find"
   ;;             "/Users/tbatchelli/Library/VirtualBox/Machines/CentOS
   ;;             Minimal/Snapshots",
   ;; etc.... }
-  
-  ;; soak gets you the actual virtualbox object, without a session, so
-  ;; you can use the usual java methods with it
-  (.getMemorySize (soak my-machine)))
+
+  ;; you can also obtain attributes from the machine one by one
+  (with-no-session my-machine [machine]
+    (.getMemorySize machine))
+ )

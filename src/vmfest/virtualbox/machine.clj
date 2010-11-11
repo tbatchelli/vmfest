@@ -70,14 +70,13 @@
 
 (extend-type vmfest.virtualbox.model.machine
   model/vbox-object
-  (soak [this]
-        (let [[_ vbox] (virtualbox/create-mgr-vbox (:server this))
-              uuid (:id this)]
-          (virtualbox/find-machine vbox uuid)))
+  (soak [this vbox]
+        (virtualbox/find-machine-obj vbox (:id this)))
   (as-map [this]
-          (let [machine (soak this)]
-            (merge this
-                   (map-from-IMachine machine (:server this))))))
+          (virtualbox/with-vbox (:server this) [_ vbox]
+            (let [machine (soak this vbox)]
+              (merge this
+                     (map-from-IMachine machine (:server this)))))))
 
 (extend-type IMachine
   model/vbox-remote-object

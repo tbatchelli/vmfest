@@ -34,11 +34,10 @@
 
 (extend-type vmfest.virtualbox.model.guest-os-type
   model/vbox-object
-  (soak [this]
-        (let [[_ vbox] (virtualbox/create-mgr-vbox (:server this))
-              uuid (:id this)]
-          (.getGuestOSType vbox uuid)))
+  (soak [this vbox]
+        (.getGuestOSType vbox (:id this)))
   (as-map [this]
-          (let [object (soak this)]
-            (merge this
-                   (map-from-IGuestOSType object)))))
+          (with-vbox (:server this) [_ vbox]
+            (let [object (soak this vbox)]
+              (merge this
+                     (map-from-IGuestOSType object))))))

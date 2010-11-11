@@ -1,6 +1,6 @@
 (ns vmfest.virtualbox.vbox
   (:use clojure.contrib.logging
-        [vmfest.virtualbox.virtualbox :as vb]
+        [vmfest.virtualbox.virtualbox :as virtualbox]
         [vmfest.util :as util]
         [vmfest.virtualbox.model :as model])
   (:import [com.sun.xml.ws.commons.virtualbox_3_2 IMachine]))
@@ -40,7 +40,7 @@ in the map passing the values as parameters to the setter"
             [key value]))]
     (doall (into {} (map get-attribute attribute-keys-vector)))))
 
-(defmacro with-server [server vbox-name & body]
+#_(defmacro with-server [server vbox-name & body]
   `(try
      (let [{:keys [url# username# password#]} ~server
            [_# ~vbox-name] (create-mgr-vbox url# username# password#)]
@@ -48,7 +48,7 @@ in the map passing the values as parameters to the setter"
      (catch Exception e#
          (log-and-raise e# :error "while trying to operate a virtualbox" :unknown))))
 
-(defmacro with-vbox [server vbox-name & body]
+#_(defmacro with-vbox [server vbox-name & body]
   `(try
      (let [[_# ~vbox-name] (create-mgr-vbox ~server)]
        ~@body)
@@ -57,12 +57,12 @@ in the map passing the values as parameters to the setter"
 
 
 (defn hard-disks [server]
-  (with-vbox server vbox
-    (map #(model/dry % server) (.getHardDisks vbox))))
+  (virtualbox/with-vbox server [_ vbox]
+    (doall (map #(model/dry % server) (.getHardDisks vbox)))))
 
 (defn machines [server]
-  (with-vbox server vbox
-    (map #(model/dry % server) (.getMachines vbox))))
+  (virtualbox/with-vbox server [_ vbox]
+    (doall (map #(model/dry % server) (.getMachines vbox)))))
 
 (comment
   ;; setting a bunch of attributes

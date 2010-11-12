@@ -52,3 +52,16 @@
                          :message full-message
                          :cause exception)
                   (condition-from-webservice-exception exception)))))
+
+(comment
+  ;; error handling using conditions
+  (def my-no-machine
+       (vmfest.virtualbox.model.Server. "http://localhost:18083" "" "" "bogus")) ;; a bogus machine
+
+  (use 'vmfest.virtualbox.machine)
+  ;; handle error based on original error type
+  (handler-case :original-error-type 
+                   (start my-no-machine)
+                   (handle :VBOX_E_OBJECT_NOT_FOUND (println "No such machine exists ")))
+  ;; -> No such machine exists
+  )

@@ -99,3 +99,36 @@
                                 :method-not-available)))))))
      (catch Exception e#
        (conditions/log-and-raise e# :error "An error occurred" :unknown))))
+
+
+(comment
+  ;; how to create the mgr and vbox independently
+  (def mgr (create-session-manager "http://localhost:18083"))
+  (def vbox (create-vbox mgr "" ""))
+
+  ;; Creating Server and Machine to use with session
+  (def server (vmfest.virtualbox.model.Server. "http://localhost:18083" "" ""))
+  (def vb-m (vmfest.virtualbox.model.Machine. machine-id server nil))
+  
+  ;; read config values with a session
+  (with-direct-session vb-m [session machine]
+    (.getMemorySize machine))
+
+  ;; set config values
+  (with-direct-session vb-m [session machine]
+    (.setMemorySize machine (long 2048))
+    (.saveSettings machine))
+
+  ;; start a vm
+  (require '[vmfest.virtualbox.machine :as machine])
+  (machine/start vb-m)
+
+    ;; stop a vm (or control it)
+  (with-remote-session vb-m [session machine]
+    (.powerDown machine))
+
+  ;; read config values without a session
+  (with-no-session vb-m [machine]
+    (.getMemorySize machine))
+
+)

@@ -3,6 +3,9 @@
         [vmfest.virtualbox.conditions :as conditions]
         [vmfest.virtualbox.model :as model]
         [vmfest.virtualbox.session :as session])
+  (:require vmfest.virtualbox.model
+            vmfest.virtualbox.machine
+            vmfest.virtualbox.guest-os-type)
   (:import [com.sun.xml.ws.commons.virtualbox_3_2
             IWebsessionManager
             IVirtualBox]
@@ -18,42 +21,22 @@
   (session/with-vbox server [_ vbox]
     (doall (map #(model/dry % server) (.getMachines vbox)))))
 
-(defn find-machine-obj
-  "Finds where a machine exists from either its ID or its name. Returns
-the IMachine corresponding to the supplied name or ID, or null if such
-machine cannot be found.
-
-vbox - A VirtualBox
-vm-string A String with either the ID or the name of the machine to find"
-  ([vbox vm-string]
+(defn find-vb-m
+  ([vbox id-or-name]
       (try
-        (.getMachine vbox vm-string)
+        (.getMachine vbox id-or-name)
         (catch Exception e
           (try
-            (.findMachine vbox vm-string)
+            (.findMachine vbox id-or-name)
             (catch Exception e
-              (log/warn (format "There is no machine identified by '%s'" vm-string)))))))
-  ([url login password vm-string]
-     (let [server (Server. url login password)]
-       (session/with-vbox server [mgr vbox]
-         (try
-           (.getMachine vbox vm-string)
-           (catch Exception e
-             (try
-               (.findMachine vbox vm-string)
-               (catch Exception e
-                 (log/warn (format "There is no machine identified by '%s'" vm-string))))))))))
+              (conditions/log-and-raise e :warn (format "There is no machine identified by '%s'" id-or-name)
+                                           :object-not-found)))))))
 
-(defn find-machine [url login password vm-string]
+(defn find-machine [url login password id-or-name]
   (let [server (Server. url login password)]
        (session/with-vbox server [mgr vbox]
-         (try
-           (dry (.getMachine vbox vm-string) server)
-           (catch Exception e
-             (try
-               (dry (.findMachine vbox vm-string) server)
-               (catch Exception e
-                 (log/warn (format "There is no machine identified by '%s'" vm-string)))))))))
+         (when-let [vb-m (find-vb-m vbox id-or-name)]
+           (dry vb-m server)))))
 
 (comment
   ;;----------------------------------------------------------
@@ -155,4 +138,21 @@ vm-string A String with either the ID or the name of the machine to find"
   ;; you can also obtain attributes from the machine one by one
   (with-no-session my-machine [machine]
     (.getMemorySize machine))
- )
+  )
+
+(comment
+  (use '[vmfest.virtualbox.virtualbox :as vbox])
+  (def my-machine (vbox/find-machine "http://localhost:18083" "" "" "CentOS Minimal"))
+  (use 'vmfest.virtualbox.model)
+  (as-map my-machine)
+  (use '[vmfest.virtualbox.machine :as machine])
+  (machine/start my-machine)
+  (machine/stop my-machine)
+  (def server (vmfest.virtualbox.model.Server. "http://localhost:18083" "" ""))
+  (vbox/machines server)
+  (use '[vmfest.virtualbox.session :as session])
+  (session/with-no-session my-machine [machine]
+    (.getMemorySize machine))
+  (session/with-direct-session my-machine [session machine]
+    (.setMemorySize machine (long 1024))
+    (.saveSettings machine)))

@@ -69,7 +69,7 @@
 (extend-type vmfest.virtualbox.model.Machine
   model/vbox-object
   (soak [this vbox]
-        (virtualbox/find-machine-obj vbox (:id this)))
+        (virtualbox/find-vb-m vbox (:id this)))
   (as-map [this]
           (session/with-vbox (:server this) [_ vbox]
             (let [machine (soak this vbox)]

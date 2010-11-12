@@ -1,7 +1,7 @@
 (ns vmfest.virtualbox.guest-os-type
-  (:use [clojure.contrib.logging :as log]
-        [vmfest.virtualbox.session :as session]
-        [vmfest.virtualbox.model :as model])
+  (:require [clojure.contrib.logging :as log]
+            [vmfest.virtualbox.session :as session]
+            [vmfest.virtualbox.model :as model])
   (:import [com.sun.xml.ws.commons.virtualbox_3_2 IGuestOSType]))
 
 (defn map-from-IGuestOSType
@@ -36,6 +36,6 @@
         (.getGuestOSType vbox (:id this)))
   (as-map [this]
           (session/with-vbox (:server this) [_ vbox]
-            (let [object (soak this vbox)]
+            (let [object (model/soak this vbox)]
               (merge this
                      (map-from-IGuestOSType object))))))

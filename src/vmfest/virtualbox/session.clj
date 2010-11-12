@@ -1,5 +1,5 @@
 (ns vmfest.virtualbox.session
-  (:use [clojure.contrib.logging :as log]
+  (:require [clojure.contrib.logging :as log]
         [vmfest.virtualbox.conditions :as conditions]
         [vmfest.virtualbox.model :as model])
   (:import [com.sun.xml.ws.commons.virtualbox_3_2
@@ -22,7 +22,7 @@
     (try 
       (.logon mgr username password)
       (catch com.sun.xml.internal.ws.client.ClientTransportException e
-        (log-and-raise e :error
+        (conditions/log-and-raise e :error
                        (format "Cannot connect to virtualbox server: '%s'" (.getMessage e))
                        :connection-error))))
  ([^Server server]
@@ -90,7 +90,7 @@
        (with-vbox (:server ~machine) [mgr# vbox#]
          (with-open [~session (.getSessionObject mgr# vbox#)]
            (.openExistingSession vbox# ~session machine-id#)
-           (trace (str "new remote session is open for machine-id=" machine-id#))
+           (log/trace (str "new remote session is open for machine-id=" machine-id#))
            (let [~console (.getConsole ~session)]
              (try
                ~@body

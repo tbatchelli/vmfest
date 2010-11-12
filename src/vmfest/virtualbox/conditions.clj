@@ -1,6 +1,6 @@
 (ns vmfest.virtualbox.conditions
-  (:use [clojure.contrib.logging :as log]
-        clojure.contrib.condition))
+  (:use clojure.contrib.condition)
+  (:require [clojure.contrib.logging :as log]))
 
 (defn unsigned-int-to-long [ui]
   (bit-and (long ui) 0xffffffff))

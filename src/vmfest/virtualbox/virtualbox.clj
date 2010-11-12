@@ -1,11 +1,9 @@
 (ns vmfest.virtualbox.virtualbox
-  (:use [clojure.contrib.logging :as log]
-        [vmfest.virtualbox.conditions :as conditions]
-        [vmfest.virtualbox.model :as model]
-        [vmfest.virtualbox.session :as session])
-  (:require vmfest.virtualbox.model
-            vmfest.virtualbox.machine
-            vmfest.virtualbox.guest-os-type)
+  (:require [clojure.contrib.logging :as log]
+            [vmfest.virtualbox.model :as model]
+            [vmfest.virtualbox.conditions :as conditions]
+            [vmfest.virtualbox.session :as session]
+            vmfest.virtualbox.guest-os-type) 
   (:import [com.sun.xml.ws.commons.virtualbox_3_2
             IWebsessionManager
             IVirtualBox]
@@ -36,7 +34,10 @@
   (let [server (Server. url login password)]
        (session/with-vbox server [mgr vbox]
          (when-let [vb-m (find-vb-m vbox id-or-name)]
-           (dry vb-m server)))))
+           (model/dry vb-m server)))))
+
+;; I can't require this until find-machine is defined.
+(require 'vmfest.virtualbox.machine)
 
 (comment
   ;;----------------------------------------------------------

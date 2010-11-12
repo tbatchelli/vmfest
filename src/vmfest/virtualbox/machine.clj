@@ -1,9 +1,9 @@
 (ns vmfest.virtualbox.machine
-  (:use [clojure.contrib.logging :as log]
-        [vmfest.virtualbox.session :as session]
-        [vmfest.virtualbox.virtualbox :as virtualbox]
-        [vmfest.virtualbox.conditions :as conditions]
-        [vmfest.virtualbox.model :as model])
+  (:require [clojure.contrib.logging :as log]
+           [vmfest.virtualbox.session :as session]
+           [vmfest.virtualbox.virtualbox :as virtualbox]
+           [vmfest.virtualbox.conditions :as conditions]
+           [vmfest.virtualbox.model :as model])
   (:import [com.sun.xml.ws.commons.virtualbox_3_2 IMachine]
            [vmfest.virtualbox.model GuestOsType Machine]))
 
@@ -15,7 +15,7 @@
    :access-error (.getAccessError vb-m) ;; todo. get object
    :os-type (let [type-id (.getOSTypeId vb-m)
                   object (GuestOsType. type-id server)]
-              (as-map object))
+              (model/as-map object))
    :hardware-version (.getHardwareVersion vb-m)
    :hardware-uuid (.getHardwareUUID vb-m)
    :cpu-count (.getCPUCount vb-m)
@@ -72,7 +72,7 @@
         (virtualbox/find-vb-m vbox (:id this)))
   (as-map [this]
           (session/with-vbox (:server this) [_ vbox]
-            (let [machine (soak this vbox)]
+            (let [machine (model/soak this vbox)]
               (merge this
                      (map-from-IMachine machine (:server this)))))))
 
@@ -90,7 +90,7 @@
           session-type  "gui"
           env "DISPLAY:0.0"]
       (try (let [progress (.openRemoteSession vbox session machine-id session-type env)]
-             (debug (str "Starting session for VM " machine-id "..."))
+             (log/debug (str "Starting session for VM " machine-id "..."))
              (.waitForCompletion progress 10000)
              (let [result-code (.getResultCode progress)]
                (if (zero? result-code)

@@ -75,7 +75,7 @@
   [^Machine machine [vb-m] & body]
   `(try
      (with-vbox (:server ~machine) [_# vbox#]
-       (let [~vb-m (soak ~machine vbox#)] 
+       (let [~vb-m (model/soak ~machine vbox#)] 
          ~@body))
       (catch java.lang.IllegalArgumentException e#
          (conditions/log-and-raise e# :error "Called a method that is not available without a session"

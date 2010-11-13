@@ -1,6 +1,11 @@
 (ns vmfest.virtualbox.conditions
   (:use clojure.contrib.condition)
-  (:require [clojure.contrib.logging :as log]))
+  (:require [clojure.contrib.logging :as log])
+  (:import [org.virtualbox_3_2
+            InvalidObjectFault
+            InvalidObjectFaultMsg
+            RuntimeFault
+            RuntimeFaultMsg]))
 
 (defn unsigned-int-to-long [ui]
   (bit-and (long ui) 0xffffffff))
@@ -28,21 +33,39 @@
    2147942487 :VBOX_E_INVALIDARG,
    2147549183 :VBOX_E_UNEXPECTED})
 
+(defprotocol fault
+  (as-map [this]))
+
+(extend-protocol fault
+  java.lang.Throwable
+  (as-map [this]
+          (log/debug (format "Processing exception %s as a java.lang.Throwable. Cause %s" (class this) (.getCause this)))
+          {:original-message (.getMessage this)
+           :cause (.getCause this)
+           :type :runtime})
+  RuntimeFaultMsg
+  (as-map [this]
+          (let [message (.getMessage this)
+                info (try (.getFaultInfo this)
+                        (catch Exception e)) ;; runtime fault
+                interface-id (when info (.getInterfaceID info))
+                component (when info (.getComponent info))
+                result-code (when info (unsigned-int-to-long (int (.getResultCode info)))) ;; originally an unsigned int
+                text (when info (.getText info))]
+            {:original-message message
+             :origin-id interface-id
+             :origin-component component
+             :error-code result-code
+             :original-error-type (*error-code-map* result-code)
+             :text text}))
+  InvalidObjectFaultMsg
+  (as-map [this]
+          (let [bad-object-id (.getBadObjectId this)]
+            {:original-message (.getMessage this)
+             :bad-object-id bad-object-id})))
+
 (defn condition-from-webservice-exception [e]
-  (when (instance? javax.xml.ws.WebServiceException e)
-    (let [rfm (.getCause e) ;;runtime fault message
-          message (.getMessage rfm)
-          rf (.getFaultInfo rfm) ;; runtime fault
-          interface-id (.getInterfaceID rf)
-          component (.getComponent rf)
-          result-code (unsigned-int-to-long (int (.getResultCode rf))) ;; originally an unsigned int
-          text (.getText rf)]
-      {:original-message message
-       :origin-id interface-id
-       :origin-component component
-       :error-code result-code
-       :original-error-type (*error-code-map* result-code)
-       :text text})))
+  (as-map (.getCause e)))
 
 (defn log-and-raise [exception log-level message type & kvs]
   (let [optional-keys (apply hash-map kvs)
@@ -55,10 +78,12 @@
 
 (comment
   ;; error handling using conditions
-  (def my-no-machine
-       (vmfest.virtualbox.model.Server. "http://localhost:18083" "" "" "bogus")) ;; a bogus machine
+  (use 'vmfest.virtualbox.virtualbox)
+  (def my-server (vmfest.virtualbox.model.Server. "http://localhost:18083" "" "") )
+  (def my-no-machine (vmfest.virtualbox.model.Machine. "bogus" my-server nil)) ;; a bogus machine
 
   (use 'vmfest.virtualbox.machine)
+  (use 'clojure.contrib.condition)
   ;; handle error based on original error type
   (handler-case :original-error-type 
                    (start my-no-machine)

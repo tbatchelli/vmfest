@@ -19,6 +19,14 @@
   (session/with-vbox server [_ vbox]
     (doall (map #(model/dry % server) (.getMachines vbox)))))
 
+(defn get-vb-m
+  "Gets the virtual machine corresponding to the supplied id. If such machine can't be found,
+ it will raise a conditions."
+  [vbox id]
+  (try (.getMachine vbox id)
+       (catch Exception e
+         (conditions/log-and-raise e :error "Machine not found." ))))
+
 (defn find-vb-m
   ([vbox id-or-name]
       (try
@@ -27,9 +35,16 @@
           (try
             (.findMachine vbox id-or-name)
             (catch Exception e
-              (conditions/log-and-raise e :warn
-                                        (format "There is no machine identified by '%s'" id-or-name)
-                                        :object-not-found)))))))
+              (log/warn (format "Machine identified by '%s' not found."
+                                id-or-name))))))))
+
+(defn get-machine
+  "Will raise a condition if machine cannot be found."
+  [url login password id]
+  (let [server (Server. url login password)]
+       (session/with-vbox server [mgr vbox]
+         (when-let [vb-m (get-vb-m vbox id)]
+           (model/dry vb-m server)))))
 
 (defn find-machine [url login password id-or-name]
   (let [server (Server. url login password)]

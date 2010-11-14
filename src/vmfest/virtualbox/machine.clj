@@ -103,7 +103,7 @@ Optional parameters are:
                  nil
                  true)))
            (catch Exception e#
-             (conditions/log-and-raise e# :error "An error occurred" :unknown))))))
+             (conditions/log-and-raise e# :error "An error occurred"))))))
 
 (defn stop 
   [^Machine m]

@@ -14,14 +14,10 @@
 (defonce *error-code-map*
   {0 :VBOX_E_UNKNOWN,
    2159738881 :VBOX_E_OBJECT_NOT_FOUND,
-   2147500033 :VBOX_E_NOTIMPL,
    2159738882 :VBOX_E_INVALID_VM_STATE,
    2159738883 :VBOX_E_VM_ERROR,
-   2147500035 :VBOX_E_POINTER,
    2159738884 :VBOX_E_FILE_ERROR,
-   2147942405 :VBOX_E_ACCESSDENIED,
    2159738885 :VBOX_E_IPRT_ERROR,
-   2147500037 :VBOX_E_FAIL,
    2159738886 :VBOX_E_PDM_ERROR,
    2159738887 :VBOX_E_INVALID_OBJECT_STATE,
    2159738888 :VBOX_E_HOST_ERROR,
@@ -29,20 +25,31 @@
    2159738890 :VBOX_E_XML_ERROR,
    2159738891 :VBOX_E_INVALID_SESSION_STATE,
    2159738892 :VBOX_E_OBJECT_IN_USE,
-   2147942414 :VBOX_E_OUTOFMEMORY,
-   2147942487 :VBOX_E_INVALIDARG,
-   2147549183 :VBOX_E_UNEXPECTED})
+   2147942405 :E_ACCESSDENIED,
+   2147500035 :E_POINTER,
+   2147500037 :E_FAIL,
+   2147500033 :E_NOTIMPL,
+   2147942414 :E_OUTOFMEMORY,
+   2147942487 :E_INVALIDARG,
+   2147549183 :E_UNEXPECTED})
 
 (defprotocol fault
   (as-map [this]))
 
 (extend-protocol fault
-  java.lang.Throwable
+  java.lang.Exception
   (as-map [this]
-          (log/debug (format "Processing exception %s as a java.lang.Throwable. Cause %s" (class this) (.getCause this)))
+          (log/warn (format "Processing exception %s as a java.lang.Exception. Cause %s" (class this) (.getCause this)))
           {:original-message (.getMessage this)
            :cause (.getCause this)
-           :type :runtime})
+           :type :exception
+           })
+  java.net.ConnectException 
+  (as-map [this]
+          {:type :connection-error})
+  com.sun.xml.internal.ws.client.ClientTransportException
+  (as-map [this]
+          {:type :connection-error})
   RuntimeFaultMsg
   (as-map [this]
           (let [message (.getMessage this)
@@ -52,7 +59,8 @@
                 component (when info (.getComponent info))
                 result-code (when info (unsigned-int-to-long (int (.getResultCode info)))) ;; originally an unsigned int
                 text (when info (.getText info))]
-            {:original-message message
+            {:type :vbox-runtime
+             :original-message message
              :origin-id interface-id
              :origin-component component
              :error-code result-code
@@ -60,21 +68,33 @@
              :text text}))
   InvalidObjectFaultMsg
   (as-map [this]
-          (let [bad-object-id (.getBadObjectId this)]
-            {:original-message (.getMessage this)
-             :bad-object-id bad-object-id})))
+          {:type :vbox-invalid-object
+           :original-message (.getMessage this)
+           :bad-object-id (.getBadObjectId this)}))
 
 (defn condition-from-webservice-exception [e]
   (as-map (.getCause e)))
 
-(defn log-and-raise [exception log-level message type & kvs]
+(defn log-and-raise [exception log-level message & kvs]
   (let [optional-keys (apply hash-map kvs)
         full-message (str message ":" (.getMessage exception))]
     (log/log log-level message)
-    (raise (merge (assoc optional-keys :type type
-                         :message full-message
-                         :cause exception)
-                  (condition-from-webservice-exception exception)))))
+    (raise (merge {:message full-message
+                   :cause exception
+                   :stack-trace (stack-trace-info exception)}
+                  (condition-from-webservice-exception exception)
+                  optional-keys))))
+
+(defmacro handle-vbox-runtime [& type-action-pairs]
+  `(condp = (:original-error-type *condition*)
+       ~@type-action-pairs
+     (raise *condition*)))
+
+(defmacro re-log-and-raise [log-level message & kvs]
+  `(apply log-and-raise (:cause clojure.contrib.condition/*condition*)
+          ~log-level
+          ~message
+          (apply concat (assoc clojure.contrib.condition/*condition* ~@kvs))))
 
 (comment
   ;; error handling using conditions
@@ -84,9 +104,23 @@
 
   (use 'vmfest.virtualbox.machine)
   (use 'clojure.contrib.condition)
+  (use 'vmfest.virtualbox.conditions)
   ;; handle error based on original error type
-  (handler-case :original-error-type 
-                   (start my-no-machine)
-                   (handle :VBOX_E_OBJECT_NOT_FOUND (println "No such machine exists ")))
-  ;; -> No such machine exists
-  )
+  (handler-case :type
+    (start my-no-machine)
+    (handle :connection-error (println "Server not started or wrong url "))
+    (handle :vbox-runtime
+      (handle-vbox-runtime :VBOX_E_OBJECT_NOT_FOUND "The machine does not exist!"
+                           :VBOX_E_HOST_ERROR "Something happened!")))
+  ;; ->The machine does not exist!
+  (handler-case :type
+    (handler-case :type
+      (start my-no-machine)
+      (handle :connection-error (println "Server not started or wrong url "))
+      (handle :vbox-runtime
+        (handle-vbox-runtime :VBOX_E_OBJECT_NOT_FOUND
+                             (re-log-and-raise :warn "nah! not that bad!" :type :new-type)
+                             :VBOX_E_HOST_ERROR "Something happened!")))
+    (handle :new-type (str "Nothing to see here, move along..."
+                           (:message *condition*))))
+)

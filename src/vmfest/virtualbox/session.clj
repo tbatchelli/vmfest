@@ -23,8 +23,7 @@
       (.logon mgr username password)
       (catch com.sun.xml.internal.ws.client.ClientTransportException e
         (conditions/log-and-raise e :error
-                       (format "Cannot connect to virtualbox server: '%s'" (.getMessage e))
-                       :connection-error))))
+                       (format "Cannot connect to virtualbox server: '%s'" (.getMessage e))))))
  ([^Server server]
     (let [{:keys [url username password]} server
           mgr (create-session-manager url)]
@@ -46,7 +45,7 @@
        (finally (when ~vbox
                   (try (.logoff ~mgr ~vbox)
                        (catch Exception e#
-                         (conditions/log-and-raise e# :warn "unable to close session" :communication))))))))
+                         (conditions/log-and-raise e# :error "unable to close session"))))))))
 
 (defmacro with-direct-session
   [machine [session vb-m] & body]
@@ -60,16 +59,14 @@
              (try
                ~@body
                (catch java.lang.IllegalArgumentException e#
-                 (conditions/log-and-raise e#
-                                :error
+                 (conditions/log-and-raise e# :error
                                 (format "Called a method that is not available with a direct session in '%s'" '~body)
-                                :invalid-method)))))))
+                                :type :invalid-method)))))))
      (catch Exception e# 
        (conditions/log-and-raise e# :error
                       (format "Cannot open session with machine '%s' reason:%s"
                               (:id ~machine)
-                              (.getMessage e#))
-                      :connection-error))))
+                              (.getMessage e#))))))
 
 (defmacro with-no-session
   [^Machine machine [vb-m] & body]
@@ -79,9 +76,9 @@
          ~@body))
       (catch java.lang.IllegalArgumentException e#
          (conditions/log-and-raise e# :error "Called a method that is not available without a session"
-                        :method-not-available))
+                        :type :invalid-method))
        (catch Exception e#
-         (conditions/log-and-raise e# :error "An error occurred" :unknown))))
+         (conditions/log-and-raise e# :error "An error occurred"))))
 
 (defmacro with-remote-session
   [^Machine machine [session console] & body]
@@ -96,9 +93,9 @@
                ~@body
                (catch java.lang.IllegalArgumentException e#
                  (conditions/log-and-raise e# :error "Called a method that is not available without a session"
-                                :method-not-available)))))))
+                                :type :invalid-method)))))))
      (catch Exception e#
-       (conditions/log-and-raise e# :error "An error occurred" :unknown))))
+       (conditions/log-and-raise e# :error "An error occurred"))))
 
 
 (comment

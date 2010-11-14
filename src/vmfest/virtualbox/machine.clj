@@ -83,12 +83,18 @@
          (vmfest.virtualbox.model.Machine. id server nil))))
 
 (defn start
-  [^Machine machine]
+  "Starts the virtual machine represented by 'machine'.
+
+Optional parameters are:
+   :session-type 'gui', 'vrdp' or 'sdl'. Default is 'gui'
+   :env environment as String to be passed to the machine at startup. See IVirtualbox::openRemoteSession for more details"
+  [^Machine machine & opt-kv]
   (session/with-vbox (:server machine) [mgr vbox]
-    (let [machine-id (:id machine)
+    (let [opts (apply hash-map opt-kv)
+          machine-id (:id machine)
           session (.getSessionObject mgr vbox)
-          session-type  "gui"
-          env "DISPLAY:0.0"]
+          session-type  (or (:session-type opts) "gui")
+          env (or (:env opts) "DISPLAY:0.0")]
       (try (let [progress (.openRemoteSession vbox session machine-id session-type env)]
              (log/debug (str "Starting session for VM " machine-id "..."))
              (.waitForCompletion progress 10000)

@@ -5,7 +5,7 @@
            [vmfest.virtualbox.conditions :as conditions]
            [vmfest.virtualbox.model :as model])
   (:import [com.sun.xml.ws.commons.virtualbox_3_2 IMachine]
-           [vmfest.virtualbox.model GuestOsType Machine]))
+           [vmfest.virtualbox.model GuestOsType Machine]y))
 
 (defn map-from-IMachine
   [^IMachine vb-m server]
@@ -69,7 +69,7 @@
 (extend-type vmfest.virtualbox.model.Machine
   model/vbox-object
   (soak [this vbox]
-        (virtualbox/find-vb-m vbox (:id this)))
+        (virtualbox/get-vb-m vbox (:id this)))
   (as-map [this]
           (session/with-vbox (:server this) [_ vbox]
             (let [machine (model/soak this vbox)]
@@ -102,8 +102,18 @@ Optional parameters are:
                (if (zero? result-code)
                  nil
                  true)))
-           (catch Exception e#
-             (conditions/log-and-raise e# :error "An error occurred"))))))
+           (catch javax.xml.ws.WebServiceException e
+             (conditions/wrap-vbox-runtime
+              e
+              {:E_UNEXPECTED {:message "Virtual Machine not registered."}
+               :E_INVALIDARG {:message (format "Invalid session type '%s'" session-type)}
+               :VBOX_E_OBJECT_NOT_FOUND {:message (format "No machine matching id '%s' found." machine-id)}
+               :VBOX_E_INVALID_OBJECT_STATE {:message "Session already open or opening."}
+               :VBOX_E_IPTR_ERROR {:message "Launching process for machine failed."}
+               :VBOX_E_VM_ERROR {:message "Failed to assign machine to session."}}))
+           (catch Exception e
+             (conditions/log-and-raise e {:log-level :error
+                                          :message "An error occurred while starting machine"}))))))
 
 (defn stop 
   [^Machine m]

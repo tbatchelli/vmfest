@@ -25,7 +25,10 @@
   [vbox id]
   (try (.getMachine vbox id)
        (catch Exception e
-         (conditions/log-and-raise e :error "Machine not found." ))))
+         (conditions/log-and-raise e {:log-error :error
+                                      :message (format "The machine with id='%s' is not found in %s."
+                                                       id
+                                                       (:url (:server vbox)))}))))
 
 (defn find-vb-m
   ([vbox id-or-name]

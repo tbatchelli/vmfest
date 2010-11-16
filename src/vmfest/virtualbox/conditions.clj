@@ -75,9 +75,10 @@
 (defn condition-from-webservice-exception [e]
   (as-map (.getCause e)))
 
-(defn log-and-raise [exception log-level message & kvs]
-  (let [optional-keys (apply hash-map kvs)
-        full-message (str message ":" (.getMessage exception))]
+(defn log-and-raise [exception optional-keys]
+  (let [log-level (or (:log-level optional-keys) :error)
+        message (or (:message optional-keys) "An exception occurred.")
+        full-message (str message ": " (.getMessage exception))]
     (log/log log-level message)
     (raise (merge {:message full-message
                    :cause exception
@@ -85,16 +86,28 @@
                   (condition-from-webservice-exception exception)
                   optional-keys))))
 
-(defmacro handle-vbox-runtime [& type-action-pairs]
-  `(condp = (:original-error-type *condition*)
-       ~@type-action-pairs
-     (raise *condition*)))
+(defn wrap-vbox-runtime [e error-condition-map & default-condition-map]
+  (let [condition (condition-from-webservice-exception e)
+        error-type (:original-error-type condition)
+        condition-map (error-type error-condition-map) ;; the map corresponding to the error type
+        merged-condition (merge default-condition-map condition-map)]
+    (log-and-raise e merged-condition)))
 
-(defmacro re-log-and-raise [log-level message & kvs]
-  `(apply log-and-raise (:cause clojure.contrib.condition/*condition*)
-          ~log-level
-          ~message
-          (apply concat (assoc clojure.contrib.condition/*condition* ~@kvs))))
+(defn handle-vbox-runtime* [condition type-action-map]
+  (let [error-type (:original-error-type condition)
+        action (error-type type-action-map)]
+    (if action action
+        (raise condition))))
+
+(defmacro handle-vbox-runtime [type-action-map]
+  `(handle-vbox-runtime* *condition* ~type-action-map))
+
+(defn re-log-and-raise* [condition optional-keys]
+  (log-and-raise (:cause condition)
+                 (merge condition optional-keys)))
+
+(defmacro re-log-and-raise [optional-keys]
+  `(re-log-and-raise* *condition* ~optional-keys))
 
 (comment
   ;; error handling using conditions
@@ -104,23 +117,25 @@
 
   (use 'vmfest.virtualbox.machine)
   (use 'clojure.contrib.condition)
-  (use 'vmfest.virtualbox.conditions)
+  (require '[vmfest.virtualbox.conditions :as conditions])
   ;; handle error based on original error type
   (handler-case :type
     (start my-no-machine)
     (handle :connection-error (println "Server not started or wrong url "))
     (handle :vbox-runtime
-      (handle-vbox-runtime :VBOX_E_OBJECT_NOT_FOUND "The machine does not exist!"
-                           :VBOX_E_HOST_ERROR "Something happened!")))
+      (conditions/handle-vbox-runtime {:VBOX_E_OBJECT_NOT_FOUND "The machine does not exist!"
+                           :VBOX_E_HOST_ERROR "Something happened!"})))
   ;; ->The machine does not exist!
+
   (handler-case :type
     (handler-case :type
       (start my-no-machine)
-      (handle :connection-error (println "Server not started or wrong url "))
+      (handle :connection-error
+        (println "Server not started or wrong url "))
       (handle :vbox-runtime
-        (handle-vbox-runtime :VBOX_E_OBJECT_NOT_FOUND
-                             (re-log-and-raise :warn "nah! not that bad!" :type :new-type)
-                             :VBOX_E_HOST_ERROR "Something happened!")))
-    (handle :new-type (str "Nothing to see here, move along..."
-                           (:message *condition*))))
+        (conditions/handle-vbox-runtime {:VBOX_E_OBJECT_NOT_FOUND
+                              (conditions/re-log-and-raise {:warn "nah! not that bad!" :type :new-type})
+                              :VBOX_E_HOST_ERROR "Something happened!"})))
+    (handle :new-type "Nothing to see here, move along..." ))
+  
 )

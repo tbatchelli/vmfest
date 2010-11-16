@@ -1,5 +1,5 @@
 (ns vmfest.test.core
-  (:use [vmfest.core] :reload)
+  (:use [vmfest.virtualbox.virtualbox] :reload)
   (:use [clojure.test]))
 
 (deftest replace-me ;; FIXME: write

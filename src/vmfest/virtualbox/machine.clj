@@ -5,7 +5,7 @@
            [vmfest.virtualbox.conditions :as conditions]
            [vmfest.virtualbox.model :as model])
   (:import [com.sun.xml.ws.commons.virtualbox_3_2 IMachine]
-           [vmfest.virtualbox.model GuestOsType Machine]y))
+           [vmfest.virtualbox.model GuestOsType Machine]))
 
 (defn map-from-IMachine
   [^IMachine vb-m server]

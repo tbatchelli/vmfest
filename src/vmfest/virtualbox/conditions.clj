@@ -73,7 +73,10 @@
            :bad-object-id (.getBadObjectId this)}))
 
 (defn condition-from-webservice-exception [e]
-  (as-map (.getCause e)))
+  (let [cause (.getCause e)]
+    (if cause
+      (as-map cause)
+      (as-map e))))
 
 (defn log-and-raise [exception optional-keys]
   (let [log-level (or (:log-level optional-keys) :error)

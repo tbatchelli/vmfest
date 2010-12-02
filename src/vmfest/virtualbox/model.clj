@@ -5,6 +5,7 @@
 (defrecord Location [servers])
 (defrecord Machine [id server location])
 (defrecord GuestOsType [id server])
+(defrecord HardDisk [id server])
 
 (defprotocol vbox-object
   (as-map [this])

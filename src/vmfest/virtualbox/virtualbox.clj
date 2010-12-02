@@ -30,6 +30,15 @@
                                                        id
                                                        (:url (:server vbox)))}))))
 
+(defn get-hard-disk
+  [vbox id]
+  (try (.getHardDisk vbox id)
+       (catch Exception e
+         (conditions/log-and-raise e {:log-error :error
+                                      :message (format "The hard disk with id='%s' is not found in %s."
+                                                       id
+                                                       (:url (:server vbox)))}))))
+
 (defn find-vb-m
   ([vbox id-or-name]
       (try
@@ -40,6 +49,16 @@
             (catch Exception e
               (log/warn (format "Machine identified by '%s' not found."
                                 id-or-name))))))))
+
+(defn find-hard-disk
+  [vbox id-or-location]
+  (try
+    (.getHardDisk vbox id-or-location)
+    (catch Exception e
+      (try (.findHardDisk vbox id-or-location)
+           (catch Exception e
+             (log/warn (format "Can't find a hard disk located in '%s'."
+                               id-or-location)))))))
 
 (defn get-machine
   "Will raise a condition if machine cannot be found."

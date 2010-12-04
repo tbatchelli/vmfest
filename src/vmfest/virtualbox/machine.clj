@@ -3,7 +3,8 @@
            [vmfest.virtualbox.session :as session]
            [vmfest.virtualbox.virtualbox :as virtualbox]
            [vmfest.virtualbox.conditions :as conditions]
-           [vmfest.virtualbox.model :as model])
+           [vmfest.virtualbox.model :as model]
+           [vmfest.virtualbox.enums :as enums])
   (:import [com.sun.xml.ws.commons.virtualbox_3_2 IMachine]
            [vmfest.virtualbox.model GuestOsType Machine]))
 
@@ -28,9 +29,10 @@
    :accelerate-2d-video-enabled? (.getAccelerate2DVideoEnabled vb-m)
    :monitor-count (.getMonitorCount vb-m)
    :bios-settings (.getBIOSSettings vb-m) ;todo: get object
-   :firmware-type (.getFirmwareType vb-m) ;todo: get object
-   :pointing-hid-type (.getPointingHidType vb-m) ;todo: get object
-   :keyboard-hid-type (.getKeyboardHidType vb-m) ;todo: get object
+   :firmware-type (do (println "firmware-type" (.getFirmwareType vb-m))
+                      (enums/firmware-type-to-key (.getFirmwareType vb-m))) ;todo: get object
+   :pointing-hid-type (enums/pointing-hid-type-to-key (.getPointingHidType vb-m)) ;todo: get object
+   :keyboard-hid-type (enums/keyboard-hid-type-to-key (.getKeyboardHidType vb-m)) ;todo: get object
    :hpet-enabled (.getHpetEnabled vb-m)
    :snapshot-folder (.getSnapshotFolder vb-m)
    :vrdp-server (.getVRDPServer vb-m) ;todo: get object
@@ -43,10 +45,10 @@
    :settings-file-path (.getSettingsFilePath vb-m)
    :settings-modified? (try (.getSettingsModified vb-m)
                             (catch Exception e (comment "Do nothing")))
-   :session-state (.getSessionState vb-m) ;todo: get object
-   :session-type (.getSessionType vb-m)
+   :session-state (enums/session-state-to-key (.getSessionState vb-m)) ;todo: get object
+   :session-type (enums/session-type-to-key (.getSessionType vb-m))
    :session-pid (.getSessionPid vb-m)
-   :state (.getState vb-m) ;todo: get object
+   :state (enums/machine-state-to-key (.getState vb-m)) ;todo: get object
    :last-state-change (.getLastStateChange vb-m) ;todo: make-date?
    :state-file-path (.getStateFilePath vb-m)
    :logFolder (.getLogFolder vb-m)
@@ -54,7 +56,7 @@
    :snapshot-count (.getSnapshotCount vb-m)
    :current-state-modified? (.getCurrentStateModified vb-m)
    :shared-folders (.getSharedFolders vb-m) ;todo: get objects
-   :clipboard-mode (.getClipboardMode vb-m) ;todo: get object
+   :clipboard-mode (enums/clipboard-mode-to-key (.getClipboardMode vb-m)) ;todo: get object
    :guest-property-notification-patterns (.getGuestPropertyNotificationPatterns vb-m)
    :teleporter-enabled? (.getTeleporterEnabled vb-m)
    :teleporter-port (.getTeleporterPort vb-m)

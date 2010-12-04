@@ -66,6 +66,48 @@
    :io-bandwidth-max (.getIoBandwidthMax vb-m)
    })
 
+(def setters
+  {:name #(.setName %2 %1)
+   :description #(.setDescription %2 %1)
+   :os-type-id #(.setOSTypeId %2 %1) ;; name is correct?
+   :hardware-version #(.setHardwareVersion %2 %1)
+   :hardware-uuid #(.setHardwareUUID %2 %1)
+   :cpu-count #(.setCPUCount %2 %1)
+   :cpu-hot-plug-enabled? #(.setCPUHotPlugEnabled %2 %1)
+   :memory-size #(.setMemorySize %2 %1)
+   :memory-balloon-size #(.setMemoryBalloonSize %2 %1)
+   :page-fusion-enabled? #(.setPageFusionEnabled %2 %1)
+   :vram-size #(.setVRAMSize %2 %1)
+   :accelerate-3d-enabled? #(.setAccelerate3DEnabled %2 %1)
+   :accelerate-2d-enabled? #(.setAccelerate2DEnabled %2 %1)
+   :monitor-count #(.setMonitorCount %2 %1)
+   :firmware-type #(.setFirmwareType %2 %1)
+   :pointing-hid-type #(.setPointingHidType %2 %1)
+   :keyboard-hid-type #(.setKeyboardHidType %2 %1)
+   :hpet-enabled #(.setHpetEnabled %2 %1)
+   :snapshot-folder #(.setSnapshotFolder %2 %1)
+   :clipboard-mode #(.setClipboardMode %2 %1)
+   :teleporter-enabled? #(.setTeleporterEnabled %2 %1)
+   :guest-property-notification-patters #(.setGuestPropertyNotificationPatterns %2 %1)
+   :teleporter-port #(.setTeleporterPort %2 %1)
+   :teleporter-address #(.setTeleporterAddress %2 %1)
+   :teleporter-password #(.setTeleporterAddress %2 %1)
+   :rtc-use-utc? #(.setRTCUseUTC %2 %1)
+   :io-cache-enabled? #(.setIoCacheEnabled %2 %1)
+   :io-cache-size #(.setIoCacheSize %2 %1)
+   :io-bandwidth-max #(.setIoBandwidthMax %2 %1)})
+
+(defn set-map [vb-m value-map]
+  (session/with-direct-session vb-m [_ m]
+    (let [get-setter (fn [k] (k setters))
+          set-fn (fn [[k v]]
+                   (let [setter (get-setter k)]
+                     (if setter
+                       (setter v m)
+                       (log/error (str "IMachine has no setter defined for " k)))))] 
+      (doall (map set-fn value-map))
+      (.saveSettings m))))
+
 (extend-type vmfest.virtualbox.model.Machine
   model/vbox-object
   (soak [this vbox]

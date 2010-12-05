@@ -10,7 +10,7 @@
    :family-description (.getFamilyDescription o)
    :id (.getId o)
    :description (.getDescription o)
-   :is64Bit? (.isIs64Bit o)
+   :64-bit? (.isIs64Bit o)
    :recommended-io-apic? (.isRecommendedIOAPIC o)
    :recommended-virt-ex? (.isRecommendedVirtEx o)
    :recommended-ram (.getRecommendedRAM o)

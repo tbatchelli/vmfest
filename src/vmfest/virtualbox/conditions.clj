@@ -117,7 +117,7 @@
   (use 'vmfest.virtualbox.virtualbox)
   (def my-server (vmfest.virtualbox.model.Server. "http://localhost:18083" "" "") )
   (def my-no-machine (vmfest.virtualbox.model.Machine. "bogus" my-server nil)) ;; a bogus machine
-
+  
   (use 'vmfest.virtualbox.machine)
   (use 'clojure.contrib.condition)
   (require '[vmfest.virtualbox.conditions :as conditions])
@@ -140,5 +140,4 @@
                               (conditions/re-log-and-raise {:warn "nah! not that bad!" :type :new-type})
                               :VBOX_E_HOST_ERROR "Something happened!"})))
     (handle :new-type "Nothing to see here, move along..." ))
-  
-)
+  )

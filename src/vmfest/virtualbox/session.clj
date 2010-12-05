@@ -9,13 +9,13 @@
             Server
             Machine]))
 
-(defn- ^IWebsessionManager create-session-manager
+(defn ^IWebsessionManager create-session-manager
    "Creates a IWebsessionManager. Note that the default port is 18083"
    [url]
    (log/debug (str "Creating session manager for " url))
    (IWebsessionManager. url))
 
-(defn- ^IVirtualBox create-vbox
+(defn ^IVirtualBox create-vbox
  "TODO"
  ([^IWebsessionManager mgr username password]
     (log/debug (str "creating new vbox with a logon for user " username))

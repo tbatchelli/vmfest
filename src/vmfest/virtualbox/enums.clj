@@ -117,6 +117,7 @@
 (defn key-to-session-state [key]
   (find-value-by-key key session-state-to-key-table))
 
+;;; SessionType
 (def session-type-to-key-table
   [[SessionType/NULL :null ""]
    [SessionType/DIRECT :direct ""]

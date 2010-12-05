@@ -25,19 +25,23 @@
   [vbox id]
   (try (.getMachine vbox id)
        (catch Exception e
-         (conditions/log-and-raise e {:log-error :error
-                                      :message (format "The machine with id='%s' is not found in %s."
-                                                       id
-                                                       (:url (:server vbox)))}))))
+         (conditions/log-and-raise
+          e
+          {:log-error :error
+           :message (format "The machine with id='%s' is not found in %s."
+                            id
+                            (:url (:server vbox)))}))))
 
 (defn get-hard-disk
   [vbox id]
   (try (.getHardDisk vbox id)
        (catch Exception e
-         (conditions/log-and-raise e {:log-error :error
-                                      :message (format "The hard disk with id='%s' is not found in %s."
-                                                       id
-                                                       (:url (:server vbox)))}))))
+         (conditions/log-and-raise
+          e
+          {:log-error :error
+           :message (format "The hard disk with id='%s' is not found in %s."
+                            id
+                            (:url (:server vbox)))}))))
 
 (defn find-vb-m
   ([vbox id-or-name]
@@ -73,6 +77,34 @@
        (session/with-vbox server [mgr vbox]
          (when-let [vb-m (find-vb-m vbox id-or-name)]
            (model/dry vb-m server)))))
+
+(defn guest-os-types [server] 
+  (session/with-vbox server [mgr vbox]
+    (let [get-keys (fn [os-type-map]
+                     (select-keys os-type-map [:id :description :family-description :64-bit?]))]
+      (map (comp get-keys vmfest.virtualbox.guest-os-type/map-from-IGuestOSType)
+           (.getGuestOSTypes vbox)))))
+
+(defn register-machine [vbox machine]
+  (try
+    (.registerMachine vbox machine)
+    (catch javax.xml.ws.WebServiceException e
+      (conditions/wrap-vbox-runtime
+       e
+       {:VBOX_E_OBJECT_NOT_FOUND
+        {:message "No matching virtual machine found"}
+        :VBOX_E_INVALID_OBJECT_STATE
+        {:message "Virtual machine was not created within this VirtualBox instance."}}))))
+
+(defn create-machine [vbox name os-type-id & [base-folder]]
+  (try
+    (.createMachine vbox name os-type-id (or base-folder "") nil false)
+    (catch javax.xml.ws.WebServiceException e
+      (conditions/wrap-vbox-runtime
+       e
+       {:VBOX_E_OBJECT_NOT_FOUND {:message "invalid os type ID."}
+        :VBOX_E_FILE_ERROR {:message "Resulting settings file name is invalid or the settings file already exists or could not be created due to an I/O error."}
+        :E_INVALIDARG {:message "name is empty or null."}}))))
 
 ;; I can't require this until find-machine is defined.
 (require 'vmfest.virtualbox.machine)

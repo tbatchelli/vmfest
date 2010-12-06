@@ -17,9 +17,14 @@
     (let [machine (vbox/create-machine vbox name os-type-id base-folder)]
       (config-fn machine)
       (machine/save-settings machine)
-      (vbox/register-machine vbox machine))))
+      (vbox/register-machine vbox machine)
+      (vmfest.virtualbox.model.Machine. (.getId machine) server nil))))
 
 (comment
- (def my-server (server "http://localhost:18083"))
- (vbox/get-os-types my-server)
- (create-machine my-server "my-name" "Linux" basic-config))
+  (use 'vmfest.manager)
+  (require '[vmfest.virtualbox.virtualbox :as vbox])
+  (require '[vmfest.virtualbox.machine :as machine])
+  (def my-server (server "http://localhost:18083"))
+  (vbox/guest-os-types my-server)
+  (def my-machine (create-machine my-server "my-name" "Linux" basic-config))
+  (machine/start my-machine))

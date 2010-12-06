@@ -176,7 +176,33 @@ Optional parameters are:
       (conditions/log-and-raise e {:log-level :error
                                     :message "An error occurred while saving a machine"}))))
 
+(defn add-storage-controller  [m name bus-type]
+  (let [bus (enums/key-to-storage-bus bus-type)]
+    (when-not bus (conditions/log-and-raise (RuntimeException.)
+                                            {:log-level :error
+                                             :message (str "Bus type not found " bus-type)}))
+    (try
+      (.addStorageController m name bus)
+      (catch javax.xml.ws.WebServiceException e
+        (conditions/wrap-vbox-runtime
+         e
+         {:VBOX_E_OBJECT_IN_USE	{:message "A storage controller with given name exists already."}
+          :E_INVALIDARG	{:message "Invalid controllerType."}})))))
 
+(defn attach-device [m name controller-port device device-type uuid]
+  (let [type (enums/key-to-device-type device-type)]
+    (when-not type (conditions/log-and-raise (RuntimeException.)
+                                             {:log-level :error
+                                              :message (str "Device Type not found " device-type)}))
+    (try
+      (.attachDevice m name controller-port device type uuid)
+      (catch javax.xml.ws.WebServiceException e
+        (conditions/wrap-vbox-runtime
+         e
+         {:E_INVALIDARG {:message "SATA device, SATA port, IDE port or IDE slot out of range."}
+          :VBOX_E_INVALID_OBJECT_STATE {:message "Attempt to attach medium to an unregistered virtual machine."}
+          :VBOX_E_INVALID_VM_STATE {:message "Invalid machine state."}
+          :VBOX_E_OBJECT_IN_USE {:message "Hard disk already attached to this or another virtual machine."}})))))
 
 (defn stop 
   [^Machine m]

@@ -3,7 +3,8 @@
   (:import [com.sun.xml.ws.commons.virtualbox_3_2
             IMachine]
            [org.virtualbox_3_2  MachineState ClipboardMode PointingHidType
-            FirmwareType KeyboardHidType SessionState SessionType]))
+            FirmwareType KeyboardHidType SessionState SessionType StorageBus
+            DeviceType]))
 
 (defmacro find-key-by-value [value table]
   `(let [[v# k# _#] (first (filter (fn [[v# _# _#]] (= ~value v#)) ~table))]
@@ -127,3 +128,30 @@
   (find-key-by-value type session-type-to-key-table))
 (defn key-to-session-type [key]
   (find-value-by-key key session-type-to-key-table))
+
+;;;StorageBus
+(def storage-bus-to-key-table
+  [[StorageBus/NULL :null ""]
+   [StorageBus/IDE :ide ""]
+   [StorageBus/SATA :sata ""]
+   [StorageBus/SCSI :scsi ""]
+   [StorageBus/FLOPPY :floppy ""]
+   [StorageBus/SAS :sas ""]])
+(defn storage-bus-to-key [bus]
+  (find-key-by-value bus storage-bus-to-key-table))
+(defn key-to-storage-bus [key]
+  (find-value-by-key key storage-bus-to-key-table))
+
+;;; DeviceType
+(def device-type-to-key-table
+  [[DeviceType/NULL :null "Null value, may also mean “no device” (not allowed for IConsole::getDeviceActivity())."]
+   [DeviceType/FLOPPY :floppy "Floppy device."]
+   [DeviceType/DVD :dvd "CD/DVD-ROM device."]
+   [DeviceType/HARD_DISK :hard-disk "Hard disk device."]
+   [DeviceType/NETWORK :network "Network device."]
+   [DeviceType/USB :usb "USB device."]
+   [DeviceType/SHARED_FOLDER :shared-folder "Shared folder device."]])
+(defn device-type-to-key [type]
+  (find-key-by-value type device-type-to-key-table))
+(defn key-to-device-type [key]
+  (find-value-by-key key device-type-to-key-table))

@@ -15,6 +15,13 @@
   (session/with-vbox server [_ vbox]
     (doall (map #(model/dry % server) (.getHardDisks vbox)))))
 
+(defn hard-disks*
+  "Gets all information fields from all the registered hard drives"
+  [server]
+  
+  (session/with-vbox server [_ vbox]
+    (doall (map #(model/as-map (model/dry % server)) (.getHardDisks vbox)))))
+
 (defn machines [server]
   (session/with-vbox server [_ vbox]
     (doall (map #(model/dry % server) (.getMachines vbox)))))

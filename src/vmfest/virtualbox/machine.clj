@@ -1,10 +1,11 @@
 (ns vmfest.virtualbox.machine
+  (:use clojure.contrib.condition)
   (:require [clojure.contrib.logging :as log]
-           [vmfest.virtualbox.session :as session]
-           [vmfest.virtualbox.virtualbox :as virtualbox]
-           [vmfest.virtualbox.conditions :as conditions]
-           [vmfest.virtualbox.model :as model]
-           [vmfest.virtualbox.enums :as enums])
+            [vmfest.virtualbox.session :as session]
+            [vmfest.virtualbox.virtualbox :as virtualbox]
+            [vmfest.virtualbox.conditions :as conditions]
+            [vmfest.virtualbox.model :as model]
+            [vmfest.virtualbox.enums :as enums])
   (:import [com.sun.xml.ws.commons.virtualbox_3_2 IMachine]
            [vmfest.virtualbox.model GuestOsType Machine]))
 
@@ -218,4 +219,39 @@ Optional parameters are:
   [^Machine m]
   (session/with-remote-session m [_ machine]
     (.resume machine)))
+
+(defn power-down
+  [^Machine m]
+  (handler-case :type 
+    (session/with-remote-session m [_ machine]
+      (.powerDown machine))
+    (handle :vbox-runtime
+      (log/warn "Trying to stop an already stopped machine"))))
+
+(defn detach-device [vb-m medium-attachment]
+  (println medium-attachment)
+  (when (.getMedium medium-attachment)
+    (let [device (.getDevice medium-attachment)
+          controller-port (.getPort medium-attachment)
+          name (.getController medium-attachment)]
+      (println "medium:" (.getMedium medium-attachment))
+      (println "medium name:" name "controller-port:" controller-port "device:" device)
+      (println "controller:" (.getController medium-attachment))
+      (try
+        (.detachDevice vb-m name controller-port device)
+        (catch Exception e (println e))))))
+
+(defn delete-storage [medium-attachment]
+  (let [medium (.getMedium medium-attachment)]
+    (.deleteStorage medium)))
+
+(defn remove-all-media [machine]
+  (session/with-direct-session machine [_ vb-m]
+    (let [medium-attachments (.getMediumAttachments vb-m)
+          detach-fn (partial detach-device vb-m)]
+      (doall (map detach-fn medium-attachments))
+      (.saveSettings vb-m)
+      (doall (map delete-storage medium-attachments)))))
+
+
 ;;;;;;;

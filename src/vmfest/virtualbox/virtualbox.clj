@@ -113,8 +113,45 @@
         :VBOX_E_FILE_ERROR {:message "Resulting settings file name is invalid or the settings file already exists or could not be created due to an I/O error."}
         :E_INVALIDARG {:message "name is empty or null."}}))))
 
+(defn unregister-machine [server machine]
+  (try
+    (session/with-vbox server [_ vbox]
+      (let [uuid (:id machine)]
+        (.unregisterMachine vbox uuid)))
+    (catch javax.xml.ws.WebServiceException e
+      (conditions/wrap-vbox-runtime
+       e
+       {:VBOX_E_OBJECT_NOT_FOUND
+        {:message "Could not find registered machine matching id."}
+        :VBOX_E_INVALID_VM_STATE
+        {:message "Machine is in Saved state."}
+        :VBOX_E_INVALID_OBJECT_STATE
+        {:message "Machine has snapshot or open session or medium attached."}}))))
+
+(defn delete-machine [machine]
+  (session/with-direct-session machine [s m]
+    (try 
+      (.deleteSettings (.getMachine s))
+      (catch javax.xml.ws.WebServiceException e
+        (conditions/wrap-vbox-runtime
+         e
+         {:VBOX_E_INVALID_VM_STATE
+          {:message "Cannot delete settings of a registered machine or machine not mutable."}
+          :VBOX_E_IPRT_ERROR
+          {:message "Could not delete the settings file."}})))))
+
+
 ;; I can't require this until find-machine is defined.
-(require 'vmfest.virtualbox.machine)
+(require '[ vmfest.virtualbox.machine :as machine])
+
+(defn destroy-machine [vbox machine]
+  (try
+    (let [settings-file (:settings-file-path (model/as-map machine))]
+      (machine/power-down machine)
+      (machine/remove-all-media machine)
+      (unregister-machine vbox machine) 
+      (.delete (java.io.File. settings-file)))))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

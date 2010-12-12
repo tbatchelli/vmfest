@@ -144,13 +144,7 @@
 ;; I can't require this until find-machine is defined.
 (require '[ vmfest.virtualbox.machine :as machine])
 
-(defn destroy-machine [vbox machine]
-  (try
-    (let [settings-file (:settings-file-path (model/as-map machine))]
-      (machine/power-down machine)
-      (machine/remove-all-media machine)
-      (unregister-machine vbox machine) 
-      (.delete (java.io.File. settings-file)))))
+
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

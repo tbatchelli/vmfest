@@ -1,12 +1,11 @@
 (ns vmfest.virtualbox.machine
   (:use clojure.contrib.condition)
   (:require [clojure.contrib.logging :as log]
-            [vmfest.virtualbox.session :as session]
             [vmfest.virtualbox.virtualbox :as virtualbox]
             [vmfest.virtualbox.conditions :as conditions]
             [vmfest.virtualbox.model :as model]
             [vmfest.virtualbox.enums :as enums])
-  (:import [com.sun.xml.ws.commons.virtualbox_3_2 IMachine]
+  (:import [com.sun.xml.ws.commons.virtualbox_3_2 IMachine IConsole]
            [vmfest.virtualbox.model GuestOsType Machine]))
 
 (defn map-from-IMachine
@@ -101,7 +100,7 @@
    :io-bandwidth-max #(.setIoBandwidthMax %2 (long %1))})
 
 
-(defn set-map* [m value-map]
+(defn set-map [m value-map]
   (let [get-setter (fn [k] (k setters))
           set-fn (fn [[k v]]
                    (let [setter (get-setter k)]
@@ -109,11 +108,6 @@
                        (setter v m)
                        (log/error (str "IMachine has no setter defined for " k)))))] 
     (doall (map set-fn value-map))))
-
-(defn set-map [vb-m value-map]
-  (session/with-direct-session vb-m [_ m]
-    (set-map* m value-map)
-    (.saveSettings m)))
 
 (extend-type vmfest.virtualbox.model.Machine
   model/vbox-object
@@ -137,32 +131,30 @@
 Optional parameters are:
    :session-type 'gui', 'vrdp' or 'sdl'. Default is 'gui'
    :env environment as String to be passed to the machine at startup. See IVirtualbox::openRemoteSession for more details"
-  [^Machine machine & opt-kv]
-  (session/with-vbox (:server machine) [mgr vbox]
-    (let [opts (apply hash-map opt-kv)
-          machine-id (:id machine)
-          session (.getSessionObject mgr vbox)
-          session-type  (or (:session-type opts) "gui")
-          env (or (:env opts) "DISPLAY:0.0")]
-      (try (let [progress (.openRemoteSession vbox session machine-id session-type env)]
-             (log/debug (str "Starting session for VM " machine-id "..."))
-             (.waitForCompletion progress 10000)
-             (let [result-code (.getResultCode progress)]
-               (if (zero? result-code)
-                 nil
-                 true)))
-           (catch javax.xml.ws.WebServiceException e
-             (conditions/wrap-vbox-runtime
-              e
-              {:E_UNEXPECTED {:message "Virtual Machine not registered."}
-               :E_INVALIDARG {:message (format "Invalid session type '%s'" session-type)}
-               :VBOX_E_OBJECT_NOT_FOUND {:message (format "No machine matching id '%s' found." machine-id)}
-               :VBOX_E_INVALID_OBJECT_STATE {:message "Session already open or opening."}
-               :VBOX_E_IPTR_ERROR {:message "Launching process for machine failed."}
-               :VBOX_E_VM_ERROR {:message "Failed to assign machine to session."}}))
-           (catch Exception e
-             (conditions/log-and-raise e {:log-level :error
-                                          :message "An error occurred while starting machine"}))))))
+  [mgr vbox machine-id & opt-kv]
+  (let [opts (apply hash-map opt-kv)
+        session (.getSessionObject mgr vbox)
+        session-type  (or (:session-type opts) "gui")
+        env (or (:env opts) "DISPLAY:0.0")]
+    (try (let [progress (.openRemoteSession vbox session machine-id session-type env)]
+           (log/debug (str "Starting session for VM " machine-id "..."))
+           (.waitForCompletion progress 10000)
+           (let [result-code (.getResultCode progress)]
+             (if (zero? result-code)
+               nil
+               true)))
+         (catch javax.xml.ws.WebServiceException e
+           (conditions/wrap-vbox-runtime
+            e
+            {:E_UNEXPECTED {:message "Virtual Machine not registered."}
+             :E_INVALIDARG {:message (format "Invalid session type '%s'" session-type)}
+             :VBOX_E_OBJECT_NOT_FOUND {:message (format "No machine matching id '%s' found." machine-id)}
+             :VBOX_E_INVALID_OBJECT_STATE {:message "Session already open or opening."}
+             :VBOX_E_IPTR_ERROR {:message "Launching process for machine failed."}
+             :VBOX_E_VM_ERROR {:message "Failed to assign machine to session."}}))
+         (catch Exception e
+           (conditions/log-and-raise e {:log-level :error
+                                        :message "An error occurred while starting machine"})))))
 
 (defn save-settings [machine]
   (try
@@ -206,27 +198,45 @@ Optional parameters are:
           :VBOX_E_OBJECT_IN_USE {:message "Hard disk already attached to this or another virtual machine."}})))))
 
 (defn stop 
-  [^Machine m]
-  (session/with-remote-session m [_ machine]
-    (.powerButton machine)))
+  [^IConsole c]
+  (try
+    (.powerButton c)
+    (catch javax.xml.ws.WebServiceException e
+      (conditions/wrap-vbox-runtime
+       e
+       {:VBOX_E_INVALID_VM_STATE {:message "Virtual machine not in Running state."}
+        :VBOX_E_PDM_ERROR {:message "Controlled power off failed."}}))))
 
 (defn pause
-  [^Machine m]
-  (session/with-remote-session m [_ machine]
-    (.pause machine)))
+  [^IConsole c]
+  (try
+    (.pause c)
+    (catch javax.xml.ws.WebServiceException e
+      (conditions/wrap-vbox-runtime
+       e
+       {:VBOX_E_INVALID_VM_STATE {:message "Virtual machine not in Running state."}
+        :VBOX_E_VM_ERROR {:message "Virtual machine error in suspend operation."}}))))
 
 (defn resume
-  [^Machine m]
-  (session/with-remote-session m [_ machine]
-    (.resume machine)))
+  [^IConsole c]
+  (try
+    (.resume c)
+    (catch javax.xml.ws.WebServiceException e
+      (conditions/wrap-vbox-runtime
+       e
+       {:VBOX_E_INVALID_VM_STATE {:message "Virtual machine not in Paused state."}
+        :VBOX_E_VM_ERROR {:message "Virtual machine error in resume operation."}}))))
+
 
 (defn power-down
-  [^Machine m]
-  (handler-case :type 
-    (session/with-remote-session m [_ machine]
-      (.powerDown machine))
-    (handle :vbox-runtime
-      (log/warn "Trying to stop an already stopped machine"))))
+  [^Machine c]
+  (try 
+    (.powerDown c)
+    (catch javax.xml.ws.WebServiceException e
+      (conditions/wrap-vbox-runtime
+       e
+       {:VBOX_E_INVALID_VM_STATE
+        {:message "Virtual machine must be Running, Paused or Stuck to be powered down."}}))))
 
 (defn detach-device [vb-m medium-attachment]
   (println medium-attachment)
@@ -245,13 +255,12 @@ Optional parameters are:
   (let [medium (.getMedium medium-attachment)]
     (.deleteStorage medium)))
 
-(defn remove-all-media [machine]
-  (session/with-direct-session machine [_ vb-m]
-    (let [medium-attachments (.getMediumAttachments vb-m)
-          detach-fn (partial detach-device vb-m)]
-      (doall (map detach-fn medium-attachments))
-      (.saveSettings vb-m)
-      (doall (map delete-storage medium-attachments)))))
+(defn remove-all-media [vb-m]
+  (let [medium-attachments (.getMediumAttachments vb-m)
+        detach-fn (partial detach-device vb-m)]
+    (doall (map detach-fn medium-attachments))
+    (.saveSettings vb-m)
+    (doall (map delete-storage medium-attachments))))
 
 
 ;;;;;;;

@@ -263,5 +263,31 @@ Optional parameters are:
     (.saveSettings vb-m)
     (doall (map delete-storage medium-attachments))))
 
+(defn get-guest-property [^IConsole console key]
+  (try
+    (.getGuestPropertyValue (.getMachine console) key)
+    (catch javax.xml.ws.WebServiceException e
+      (conditions/wrap-vbox-runtime
+       e
+       {:VBOX_E_INVALID_VM_STATE {:message "Machine session is not open."}}))))
+
+(defn set-extra-data [^IMachine m key value]
+  (try
+    (.setExtraData m key value)
+    (.saveSettings m)
+    (catch javax.xml.ws.WebServiceException e
+      (conditions/wrap-vbox-runtime
+       e
+       {:VBOX_E_FILE_ERROR {:message "Sttings file not accessible."}
+        :VBOX_E_XML_ERROR {:message "Could not parse the settings file."}}))))
+
+(defn get-extra-data [^IMachine m key]
+  (try
+    (.getExtraData m key)
+    (catch javax.xml.ws.WebServiceException e
+      (conditions/wrap-vbox-runtime
+       e
+       {:VBOX_E_FILE_ERROR {:message "Settings file not accessible."}
+        :VBOX_E_XML_ERROR {:message "Could not parse the settings file."}}))))
 
 ;;;;;;;

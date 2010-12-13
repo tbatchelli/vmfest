@@ -45,6 +45,18 @@
   (attach-hard-disk uuid)
   (throw (RuntimeException. "Image not found.")))
 
+(defn get-ip [machine]
+  (session/with-remote-session machine [_ console]
+    (machine/get-guest-property console "/VirtualBox/GuestInfo/Net/0/V4/IP")))
+
+(defn set-extra-data [machine key value]
+  (session/with-direct-session machine [_ vb-m]
+    (machine/set-extra-data vb-m key value)))
+
+(defn get-extra-data [machine key]
+  (session/with-direct-session machine [_ vb-m]
+    (machine/get-extra-data vb-m key)))
+
 ;;; jclouds/pallet-style infrastructure
 
 (def *machine-models*

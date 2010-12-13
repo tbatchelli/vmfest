@@ -3,7 +3,8 @@
            [vmfest.virtualbox.machine :as machine]
            [vmfest.virtualbox.session :as session]
            [vmfest.virtualbox.model :as model]
-           [clojure.contrib.logging :as log])
+           [clojure.contrib.logging :as log]
+           vmfest.virtualbox.medium)
   (use clojure.contrib.condition))
 
 (defn server [url & [identity credentials]]
@@ -14,6 +15,8 @@
            :node-path "/Users/tbatchelli/.vmfest/nodes"}})
 
 (def *location* (:local *locations*))
+
+;; machine configuration stuff
 
 (defn add-ide-controller [m]
   (machine/add-storage-controller m "IDE Controller" :ide))
@@ -32,6 +35,18 @@
     (configure-machine m parameters)
     (add-ide-controller m)))
 
+
+(defn attach-hard-disk [vb-m image-uuid]
+  (session/with-direct-session vb-m [_ m]
+    (attach-device m "IDE Controller" 0 0 :hard-disk image-uuid)
+    (.saveSettings m)))
+
+(defn attach-image [vb-m uuid]
+  (attach-hard-disk uuid)
+  (throw (RuntimeException. "Image not found.")))
+
+;;; jclouds/pallet-style infrastructure
+
 (def *machine-models*
   {:micro basic-config})
 
@@ -39,17 +54,6 @@
   {:cent-os-5-5 {:description "CentOS 5.5 32bit"
                               :uuid "3a971213-0482-4eb8-8cfd-7eefc9e8b0fe"
                               :os-type-id "RedHat"}})
-
-(defn attach-hard-disk [vb-m image-uuid]
-  (session/with-direct-session vb-m [_ m]
-    (attach-device m "IDE Controller" 0 0 :hard-disk image-uuid)
-    (.saveSettings m)))
-
-(comment "TODO: Need a destroy-machine function")
-
-(defn attach-image [vb-m uuid]
-  (attach-hard-disk uuid)
-  (throw (RuntimeException. "Image not found.")))
 
 (defn create-machine [server name os-type-id config-fn image-uuid & [base-folder]]
   (let [m (session/with-vbox server [_ vbox]
@@ -65,8 +69,6 @@
 (defn instance [server name image-key machine-key & [base-folder]]
   (let [image (image-key *images*)
         config-fn (machine-key *machine-models*)]
-    (println image)
-    (println config-fn)
     (when-not (and image config-fn)
       (throw (RuntimeException. "Image or Machine not found")))
     (let [uuid (:uuid image)
@@ -111,26 +113,80 @@
         (power-down machine)
         (session/with-direct-session machine [_ vb-m]
           (machine/remove-all-media vb-m))
-        (vbox/unregister-machine vbox machine) 
+        (session/with-vbox vbox [_ vbox]
+          (vbox/unregister-machine vbox machine)) 
         (.delete (java.io.File. settings-file))))))
 
-(comment
+;;; virtualbox-wide functions
+
+(defn hard-disks [server]
+  (session/with-vbox server [_ vbox]
+    (doall (map #(model/dry % server) (.getHardDisks vbox)))))
+
+(defn machines [server]
+  (session/with-vbox server [_ vbox]
+    (doall (map #(model/dry % server) (.getMachines vbox)))))
+
+(defn get-machine
+  "Will raise a condition if machine cannot be found."
+  [server id]
+  (session/with-vbox server [mgr vbox]
+    (when-let [vb-m (vbox/get-vb-m vbox id)]
+      (model/dry vb-m server))))
+
+(defn find-machine [server id-or-name]
+  (session/with-vbox server [mgr vbox]
+    (when-let [vb-m (vbox/find-vb-m vbox id-or-name)]
+      (model/dry vb-m server))))
+
+(defn guest-os-types [server] 
+  (session/with-vbox server [mgr vbox]
+    (let [get-keys (fn [os-type-map]
+                     (select-keys os-type-map [:id :description :family-description :64-bit?]))]
+      (map (comp get-keys vmfest.virtualbox.guest-os-type/map-from-IGuestOSType)
+           (.getGuestOSTypes vbox)))))
+
+;;; model forwards
+
+(defn as-map [& params]
+  (apply model/as-map params))
+
+(comment "without pallet-style infrastructure"
   (use 'vmfest.manager)
-  (require '[vmfest.virtualbox.virtualbox :as vbox])
-  (require '[vmfest.virtualbox.machine :as machine])
   (def my-server (server "http://localhost:18083"))
-  (vbox/guest-os-types my-server) ;; see the list of os guests
-  ;; create and start one server
+  (guest-os-types my-server) ;; see the list of os guests
+  ;; create and start one server with a configuring function 
   (def my-machine (create-machine my-server "my-name" "Linux" basic-config))
-  (machine/start my-machine)
+  (start my-machine)
   ;; create and start many servers
   (def clone-names #{"c1" "c2" "c3" "c4" "c5" "c6"})
   (def my-machines (map #(create-machine my-server % "Linux" basic-config) clone-names))
-  (map machine/start my-machines)
-  (map machine/stop my-machines)
+  (map start my-machines)
+  (map stop my-machines))
 
-  ;; new stuff
+(comment "with pallet-style infrastructure"
+  (use 'vmfest.manager)
+  ;; create a connection to the vbox server
+  (def my-server (server "http://localhost:18083"))
+  
+  ;; instantiate a new machine based on a supplied hardware model and image
   (def my-machine (instance my-server "boot14" :cent-os-5-5 :micro))
+
+  ;; operate the machine
   (start my-machine)
-  (stop my-machine)
-  (destroy my-machine))
+  (pause my-machine)
+  (resume my-machine)
+  (stop my-machine) ;; tells the OS to shut down
+  (power-down my-machine) ;; turns off the machine
+  ;; destroy the machine. All files will be deleted (irrecoverable)
+  (destroy my-machine)
+
+  ;; list available hard drives
+  (hard-disks my-server)
+  ;; view all info about the hard-drives
+  (map as-map (hard-disks my-server))
+
+  ;;view all available machines
+  (machines my-server)
+  ;;get a machine by name or id
+  (def my-test-machine (find-machine my-server "CentOS Test")))

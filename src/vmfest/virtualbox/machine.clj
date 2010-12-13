@@ -4,7 +4,8 @@
             [vmfest.virtualbox.virtualbox :as virtualbox]
             [vmfest.virtualbox.conditions :as conditions]
             [vmfest.virtualbox.model :as model]
-            [vmfest.virtualbox.enums :as enums])
+            [vmfest.virtualbox.enums :as enums]
+            [vmfest.virtualbox.session :as session])
   (:import [com.sun.xml.ws.commons.virtualbox_3_2 IMachine IConsole]
            [vmfest.virtualbox.model GuestOsType Machine]))
 

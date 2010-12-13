@@ -2,7 +2,6 @@
   (:require [clojure.contrib.logging :as log]
             [vmfest.virtualbox.model :as model]
             [vmfest.virtualbox.conditions :as conditions]
-            [vmfest.virtualbox.session :as session]
             vmfest.virtualbox.guest-os-type) 
   (:import [com.sun.xml.ws.commons.virtualbox_3_2
             IWebsessionManager
@@ -10,21 +9,6 @@
            [vmfest.virtualbox.model
             Server
             Machine]))
-
-(defn hard-disks [server]
-  (session/with-vbox server [_ vbox]
-    (doall (map #(model/dry % server) (.getHardDisks vbox)))))
-
-(defn hard-disks*
-  "Gets all information fields from all the registered hard drives"
-  [server]
-  
-  (session/with-vbox server [_ vbox]
-    (doall (map #(model/as-map (model/dry % server)) (.getHardDisks vbox)))))
-
-(defn machines [server]
-  (session/with-vbox server [_ vbox]
-    (doall (map #(model/dry % server) (.getMachines vbox)))))
 
 (defn get-vb-m
   "Gets the virtual machine corresponding to the supplied id. If such machine can't be found,
@@ -71,26 +55,6 @@
              (log/warn (format "Can't find a hard disk located in '%s'."
                                id-or-location)))))))
 
-(defn get-machine
-  "Will raise a condition if machine cannot be found."
-  [url login password id]
-  (let [server (Server. url login password)]
-       (session/with-vbox server [mgr vbox]
-         (when-let [vb-m (get-vb-m vbox id)]
-           (model/dry vb-m server)))))
-
-(defn find-machine [url login password id-or-name]
-  (let [server (Server. url login password)]
-       (session/with-vbox server [mgr vbox]
-         (when-let [vb-m (find-vb-m vbox id-or-name)]
-           (model/dry vb-m server)))))
-
-(defn guest-os-types [server] 
-  (session/with-vbox server [mgr vbox]
-    (let [get-keys (fn [os-type-map]
-                     (select-keys os-type-map [:id :description :family-description :64-bit?]))]
-      (map (comp get-keys vmfest.virtualbox.guest-os-type/map-from-IGuestOSType)
-           (.getGuestOSTypes vbox)))))
 
 (defn register-machine [vbox machine]
   (try
@@ -113,11 +77,10 @@
         :VBOX_E_FILE_ERROR {:message "Resulting settings file name is invalid or the settings file already exists or could not be created due to an I/O error."}
         :E_INVALIDARG {:message "name is empty or null."}}))))
 
-(defn unregister-machine [server machine]
+(defn unregister-machine [vbox machine]
   (try
-    (session/with-vbox server [_ vbox]
-      (let [uuid (:id machine)]
-        (.unregisterMachine vbox uuid)))
+    (let [uuid (:id machine)]
+      (.unregisterMachine vbox uuid))
     (catch javax.xml.ws.WebServiceException e
       (conditions/wrap-vbox-runtime
        e
@@ -128,7 +91,9 @@
         :VBOX_E_INVALID_OBJECT_STATE
         {:message "Machine has snapshot or open session or medium attached."}}))))
 
-(defn delete-machine [machine]
+
+;; this doesn't work yet... I don't know why
+#_(defn delete-machine [machine]
   (session/with-direct-session machine [s m]
     (try 
       (.deleteSettings (.getMachine s))
@@ -139,12 +104,6 @@
           {:message "Cannot delete settings of a registered machine or machine not mutable."}
           :VBOX_E_IPRT_ERROR
           {:message "Could not delete the settings file."}})))))
-
-
-;; I can't require this until find-machine is defined.
-(require '[ vmfest.virtualbox.machine :as machine])
-
-
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

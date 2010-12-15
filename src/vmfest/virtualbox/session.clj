@@ -91,6 +91,7 @@
      (let [machine-id# (:id ~machine)]
        (with-vbox (:server ~machine) [mgr# vbox#]
          (with-open [~session (.getSessionObject mgr# vbox#)]
+           (log/info (format "with-remote-session: Opening existing session for machine %s" ~machine))
            (.openExistingSession vbox# ~session machine-id#)
            (log/trace (str "new remote session is open for machine-id=" machine-id#))
            (let [~console (.getConsole ~session)]

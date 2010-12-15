@@ -139,7 +139,7 @@ Optional parameters are:
         env (or (:env opts) "DISPLAY:0.0")]
     (try (let [progress (.openRemoteSession vbox session machine-id session-type env)]
            (log/debug (str "Starting session for VM " machine-id "..."))
-           (.waitForCompletion progress 10000)
+           (.waitForCompletion progress 30000)
            (let [result-code (.getResultCode progress)]
              (if (zero? result-code)
                nil

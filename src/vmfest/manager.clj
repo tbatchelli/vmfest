@@ -54,8 +54,15 @@
     (machine/set-extra-data vb-m key value)))
 
 (defn get-extra-data [machine key]
-  (session/with-direct-session machine [_ vb-m]
-    (machine/get-extra-data vb-m key)))
+  ;; todo: this might need to try a remote session first, since it
+  ;; can't get the extra data if the machine is running
+  (try
+    (session/with-no-session machine [vb-m]
+      (machine/get-extra-data vb-m key))
+    (catch Exception e
+      (session/with-remote-session machine [_ console]
+        (let [vb-m (.getMachine console)]
+          (machine/get-extra-data vb-m key))))))
 
 ;;; jclouds/pallet-style infrastructure
 
@@ -122,7 +129,9 @@
   (let [vbox (:server machine)]
     (try
       (let [settings-file (:settings-file-path (model/as-map machine))]
-        (power-down machine)
+        (let [progress (power-down machine)]
+          (when progress
+            (.waitForCompletion progress -1)))
         (session/with-direct-session machine [_ vb-m]
           (machine/remove-all-media vb-m))
         (session/with-vbox vbox [_ vbox]

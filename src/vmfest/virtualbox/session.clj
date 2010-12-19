@@ -43,7 +43,7 @@
      (try
        ~@body
        (finally (when ~vbox
-                  (try (.logoff ~mgr ~vbox)
+                  (try (.disconnect ~mgr ~vbox)
                        (catch Exception e#
                          (conditions/log-and-raise e# {:log-level :error
                                                        :message "unable to close session"}))))))))

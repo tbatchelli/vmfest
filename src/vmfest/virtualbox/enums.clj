@@ -4,7 +4,7 @@
             IMachine]
            [org.virtualbox_3_2  MachineState ClipboardMode PointingHidType
             FirmwareType KeyboardHidType SessionState SessionType StorageBus
-            DeviceType]))
+            DeviceType NetworkAttachmentType]))
 
 (defmacro find-key-by-value [value table]
   `(let [[v# k# _#] (first (filter (fn [[v# _# _#]] (= ~value v#)) ~table))]
@@ -155,3 +155,16 @@
   (find-key-by-value type device-type-to-key-table))
 (defn key-to-device-type [key]
   (find-value-by-key key device-type-to-key-table))
+
+;;; NetworkAttachmentType
+(def network-attachment-type-to-key-table
+  [[NetworkAttachmentType/NULL :null "Null value, also means 'not attached'."]
+   [NetworkAttachmentType/NAT :nat ""]
+   [NetworkAttachmentType/BRIDGED :bridged ""]
+   [NetworkAttachmentType/INTERNAL :internal ""]
+   [NetworkAttachmentType/HOST_ONLY :host-only ""]
+   [NetworkAttachmentType/VDE :vde ""]])
+(defn network-attachment-type-to-key [type]
+  (find-key-by-value type network-attachment-type-to-key-table))
+(defn key-to-network-attachment-type [key]
+  (find-value-by-key key network-attachment-type-to-key-table))

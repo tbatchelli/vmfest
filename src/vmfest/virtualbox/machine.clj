@@ -30,8 +30,7 @@
    :accelerate-2d-video-enabled? (.getAccelerate2DVideoEnabled vb-m)
    :monitor-count (.getMonitorCount vb-m)
    :bios-settings (.getBIOSSettings vb-m) ;todo: get object
-   :firmware-type (do (println "firmware-type" (.getFirmwareType vb-m))
-                      (enums/firmware-type-to-key (.getFirmwareType vb-m))) ;todo: get object
+   :firmware-type (enums/firmware-type-to-key (.getFirmwareType vb-m)) ;todo: get object
    :pointing-hid-type (enums/pointing-hid-type-to-key (.getPointingHidType vb-m)) ;todo: get object
    :keyboard-hid-type (enums/keyboard-hid-type-to-key (.getKeyboardHidType vb-m)) ;todo: get object
    :hpet-enabled (.getHpetEnabled vb-m)
@@ -197,6 +196,18 @@ Optional parameters are:
           :VBOX_E_INVALID_OBJECT_STATE {:message "Attempt to attach medium to an unregistered virtual machine."}
           :VBOX_E_INVALID_VM_STATE {:message "Invalid machine state."}
           :VBOX_E_OBJECT_IN_USE {:message "Hard disk already attached to this or another virtual machine."}})))))
+
+(defn set-network-adapter [m port type interface]
+  (try
+    (when-let [adapter (.getNetworkAdapter m (long port))] 
+      (condp = type
+          :bridged (do (.attachToBridgedInterface adapter)
+                       ;; todo: get this from IHost.getNetworkInterfaces
+                       (.setHostInterface adapter interface))
+          :nat (.attachToNAT adapter)
+          :internal (.attachToInternalNetwork adapter)
+          :host-only (.attachToHostOnlyInterface adapter)
+          :vde (.attachToVDE adapter)))))
 
 (defn stop 
   [^IConsole c]

@@ -24,6 +24,10 @@
 (defn attach-device [m name controller-port device device-type uuid]
   (machine/attach-device m name controller-port device device-type uuid))
 
+(defn set-bridged-network [m interface]
+  (machine/set-network-adapter m 0 :bridged interface)
+  (.saveSettings m))
+
 (defn configure-machine [vb-m param-map]
   (machine/set-map vb-m param-map)
   (.saveSettings vb-m))
@@ -33,8 +37,8 @@
         {:memory-size 512
          :cpu-count 1}]
     (configure-machine m parameters)
+    (set-bridged-network m "en1: AirPort 2")
     (add-ide-controller m)))
-
 
 (defn attach-hard-disk [vb-m image-uuid]
   (session/with-direct-session vb-m [_ m]
@@ -56,13 +60,19 @@
 (defn get-extra-data [machine key]
   ;; todo: this might need to try a remote session first, since it
   ;; can't get the extra data if the machine is running
-  (try
-    (session/with-no-session machine [vb-m]
+  (log/info (str "get-extra-data: getting extra data for " (:id machine)))
+  (handler-case :type
+    (log/info (str "get-extra-data: trying to get a direct session "))
+    (session/with-direct-session machine [_ vb-m]
       (machine/get-extra-data vb-m key))
-    (catch Exception e
-      (session/with-remote-session machine [_ console]
-        (let [vb-m (.getMachine console)]
-          (machine/get-extra-data vb-m key))))))
+    (handle :vbox-runtime
+      (handler-case :type
+        (log/info "get-extra-data: trying to get a remote session (direct one failed)")
+        (session/with-remote-session machine [_ console]
+          (let [vb-m (.getMachine console)]
+            (machine/get-extra-data vb-m key)))
+        (handle :vbox-runtime
+          (log/info "get-extra-data: No dice. Unable to open any session with machine"))))))
 
 ;;; jclouds/pallet-style infrastructure
 
@@ -211,3 +221,11 @@
   (machines my-server)
   ;;get a machine by name or id
   (def my-test-machine (find-machine my-server "CentOS Test")))
+
+(comment "From pallet"
+         "start swank with $ mvn -Pno-jclouds,vmfest clojure:swank"
+         (require 'pallet.core)
+         (def service (pallet.compute/compute-service-from-config-file "virtualbox"))
+         (def my-node (pallet.core/make-node "pallet-test" {:image-id :cent-os-5-5 :packager :yum :os-family :centos}))
+         (pallet.core/converge {my-node 1} :compute service)
+         (pallet.core/converge {my-node 0} :compute service))

@@ -302,3 +302,6 @@ Optional parameters are:
         :VBOX_E_XML_ERROR {:message "Could not parse the settings file."}}))))
 
 ;;;;;;;
+
+(defn state [^IMachine vb-m]
+  (enums/machine-state-to-key (.getState vb-m)))

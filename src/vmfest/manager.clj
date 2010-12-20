@@ -105,6 +105,25 @@
       (create-machine server name os-type-id config-fn uuid base-folder))))
 
 ;;; machine control
+(defn current-time-millis []
+  (System/currentTimeMillis))
+
+(defn wait-for-machine-state [m state-keys & [timeout-in-ms]]
+  (let [begin-time (current-time-millis)
+        timeout (or timeout-in-ms 1500)
+        target-state? (fn [state-key] (some #(= state-key %) state-keys))]
+    (loop []
+      (let [current-state (session/with-no-session m [vb-m]
+                            (machine/state vb-m))
+            current-time (current-time-millis)]
+        (if (target-state? current-state)
+          current-state
+          (if (> (- current-time begin-time) timeout)
+            nil
+            (do
+              (Thread/sleep 250)
+              (recur))))))))
+
 (defn start
   [^Machine m & opt-kv]
   (let [server (:server m)
@@ -147,6 +166,8 @@
         (session/with-vbox vbox [_ vbox]
           (vbox/unregister-machine vbox machine)) 
         (.delete (java.io.File. settings-file))))))
+
+
 
 ;;; virtualbox-wide functions
 

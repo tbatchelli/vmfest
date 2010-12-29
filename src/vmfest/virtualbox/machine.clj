@@ -282,6 +282,16 @@ Optional parameters are:
        e
        {:VBOX_E_INVALID_VM_STATE {:message "Machine session is not open."}}))))
 
+(defn set-guest-property [^IMachine machine key value]
+  (try
+    (.setGuestPropertyValue machine key value)
+    (catch javax.xml.ws.WebServiceException e
+      (conditions/wrap-vbox-runtime
+       e
+       {:E_ACCESSDENIED {:message "Property cannot be changed."}
+        :VBOX_E_INVALID_VM_STATE {:message "Virtual machine is not mutable or session not open."}
+        :VBOX_E_INVALID_OBJECT_STATE {:message "Cannot set transient property when machine not running."}}))))
+
 (defn set-extra-data [^IMachine m key value]
   (try
     (.setExtraData m key value)

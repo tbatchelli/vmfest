@@ -5,4 +5,4 @@
                  [org.clojars.tbatchelli/vboxws_java16 "3.2.10"]
                  [log4j/log4j "1.2.14"]]
   :dev-dependencies [[swank-clojure/swank-clojure "1.2.1"]
-                     [marginalia "0.2.0"]])
+                     [marginalia "0.3.2"]])

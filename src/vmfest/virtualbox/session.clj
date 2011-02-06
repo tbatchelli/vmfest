@@ -66,7 +66,7 @@ VirtualBoxManager object plus the credentials or by a Server object.
   "A convenience function that will create both a session manager and
   a vbox at once
 
-        create-mgr-vbox: Server 
+        create-mgr-vbox: Server
         create-mgr-vbox: String x String x String
               -> [VirtualBoxManager IVirtualBox]
 "
@@ -86,7 +86,8 @@ VirtualBoxManager object plus the credentials or by a Server object.
 ;; block has been executed, thus cleaning up the session.
 
 (defmacro with-vbox [^Server server [mgr vbox] & body]
-  "Wraps a code block with the creation and the destruction of a session with a virtualbox.
+  "Wraps a code block with the creation and the destruction of a session
+with a virtualbox.
        with-vbox: Server x [symbol symbol] x body
           -> body"
   `(let [[~mgr ~vbox] (create-mgr-vbox ~server)]
@@ -95,8 +96,9 @@ VirtualBoxManager object plus the credentials or by a Server object.
        (finally (when ~mgr
                   (try (.disconnect ~mgr)
                        (catch Exception e#
-                         (conditions/log-and-raise e# {:log-level :error
-                                                       :message "unable to close session"}))))))))
+                         (conditions/log-and-raise
+                          e# {:log-level :error
+                              :message "unable to close session"}))))))))
 
 (def lock-type-constant
   {:write org.virtualbox_4_0.LockType/Write
@@ -118,7 +120,8 @@ VirtualBoxManager object plus the credentials or by a Server object.
                 {:log-level :error
                  :message
                  (format
-                  "Called a method that is not available with a direct session in '%s'"
+                  "Called a method that is not available with a direct
+session in '%s'"
                   '~body)
                  :type :invalid-method}))
              (finally (.unlockMachine ~session))))))
@@ -135,12 +138,14 @@ VirtualBoxManager object plus the credentials or by a Server object.
   [^Machine machine [vb-m] & body]
   `(try
      (with-vbox (:server ~machine) [_# vbox#]
-       (let [~vb-m (.findMachine vbox# (:id ~machine))] 
+       (let [~vb-m (.findMachine vbox# (:id ~machine))]
          ~@body))
       (catch java.lang.IllegalArgumentException e#
-        (conditions/log-and-raise e# {:log-level :error
-                                      :message "Called a method that is not available without a session"
-                                      :type :invalid-method}))
+        (conditions/log-and-raise
+         e#
+         {:log-level :error
+          :message "Called a method that is not available without a session"
+          :type :invalid-method}))
        (catch Exception e#
          (conditions/log-and-raise e# {:log-level :error
                                        :message "An error occurred"}))))
@@ -155,7 +160,7 @@ VirtualBoxManager object plus the credentials or by a Server object.
   ;; Creating Server and Machine to use with session
   (def server (vmfest.virtualbox.model.Server. "http://localhost:18083" "" ""))
   (def vb-m (vmfest.virtualbox.model.Machine. machine-id server nil))
-  
+
   ;; read config values with a session
   (with-session vb-m :write [session machine]
     (.getMemorySize machine))

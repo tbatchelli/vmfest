@@ -2,7 +2,7 @@
   (:require [clojure.contrib.logging :as log]
             [vmfest.virtualbox.session :as session]
             [vmfest.virtualbox.model :as model])
-  (:import [com.sun.xml.ws.commons.virtualbox_3_2 IGuestOSType]))
+  (:import [org.virtualbox_4_0 IGuestOSType]))
 
 (defn map-from-IGuestOSType
   [o]

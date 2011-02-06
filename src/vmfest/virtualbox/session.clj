@@ -4,9 +4,10 @@ destruction of sessions with the VBox servers"
   (:require [clojure.contrib.logging :as log]
         [vmfest.virtualbox.conditions :as conditions]
         [vmfest.virtualbox.model :as model])
-  (:import [com.sun.xml.ws.commons.virtualbox_3_2
-            IWebsessionManager
-            IVirtualBox]
+  (:import [org.virtualbox_4_0
+            VirtualBoxManager
+            IVirtualBox
+            VBoxException]
            [vmfest.virtualbox.model
             Server
             Machine]))
@@ -18,14 +19,15 @@ destruction of sessions with the VBox servers"
 ;; the server yet, it just creates a data structure containing the
 ;; session details.
 
-(defn ^IWebsessionManager create-session-manager
-  "Creates a IWebsessionManager. Note that the default port is 18083
+(defn ^VirtualBoxManager create-session-manager
+  "Creates a VirtualBoxManager. Home is where the vbox binaries are.
+If no home is passed, it will use the default
 
-       create-session-manager: String
-             -> IWebSessionManager"
-   [url]
-   (log/debug (str "Creating session manager for " url))
-   (IWebsessionManager. url))
+       create-session-manager: (String)
+             -> VirtualBoxManager"
+  [& [home]]
+   (log/debug (str "Creating session manager for home=" (or home "default")))
+   (VirtualBoxManager/createInstance home))
 
 ;; Before we can interact with the server we need to create a Virtual
 ;; Box object trhough our session, to keep track of our actions on the
@@ -33,16 +35,21 @@ destruction of sessions with the VBox servers"
 
 (defn ^IVirtualBox create-vbox
   "Create a vbox object on the server represented by either the
-IWebSessionManager object plus the credentials or by a Server object.
+VirtualBoxManager object plus the credentials or by a Server object.
 
-       create-vbox: IWebsessionManager x String x String 
+       create-vbox: VirtualBoxManager String x String x String
        create-vbox: Session
              -> IVirtualBox"
-  ([^IWebsessionManager mgr username password]
-     (log/debug (str "creating new vbox with a logon for user " username))
-     (try 
-       (.logon mgr username password)
-       (catch com.sun.xml.internal.ws.client.ClientTransportException e
+  ([^VirtualBoxManager mgr url username password]
+     (log/debug
+      (format
+       "creating new vbox with a logon for url=%s and username=%s"
+       url
+       username))
+     (try
+       (.connect mgr url username password)
+       (.getVBox mgr)
+       (catch VBoxException e
          (conditions/log-and-raise
           e
           {:log-level :error
@@ -51,8 +58,8 @@ IWebSessionManager object plus the credentials or by a Server object.
                      (.getMessage e))}))))
   ([^Server server]
      (let [{:keys [url username password]} server
-           mgr (create-session-manager url)]
-       (create-vbox mgr username password))))
+           mgr (create-session-manager)]
+       (create-vbox mgr url username password))))
 
 (defn create-mgr-vbox
   "A convenience function that will create both a session manager and
@@ -60,14 +67,14 @@ IWebSessionManager object plus the credentials or by a Server object.
 
         create-mgr-vbox: Server 
         create-mgr-vbox: String x String x String
-              -> [IWebSessionManager IVirtualBox]
+              -> [VirtualBoxManager IVirtualBox]
 "
   ([^Server server]
      (let [{:keys [url username password]} server]
        (create-mgr-vbox url username password)))
   ([url username password]
-     (let [mgr (create-session-manager url)
-           vbox (create-vbox mgr username password)]
+     (let [mgr (create-session-manager )
+           vbox (create-vbox mgr url username password)]
        [mgr vbox])))
 
 ;; When interacting with the server it is important that the objects
@@ -87,7 +94,7 @@ IWebSessionManager object plus the credentials or by a Server object.
        (finally (when ~vbox
                   (try (.disconnect ~mgr ~vbox)
                        (catch Exception e#
-                         (conditions/log-and-raise e# {:log-level :error
+                         #_(conditions/log-and-raise e# {:log-level :error
                                                        :message "unable to close session"}))))))))
 
 ;; When we want to manipulate the configuration of a VM, we need to
@@ -156,8 +163,8 @@ IWebSessionManager object plus the credentials or by a Server object.
 
 (comment
   ;; how to create the mgr and vbox independently
-  (def mgr (create-session-manager "http://localhost:18083"))
-  (def vbox (create-vbox mgr "" ""))
+  (def mgr (create-session-manager))
+  (def vbox (create-vbox mgr "http://localhost:18083" "" ""))
 
   ;; Creating Server and Machine to use with session
   (def server (vmfest.virtualbox.model.Server. "http://localhost:18083" "" ""))

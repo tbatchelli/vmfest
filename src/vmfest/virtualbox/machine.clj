@@ -6,7 +6,7 @@
             [vmfest.virtualbox.model :as model]
             [vmfest.virtualbox.enums :as enums]
             [vmfest.virtualbox.session :as session])
-  (:import [com.sun.xml.ws.commons.virtualbox_3_2 IMachine IConsole]
+  (:import [org.virtualbox_4_0 IMachine IConsole]
            [vmfest.virtualbox.model GuestOsType Machine]))
 
 (defn map-from-IMachine
@@ -115,9 +115,14 @@
         (virtualbox/get-vb-m vbox (:id this)))
   (as-map [this]
           (session/with-vbox (:server this) [_ vbox]
-            (let [machine (model/soak this vbox)]
-              (merge this
-                     (map-from-IMachine machine (:server this)))))))
+            (try
+              (let [machine (model/soak this vbox)]
+                (merge this
+                       (map-from-IMachine machine (:server this))))
+              (catch Exception e
+                (merge this
+                       {:error "Machine not found"
+                        :exception e}))))))
 
 (extend-type IMachine
   model/vbox-remote-object

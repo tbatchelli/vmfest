@@ -1,5 +1,5 @@
 (ns vmfest.virtualbox.model
-  (:import [com.sun.xml.ws.commons.virtualbox_3_2 IVirtualBox]))
+  (:import [org.virtualbox_4_0 IVirtualBox]))
 
 (defrecord Server [url username password]) 
 (defrecord Location [servers])

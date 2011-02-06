@@ -1,10 +1,11 @@
 (ns vmfest.virtualbox.enums
   (:require [clojure.contrib.logging :as log])
-  (:import [com.sun.xml.ws.commons.virtualbox_3_2
-            IMachine]
-           [org.virtualbox_3_2  MachineState ClipboardMode PointingHidType
-            FirmwareType KeyboardHidType SessionState SessionType StorageBus
-            DeviceType NetworkAttachmentType]))
+  (:import
+   [org.virtualbox_4_0 IMachine]
+   [org.virtualbox_4_0.jaxws MachineState ClipboardMode
+    PointingHidType FirmwareType KeyboardHidType SessionState SessionType
+    StorageBus
+    DeviceType NetworkAttachmentType]))
 
 (defmacro find-key-by-value [value table]
   `(let [[v# k# _#] (first (filter (fn [[v# _# _#]] (= ~value v#)) ~table))]
@@ -109,10 +110,10 @@
 ;;; SessionState
 (def session-state-to-key-table
   [[SessionState/NULL :null ""]
-   [SessionState/CLOSED :closed ""]
-   [SessionState/OPEN :open ""]
+   [SessionState/UNLOCKED :unlocked ""]
+   [SessionState/LOCKED :locked ""]
    [SessionState/SPAWNING :spawning ""]
-   [SessionState/CLOSING :closing ""]])
+   [SessionState/UNLOCKING :unlocking ""]])
 (defn session-state-to-key [state]
   (find-key-by-value state session-state-to-key-table))
 (defn key-to-session-state [key]
@@ -121,9 +122,9 @@
 ;;; SessionType
 (def session-type-to-key-table
   [[SessionType/NULL :null ""]
-   [SessionType/DIRECT :direct ""]
+   [SessionType/WRITE_LOCK :write-lock ""]
    [SessionType/REMOTE :remote ""]
-   [SessionType/EXISTING :existing ""]])
+   [SessionType/SHARED :shared ""]])
 (defn session-type-to-key [type]
   (find-key-by-value type session-type-to-key-table))
 (defn key-to-session-type [key]

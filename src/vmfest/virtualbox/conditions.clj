@@ -1,7 +1,7 @@
 (ns vmfest.virtualbox.conditions
   (:use clojure.contrib.condition)
   (:require [clojure.contrib.logging :as log])
-  (:import [org.virtualbox_3_2
+  (:import [org.virtualbox_4_0.jaxws
             InvalidObjectFault
             InvalidObjectFaultMsg
             RuntimeFault

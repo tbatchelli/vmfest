@@ -2,59 +2,28 @@
   (:require [clojure.contrib.logging :as log]
             [vmfest.virtualbox.model :as model]
             [vmfest.virtualbox.conditions :as conditions]
-            vmfest.virtualbox.guest-os-type) 
-  (:import [com.sun.xml.ws.commons.virtualbox_3_2
-            IWebsessionManager
+            vmfest.virtualbox.guest-os-type)
+  (:import [org.virtualbox_4_0
+            VirtualBoxManager
             IVirtualBox]
            [vmfest.virtualbox.model
             Server
             Machine]))
 
-(defn get-vb-m
-  "Gets the virtual machine corresponding to the supplied id. If such machine can't be found,
- it will raise a conditions."
-  [vbox id]
-  (try (.getMachine vbox id)
-       (catch Exception e
-         (conditions/log-and-raise
-          e
-          {:log-error :error
-           :message (format "The machine with id='%s' is not found in %s."
-                            id
-                            (:url (:server vbox)))}))))
-
-(defn get-hard-disk
-  [vbox id]
-  (try (.getHardDisk vbox id)
-       (catch Exception e
-         (conditions/log-and-raise
-          e
-          {:log-error :error
-           :message (format "The hard disk with id='%s' is not found in %s."
-                            id
-                            (:url (:server vbox)))}))))
-
 (defn find-vb-m
   ([vbox id-or-name]
-      (try
-        (.getMachine vbox id-or-name)
-        (catch Exception e
-          (try
-            (.findMachine vbox id-or-name)
-            (catch Exception e
-              (log/warn (format "Machine identified by '%s' not found."
-                                id-or-name))))))))
+     (try
+       (.findMachine vbox id-or-name)
+       (catch Exception e
+         (log/warn (format "Machine identified by '%s' not found."
+                           id-or-name))))))
 
 (defn find-hard-disk
   [vbox id-or-location]
-  (try
-    (.getHardDisk vbox id-or-location)
-    (catch Exception e
-      (try (.findHardDisk vbox id-or-location)
-           (catch Exception e
-             (log/warn (format "Can't find a hard disk located in '%s'."
-                               id-or-location)))))))
-
+  (try (.findHardDisk vbox id-or-location)
+       (catch Exception e
+         (log/warn (format "Can't find a hard disk located in '%s'."
+                           id-or-location)))))
 
 (defn register-machine [vbox machine]
   (try

@@ -7,7 +7,8 @@ destruction of sessions with the VBox servers"
   (:import [org.virtualbox_4_0
             VirtualBoxManager
             IVirtualBox
-            VBoxException]
+            VBoxException
+            LockType]
            [vmfest.virtualbox.model
             Server
             Machine]))
@@ -91,46 +92,50 @@ VirtualBoxManager object plus the credentials or by a Server object.
   `(let [[~mgr ~vbox] (create-mgr-vbox ~server)]
      (try
        ~@body
-       (finally (when ~vbox
-                  (try (.disconnect ~mgr ~vbox)
+       (finally (when ~mgr
+                  (try (.disconnect ~mgr)
                        (catch Exception e#
-                         #_(conditions/log-and-raise e# {:log-level :error
+                         (conditions/log-and-raise e# {:log-level :error
                                                        :message "unable to close session"}))))))))
 
-;; When we want to manipulate the configuration of a VM, we need to
-;; acquire a lock on such VM to prevent others from modifying it
-;; concurrently. To do so we need to acquire a **direct session** with
-;; the VM through the vbox hosting it.
+(def lock-type-constant
+  {:write org.virtualbox_4_0.LockType/Write
+   :shared org.virtualbox_4_0.LockType/Shared})
 
-(defmacro with-direct-session
-  "Wraps the body with a session with a machine. "
-  [machine [session vb-m] & body]
+(defmacro with-session
+  [machine type [session vb-m] & body]
   `(try
-     (let [machine-id# (:id ~machine)]
-       (with-vbox (:server ~machine) [mgr# vbox#]
-         (with-open [~session (.getSessionObject mgr# vbox#)]
-           (.openSession vbox# ~session machine-id#)
-           (log/trace (format "direct session is open for machine-id='%s'" machine-id#))
-           (let [~vb-m (.getMachine ~session)]
-             (try
-               ~@body
-               (catch java.lang.IllegalArgumentException e#
-                 (conditions/log-and-raise e#
-                                           {:log-level :error
-                                            :message
-                                            (format "Called a method that is not available with a direct session in '%s'" '~body)
-                                            :type :invalid-method})))))))
-     (catch Exception e# 
-       (conditions/log-and-raise e# {:log-level :error
-                                     :message (format "Cannot open session with machine '%s' reason:%s"
-                                                      (:id ~machine)
-                                                      (.getMessage e#))}))))
+     (with-vbox (:server ~machine) [mgr# vbox#]
+       (let [~session (.getSessionObject mgr#)
+             immutable-vb-m# (.findMachine vbox# (:id ~machine))]
+         (.lockMachine immutable-vb-m# ~session (~type lock-type-constant))
+         (let [~vb-m (.getMachine ~session)]
+           (try
+             ~@body
+             (catch java.lang.IllegalArgumentException e#
+               (conditions/log-and-raise
+                e#
+                {:log-level :error
+                 :message
+                 (format
+                  "Called a method that is not available with a direct session in '%s'"
+                  '~body)
+                 :type :invalid-method}))
+             (finally (.unlockMachine ~session))))))
+     (catch Exception e#
+       (conditions/log-and-raise
+        e#
+        {:log-level :error
+         :message (format "Cannot open session with machine '%s' reason:%s"
+                          (:id ~machine)
+                          (.getMessage e#))}))))
+
 
 (defmacro with-no-session
   [^Machine machine [vb-m] & body]
   `(try
      (with-vbox (:server ~machine) [_# vbox#]
-       (let [~vb-m (model/soak ~machine vbox#)] 
+       (let [~vb-m (.findMachine vbox# (:id ~machine))] 
          ~@body))
       (catch java.lang.IllegalArgumentException e#
         (conditions/log-and-raise e# {:log-level :error
@@ -140,25 +145,6 @@ VirtualBoxManager object plus the credentials or by a Server object.
          (conditions/log-and-raise e# {:log-level :error
                                        :message "An error occurred"}))))
 
-(defmacro with-remote-session
-  [^Machine machine [session console] & body]
-  `(try
-     (let [machine-id# (:id ~machine)]
-       (with-vbox (:server ~machine) [mgr# vbox#]
-         (with-open [~session (.getSessionObject mgr# vbox#)]
-           (log/info (format "with-remote-session: Opening existing session for machine %s" ~machine))
-           (.openExistingSession vbox# ~session machine-id#)
-           (log/trace (str "new remote session is open for machine-id=" machine-id#))
-           (let [~console (.getConsole ~session)]
-             (try
-               ~@body
-               (catch java.lang.IllegalArgumentException e#
-                 (conditions/log-and-raise e# {:log-level :error
-                                               :message "Called a method that is not available without a session"
-                                               :type :invalid-method})))))))
-     (catch Exception e#
-       (conditions/log-and-raise e# {:log-level :error
-                                     :message "An error occurred"}))))
 
 
 (comment
@@ -171,11 +157,11 @@ VirtualBoxManager object plus the credentials or by a Server object.
   (def vb-m (vmfest.virtualbox.model.Machine. machine-id server nil))
   
   ;; read config values with a session
-  (with-direct-session vb-m [session machine]
+  (with-session vb-m :write [session machine]
     (.getMemorySize machine))
 
   ;; set config values
-  (with-direct-session vb-m [session machine]
+  (with-session vb-m :direct [session machine]
     (.setMemorySize machine (long 2048))
     (.saveSettings machine))
 

@@ -1,7 +1,8 @@
 (ns vmfest.virtualbox.session-test
   (:use vmfest.virtualbox.session :reload-all)
   (:use [vmfest.virtualbox.virtualbox :only (find-vb-m)])
-  (:use clojure.test)
+  (:use clojure.test
+        clojure.contrib.condition)
   (:import [org.virtualbox_4_0
             VirtualBoxManager]
            [clojure.contrib.condition
@@ -18,19 +19,25 @@
 (deftest ^{:integration true}
   ws-session-test
   (let [mgr (create-session-manager)]
-    (testing "Get ahold of VBox manager"
-      (is (= (class mgr)
-             VirtualBoxManager)))
-    (testing "Connect to the remote vbox server"
-      (let [vbox (create-vbox mgr *url* *username* *password*)]
-        (testing "Get a connection to the remote VBox Server"
-          (is (not (nil? (.getVersion vbox)))))
-        (testing "Connecting to a malformed address should throwh a condition"
-          (is (thrown-with-msg? Condition #"Cannot connect"
-                (create-vbox mgr "bogus address" "" ""))))))
-    (testing "create-mgr-vbox"
-      (let [[mgr vbox] (create-mgr-vbox *url* *username* *password*)]
-        (is (not (nil? (.getVersion vbox))))))))
+    (try
+      (testing "Get ahold of VBox manager"
+        (is (= (class mgr)
+               VirtualBoxManager)))
+      (testing "Connect to the remote vbox server"
+        (let [vbox (create-vbox mgr *url* *username* *password*)]
+          (testing "Get a connection to the remote VBox Server"
+            (is (not (nil? (.getVersion vbox)))))
+          (testing "Connecting to a malformed address should throwh a condition"
+            (is (thrown-with-msg? Condition #"Cannot connect"
+                  (create-vbox mgr "bogus address" "" ""))))))
+      (finally (when mgr
+                 (try (.disconnect mgr))))))
+  (testing "create-mgr-vbox"
+    (let [[mgr vbox] (create-mgr-vbox *url* *username* *password*)]
+      (try
+        (is (not (nil? (.getVersion vbox))))
+        (finally (when mgr
+                   (try (.disconnect mgr))))))))
 
 (deftest ^{:integration true}
   session-wrappers
@@ -38,56 +45,57 @@
     (is (not (nil? (with-vbox *server* [mgr vbox]
                      (.getVersion vbox)))))))
 
-#_(deftest ^{:integration true}
-  get-a-vb-to-test-with
-  (def vb-m-1
-    (with-vbox *server* [_ vbox]
-      (find-vb-m vbox "Test-1")))
-  (is (not (nil? vb-m-1))))
-
 (def valid-machine (Machine. "Test-1" *server* nil))
+(def bogus-machine (Machine. "Bogus name" *server* nil))
 
+(deftest ^{:integration true}
+  with-session-tests
+  (testing "use write session to update machine definition"
+    (is (with-session valid-machine :write [s vb-m]
+          (let [next-memory-size (+ 1 (.getMemorySize vb-m))]
+            (.setMemorySize vb-m (long next-memory-size))
+            (.saveSettings vb-m)
+            (= next-memory-size (.getMemorySize vb-m))))))
+  (testing "write locks are acquired and released correctly,"
+    (testing "write locks are released"
+      (is (nil? (do
+                  (with-session valid-machine :write [s m])
+                  (with-session valid-machine :write [s m])))
+          "No locking exceptions are thrown"))
+    (testing "write locks are acquired"
+      (is (thrown-with-msg? Condition #"Cannot open session with machine"
+           (with-session valid-machine :write [s m]
+             (with-session valid-machine :write [s2 m2])))))
+    (testing "shared locks can be acquired after a write lock"
+      (is (nil? (do
+                  (with-session valid-machine :write [s m]
+                    (with-session valid-machine :shared [s2 m2]
+                      (with-session valid-machine :shared [s3 m3])))))))
+    (testing "a write lock cannot be acquired after a shared lock"
+      (is (thrown-with-msg? Condition #"Cannot open session with machine"
+            (with-session valid-machine :shared [s m]
+              (with-session valid-machine :write [s2 m2]))))))
+  (testing "a session with a bogus machine will throw a condition"
+      (is (thrown-with-msg? Condition #"Cannot open session with machine"
+            (with-session bogus-machine :write [s m]))))
+  (testing "write session method call -- wrong method,"
+    (is (thrown?
+         Condition
+         (with-session valid-machine :write [session machine]
+           (.setBogusVariable machine nil))))
+    (is (handler-case :type
+          (with-session valid-machine :write [session machine]
+            (.setBogusVariable machine nil))
+          (handle :invalid-method true)))))
 
-#_(deftest ^{:integration true}
-  with-direct-session-test
-  (testing "direct session with a valid machine"
-    (is (> 0
-           (with-direct-session valid-machine [s vb-m]
-               (.getMemorySize vb-m))))))
+(deftest ^{:integration true}
+  shared-sessions-can-control-machines
+  ;; todo
+  )
 
-
-
-
-(comment "old tests"
-         (ns int.vmfest.virtualbox.session-int
-  (:use :reload [vmfest.virtualbox.session]
-        [vmfest.virtualbox.virtualbox :only [find-machine]] )
-  (:use clojure.contrib.condition)
-  (:require :reload [vmfest.virtualbox.model])
-  (:import  clojure.contrib.condition.Condition)
-  (:use [clojure.test]))
-
-(deftest test-direct-connection
-  (let [vb-m (find-machine "http://localhost:18083" "" "" "Test1")]
-    (testing "direct session read -- happy path"
-      (is (< 0 (with-direct-session vb-m [session machine]
-                 (.getMemorySize machine)))))
-    (testing "direct session write -- happy path"
-      (do (with-direct-session vb-m [session machine]
-            (.setMemorySize machine (long 1024))
-            (.saveSettings machine)))
-      (is (= 1024 (with-direct-session vb-m [session machine]
-                    (.getMemorySize machine))))
-      (do (with-direct-session vb-m [session machine]
-            (.setMemorySize machine (long 512))
-            (.saveSettings machine)))
-      (is (= 512 (with-direct-session vb-m [session machine]
-                   (.getMemorySize machine)))))
-    (testing "direct session method call -- wrong method"
-      (is (thrown? Condition
-                   (with-direct-session vb-m [session machine]
-                     (.setBogusVariable machine nil))))
-      (is (handler-case :type
-                       (with-direct-session vb-m [session machine]
-                         (.setBogusVariable machine nil))
-                       (handle :invalid-method true)))))))
+(deftest ^{:integration true}
+  with-no-session-tests
+  (testing "with no session you can read parameters on the machine"
+    (with-no-session valid-machine [vb-m]
+      (is (not (nil? vb-m)))
+      (is (< 0 (.getMemorySize vb-m))))))

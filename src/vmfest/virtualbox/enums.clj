@@ -1,10 +1,8 @@
 (ns vmfest.virtualbox.enums
   (:require [clojure.contrib.logging :as log])
   (:import
-   [org.virtualbox_4_0 IMachine]
-   [org.virtualbox_4_0.jaxws MachineState ClipboardMode
-    PointingHidType FirmwareType KeyboardHidType SessionState SessionType
-    StorageBus
+   [org.virtualbox_4_0 IMachine MachineState ClipboardMode PointingHidType
+    FirmwareType KeyboardHidType SessionState SessionType StorageBus
     DeviceType NetworkAttachmentType]))
 
 (defmacro find-key-by-value [value table]
@@ -25,30 +23,30 @@
 
 ;;; MachineState
 (def machine-state-to-key-table
-  [[MachineState/POWERED_OFF :powered-off ""]
-   [MachineState/SAVED :saved ""]
-   [MachineState/TELEPORTED :teleported ""]
-   [MachineState/ABORTED :aborted ""]
-   [MachineState/RUNNING :running ""]
-   [MachineState/PAUSED :paused ""]
-   [MachineState/STUCK :stuck ""]
-   [MachineState/TELEPORTING :teleporting ""]
-   [MachineState/LIVE_SNAPSHOTTING :live-snapshotting ""]
-   [MachineState/STARTING :starting ""]
-   [MachineState/STOPPING :stopping ""]
-   [MachineState/SAVING :saving ""]
-   [MachineState/RESTORING :restoring ""]
-   [MachineState/TELEPORTING_PAUSED_VM :teleporting-paused-vm ""]
-   [MachineState/TELEPORTING_IN :teleporting-in ""]
-   [MachineState/DELETING_SNAPSHOT_ONLINE :deleting-snapshot-online ""]
-   [MachineState/DELETING_SNAPSHOT_PAUSED :deleting-snapshot-paused ""]
-   [MachineState/RESTORING_SNAPSHOT :restoring-snapshot ""]
-   [MachineState/DELETING_SNAPSHOT :deleting-snapshot ""]
-   [MachineState/SETTING_UP :setting-up ""]
-   [MachineState/FIRST_ONLINE :first-online ""]
-   [MachineState/LAST_ONLINE :last-online ""]
-   [MachineState/FIRST_TRANSIENT :first-transient ""]
-   [MachineState/LAST_TRANSIENT :last-transient ""]])
+  [[MachineState/PoweredOff :powered-off ""]
+   [MachineState/Saved :saved ""]
+   [MachineState/Teleported :teleported ""]
+   [MachineState/Aborted :aborted ""]
+   [MachineState/Running :running ""]
+   [MachineState/Paused :paused ""]
+   [MachineState/Stuck :stuck ""]
+   [MachineState/Teleporting :teleporting ""]
+   [MachineState/LiveSnapshotting :live-snapshotting ""]
+   [MachineState/Starting :starting ""]
+   [MachineState/Stopping :stopping ""]
+   [MachineState/Saving :saving ""]
+   [MachineState/Restoring :restoring ""]
+   [MachineState/TeleportingPausedVM :teleporting-paused-vm ""]
+   [MachineState/TeleportingIn :teleporting-in ""]
+   [MachineState/DeletingSnapshotOnline :deleting-snapshot-online ""]
+   [MachineState/DeletingSnapshotPaused :deleting-snapshot-paused ""]
+   [MachineState/RestoringSnapshot :restoring-snapshot ""]
+   [MachineState/DeletingSnapshot :deleting-snapshot ""]
+   [MachineState/SettingUp :setting-up ""]
+   [MachineState/FirstOnline :first-online ""]
+   [MachineState/LastOnline :last-online ""]
+   [MachineState/FirstTransient :first-transient ""]
+   [MachineState/LastTransient :last-transient ""]])
 
 (defn machine-state-to-key [state]
   (find-key-by-value state machine-state-to-key-table))
@@ -58,10 +56,10 @@
 
 ;;; ClipboardMode
 (def clipboard-mode-to-key-table
-  [[ClipboardMode/DISABLED :disabled ""]
-   [ClipboardMode/HOST_TO_GUEST :host-to-guest ""]
-   [ClipboardMode/GUEST_TO_HOST :guest-to-host ""]
-   [ClipboardMode/BIDIRECTIONAL :bidirectional ""]])
+  [[ClipboardMode/Disabled :disabled ""]
+   [ClipboardMode/HostToGuest :host-to-guest ""]
+   [ClipboardMode/GuestToHost :guest-to-host ""]
+   [ClipboardMode/Bidirectional :bidirectional ""]])
 
 (defn clipboard-mode-to-key [mode]
   (find-key-by-value mode clipboard-mode-to-key-table))
@@ -71,11 +69,11 @@
 
 ;;; PointingHidType
 (def pointing-hid-type-to-key-table
-  [[PointingHidType/NONE :none ""]
-   [PointingHidType/PS_2_MOUSE :ps2-mouse ""]
-   [PointingHidType/USB_MOUSE :usb-mouse ""]
-   [PointingHidType/USB_TABLET :usb-tablet ""]
-   [PointingHidType/COMBO_MOUSE :combo-mouse ""]])
+  [[PointingHidType/None :none ""]
+   [PointingHidType/PS2Mouse :ps2-mouse ""]
+   [PointingHidType/USBMouse :usb-mouse ""]
+   [PointingHidType/USBTablet :usb-tablet ""]
+   [PointingHidType/ComboMouse :combo-mouse ""]])
 
 (defn pointing-hid-type-to-key [type]
   (find-key-by-value type pointing-hid-type-to-key-table))
@@ -87,8 +85,8 @@
 (def firmware-type-to-key-table
   [[FirmwareType/BIOS :bios ""]
    [FirmwareType/EFI :efi ""]
-   [FirmwareType/EFI_32 :efi-32 ""]
-   [FirmwareType/EFI_64 :efi-64 ""]
+   [FirmwareType/EFI32 :efi-32 ""]
+   [FirmwareType/EFI64 :efi-64 ""]
    [FirmwareType/EFIDUAL :efi-dual ""]])
 
 (defn firmware-type-to-key [type]
@@ -98,10 +96,10 @@
   (find-value-by-key key firmware-type-to-key-table))
 ;;; KeyboardHidType
 (def keyboard-hid-type-to-key-table
-  [[KeyboardHidType/NONE :none ""]
-   [KeyboardHidType/PS_2_KEYBOARD :ps2-keyboard ""]
-   [KeyboardHidType/USB_KEYBOARD :usb-keyboard ""]
-   [KeyboardHidType/COMBO_KEYBOARD :combo-keyboard ""]])
+  [[KeyboardHidType/None :none ""]
+   [KeyboardHidType/PS2Keyboard :ps2-keyboard ""]
+   [KeyboardHidType/USBKeyboard :usb-keyboard ""]
+   [KeyboardHidType/ComboKeyboard :combo-keyboard ""]])
 (defn keyboard-hid-type-to-key [type]
   (find-key-by-value type keyboard-hid-type-to-key-table))
 (defn key-to-keyboard-hid-type [key]
@@ -109,11 +107,11 @@
 
 ;;; SessionState
 (def session-state-to-key-table
-  [[SessionState/NULL :null ""]
-   [SessionState/UNLOCKED :unlocked ""]
-   [SessionState/LOCKED :locked ""]
-   [SessionState/SPAWNING :spawning ""]
-   [SessionState/UNLOCKING :unlocking ""]])
+  [[SessionState/Null :null ""]
+   [SessionState/Unlocked :unlocked ""]
+   [SessionState/Locked :locked ""]
+   [SessionState/Spawning :spawning ""]
+   [SessionState/Unlocking :unlocking ""]])
 (defn session-state-to-key [state]
   (find-key-by-value state session-state-to-key-table))
 (defn key-to-session-state [key]
@@ -121,10 +119,10 @@
 
 ;;; SessionType
 (def session-type-to-key-table
-  [[SessionType/NULL :null ""]
-   [SessionType/WRITE_LOCK :write-lock ""]
-   [SessionType/REMOTE :remote ""]
-   [SessionType/SHARED :shared ""]])
+  [[SessionType/Null :null ""]
+   [SessionType/WriteLock :write-lock ""]
+   [SessionType/Remote :remote ""]
+   [SessionType/Shared :shared ""]])
 (defn session-type-to-key [type]
   (find-key-by-value type session-type-to-key-table))
 (defn key-to-session-type [key]
@@ -132,11 +130,11 @@
 
 ;;;StorageBus
 (def storage-bus-to-key-table
-  [[StorageBus/NULL :null ""]
+  [[StorageBus/Null :null ""]
    [StorageBus/IDE :ide ""]
    [StorageBus/SATA :sata ""]
    [StorageBus/SCSI :scsi ""]
-   [StorageBus/FLOPPY :floppy ""]
+   [StorageBus/Floppy :floppy ""]
    [StorageBus/SAS :sas ""]])
 (defn storage-bus-to-key [bus]
   (find-key-by-value bus storage-bus-to-key-table))
@@ -145,13 +143,14 @@
 
 ;;; DeviceType
 (def device-type-to-key-table
-  [[DeviceType/NULL :null "Null value, may also mean “no device” (not allowed for IConsole::getDeviceActivity())."]
-   [DeviceType/FLOPPY :floppy "Floppy device."]
+  [[DeviceType/Null
+    :null "Null value, may also mean “no device” (not allowed for IConsole::getDeviceActivity())."]
+   [DeviceType/Floppy :floppy "Floppy device."]
    [DeviceType/DVD :dvd "CD/DVD-ROM device."]
-   [DeviceType/HARD_DISK :hard-disk "Hard disk device."]
-   [DeviceType/NETWORK :network "Network device."]
+   [DeviceType/HardDisk :hard-disk "Hard disk device."]
+   [DeviceType/Network :network "Network device."]
    [DeviceType/USB :usb "USB device."]
-   [DeviceType/SHARED_FOLDER :shared-folder "Shared folder device."]])
+   [DeviceType/SharedFolder :shared-folder "Shared folder device."]])
 (defn device-type-to-key [type]
   (find-key-by-value type device-type-to-key-table))
 (defn key-to-device-type [key]
@@ -159,11 +158,11 @@
 
 ;;; NetworkAttachmentType
 (def network-attachment-type-to-key-table
-  [[NetworkAttachmentType/NULL :null "Null value, also means 'not attached'."]
+  [[NetworkAttachmentType/Null :null "Null value, also means 'not attached'."]
    [NetworkAttachmentType/NAT :nat ""]
-   [NetworkAttachmentType/BRIDGED :bridged ""]
-   [NetworkAttachmentType/INTERNAL :internal ""]
-   [NetworkAttachmentType/HOST_ONLY :host-only ""]
+   [NetworkAttachmentType/Bridged :bridged ""]
+   [NetworkAttachmentType/Internal :internal ""]
+   [NetworkAttachmentType/HostOnly :host-only ""]
    [NetworkAttachmentType/VDE :vde ""]])
 (defn network-attachment-type-to-key [type]
   (find-key-by-value type network-attachment-type-to-key-table))

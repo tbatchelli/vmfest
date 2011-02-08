@@ -6,7 +6,7 @@
             [vmfest.virtualbox.model :as model]
             [vmfest.virtualbox.enums :as enums]
             [vmfest.virtualbox.session :as session])
-  (:import [org.virtualbox_4_0 IMachine IConsole]
+  (:import [org.virtualbox_4_0 IMachine IConsole VBoxException]
            [vmfest.virtualbox.model GuestOsType Machine]))
 
 (defn map-from-IMachine
@@ -30,22 +30,26 @@
    :accelerate-2d-video-enabled? (.getAccelerate2DVideoEnabled vb-m)
    :monitor-count (.getMonitorCount vb-m)
    :bios-settings (.getBIOSSettings vb-m) ;todo: get object
-   :firmware-type (enums/firmware-type-to-key (.getFirmwareType vb-m)) ;todo: get object
-   :pointing-hid-type (enums/pointing-hid-type-to-key (.getPointingHidType vb-m)) ;todo: get object
-   :keyboard-hid-type (enums/keyboard-hid-type-to-key (.getKeyboardHidType vb-m)) ;todo: get object
+   :firmware-type (enums/firmware-type-to-key
+                   (.getFirmwareType vb-m)) ;todo: get object
+   :pointing-hid-type (enums/pointing-hid-type-to-key
+                       (.getPointingHidType vb-m)) ;todo: get object
+   :keyboard-hid-type (enums/keyboard-hid-type-to-key
+                       (.getKeyboardHidType vb-m)) ;todo: get object
    :hpet-enabled (.getHpetEnabled vb-m)
    :snapshot-folder (.getSnapshotFolder vb-m)
-   :vrdp-server (.getVRDPServer vb-m) ;todo: get object
+   :vrde-server (.getVRDEServer vb-m) ;todo: get object
    :medium-attachments (.getMediumAttachments vb-m) ;todo: get
-                                 ;objects
+                                        ;objects
    :usb-controller (.getUSBController vb-m) ;todo: get object
    :audio-adapter (.getAudioAdapter vb-m) ; todo: get object
    :storage-controllers (.getStorageControllers vb-m) ;todo: get
-                                 ;objects
+                                        ;objects
    :settings-file-path (.getSettingsFilePath vb-m)
    :settings-modified? (try (.getSettingsModified vb-m)
                             (catch Exception e (comment "Do nothing")))
-   :session-state (enums/session-state-to-key (.getSessionState vb-m)) ;todo: get object
+   :session-state (enums/session-state-to-key
+                   (.getSessionState vb-m)) ;todo: get object
    :session-type (enums/session-type-to-key (.getSessionType vb-m))
    :session-pid (.getSessionPid vb-m)
    :state (enums/machine-state-to-key (.getState vb-m)) ;todo: get object
@@ -56,8 +60,10 @@
    :snapshot-count (.getSnapshotCount vb-m)
    :current-state-modified? (.getCurrentStateModified vb-m)
    :shared-folders (.getSharedFolders vb-m) ;todo: get objects
-   :clipboard-mode (enums/clipboard-mode-to-key (.getClipboardMode vb-m)) ;todo: get object
-   :guest-property-notification-patterns (.getGuestPropertyNotificationPatterns vb-m)
+   :clipboard-mode (enums/clipboard-mode-to-key
+                    (.getClipboardMode vb-m)) ;todo: get object
+   :guest-property-notification-patterns
+   (.getGuestPropertyNotificationPatterns vb-m)
    :teleporter-enabled? (.getTeleporterEnabled vb-m)
    :teleporter-port (.getTeleporterPort vb-m)
    :teleporter-address (.getTeleporterAddress vb-m)
@@ -65,7 +71,7 @@
    :rtc-use-utc? (.getRTCUseUTC vb-m)
    :io-cache-enabled? (.getIoCacheEnabled vb-m)
    :io-cache-size (.getIoCacheSize vb-m)
-   :io-bandwidth-max (.getIoBandwidthMax vb-m)
+                                        ;   :io-bandwidth-max (.getIoBandwidthMax vb-m)
    })
 
 (def setters
@@ -90,29 +96,35 @@
    :snapshot-folder #(.setSnapshotFolder %2 %1)
    :clipboard-mode #(.setClipboardMode %2 %1)
    :teleporter-enabled? #(.setTeleporterEnabled %2 %1)
-   :guest-property-notification-patters #(.setGuestPropertyNotificationPatterns %2 %1)
+   :guest-property-notification-patters
+   #(.setGuestPropertyNotificationPatterns %2 %1)
    :teleporter-port #(.setTeleporterPort %2 %1)
    :teleporter-address #(.setTeleporterAddress %2 %1)
    :teleporter-password #(.setTeleporterAddress %2 %1)
    :rtc-use-utc? #(.setRTCUseUTC %2 %1)
    :io-cache-enabled? #(.setIoCacheEnabled %2 %1)
    :io-cache-size #(.setIoCacheSize %2 (long %1))
-   :io-bandwidth-max #(.setIoBandwidthMax %2 (long %1))})
+   ;;   :io-bandwidth-max #(.setIoBandwidthMax %2 (long %1))
+   })
 
 
 (defn set-map [m value-map]
   (let [get-setter (fn [k] (k setters))
-          set-fn (fn [[k v]]
-                   (let [setter (get-setter k)]
-                     (if setter
-                       (setter v m)
-                       (log/error (str "IMachine has no setter defined for " k)))))] 
+        set-fn (fn [[k v]]
+                 (let [setter (get-setter k)]
+                   (if setter
+                     (setter v m)
+                     (log/error
+                      (str "IMachine has no setter defined for " k)))))]
     (doall (map set-fn value-map))))
 
 (extend-type vmfest.virtualbox.model.Machine
   model/vbox-object
   (soak [this vbox]
-        (virtualbox/find-vb-m vbox (:id this)))
+        (let [vb-m (virtualbox/find-vb-m vbox (:id this))]
+          (log/trace
+           (format "soak: soaking %s into %s" this vb-m))
+          vb-m))
   (as-map [this]
           (session/with-vbox (:server this) [_ vbox]
             (try
@@ -120,6 +132,8 @@
                 (merge this
                        (map-from-IMachine machine (:server this))))
               (catch Exception e
+                (log/error (format "as-map: Machine %s not found. Reason"
+                                   (:id this)) e)
                 (merge this
                        {:error "Machine not found"
                         :exception e}))))))
@@ -134,77 +148,108 @@
   "Starts the virtual machine represented by 'machine'.
 
 Optional parameters are:
-   :session-type 'gui', 'vrdp' or 'sdl'. Default is 'gui'
-   :env environment as String to be passed to the machine at startup. See IVirtualbox::openRemoteSession for more details"
+   :session-type 'gui', 'headless' or 'sdl'. Default is 'gui'
+   :env environment as String to be passed to the machine at startup.
+See IVirtualbox::openRemoteSession for more details"
   [mgr vbox machine-id & opt-kv]
   (let [opts (apply hash-map opt-kv)
-        session (.getSessionObject mgr vbox)
+        session (.getSessionObject mgr)
         session-type  (or (:session-type opts) "gui")
         env (or (:env opts) "DISPLAY:0.0")]
-    (try (let [progress (.openRemoteSession vbox session machine-id session-type env)]
-           (log/debug (str "Starting session for VM " machine-id "..."))
+    (try (let [vb-m (virtualbox/find-vb-m vbox machine-id)
+               progress
+               (.launchVMProcess vb-m session session-type env)
+               #_(.openRemoteSession vbox session machine-id session-type env)]
+           (log/debug (str "start: Starting session for VM " machine-id "..."))
            (.waitForCompletion progress 30000)
            (let [result-code (.getResultCode progress)]
-             (if (zero? result-code)
-               nil
-               true)))
-         (catch javax.xml.ws.WebServiceException e
+             (log/debug (format "start: VM %s started with result code %s"
+                                machine-id
+                                result-code))
+             result-code))
+         (catch VBoxException e
            (conditions/wrap-vbox-runtime
             e
-            {:E_UNEXPECTED {:message "Virtual Machine not registered."}
-             :E_INVALIDARG {:message (format "Invalid session type '%s'" session-type)}
-             :VBOX_E_OBJECT_NOT_FOUND {:message (format "No machine matching id '%s' found." machine-id)}
-             :VBOX_E_INVALID_OBJECT_STATE {:message "Session already open or opening."}
-             :VBOX_E_IPTR_ERROR {:message "Launching process for machine failed."}
-             :VBOX_E_VM_ERROR {:message "Failed to assign machine to session."}}))
+            {:E_UNEXPECTED
+             {:message "Virtual Machine not registered."}
+             :E_INVALIDARG
+             {:message (format "Invalid session type '%s'" session-type)}
+             :VBOX_E_OBJECT_NOT_FOUND
+             {:message (format "No machine matching id '%s' found." machine-id)}
+             :VBOX_E_INVALID_OBJECT_STATE
+             {:message "Session already open or opening."}
+             :VBOX_E_IPTR_ERROR
+             {:message "Launching process for machine failed."}
+             :VBOX_E_VM_ERROR
+             {:message "Failed to assign machine to session."}}))
          (catch Exception e
-           (conditions/log-and-raise e {:log-level :error
-                                        :message "An error occurred while starting machine"})))))
+           (log/error "Cannot start machine" e)
+           (conditions/log-and-raise
+            e
+            {:log-level :error
+             :message "An error occurred while starting machine"})))))
 
 (defn save-settings [machine]
   (try
     (.saveSettings machine)
-    (catch javax.xml.ws.WebServiceException e
+    (catch VBoxException e
       (conditions/wrap-vbox-runtime
        e
-       {:VBOX_E_FILE_ERROR {:message "Settings file not accessible while trying to save them"}
-        :VBOX_E_XML_ERROR {:message "Cannot parse settings XML file"}
-        :E_ACCESSDENIED {:message "Saving of the settings has been refused"}}))
+       {:VBOX_E_FILE_ERROR
+        {:message "Settings file not accessible while trying to save them"}
+        :VBOX_E_XML_ERROR
+        {:message "Cannot parse settings XML file"}
+        :E_ACCESSDENIED
+        {:message "Saving of the settings has been refused"}}))
     (catch Exception e
-      (conditions/log-and-raise e {:log-level :error
-                                    :message "An error occurred while saving a machine"}))))
+      (conditions/log-and-raise
+       e
+       {:log-level :error
+        :message "An error occurred while saving a machine"}))))
 
 (defn add-storage-controller  [m name bus-type]
   (let [bus (enums/key-to-storage-bus bus-type)]
-    (when-not bus (conditions/log-and-raise (RuntimeException.)
-                                            {:log-level :error
-                                             :message (str "Bus type not found " bus-type)}))
+    (when-not bus (conditions/log-and-raise
+                   (RuntimeException.)
+                   {:log-level :error
+                    :message (str "Bus type not found " bus-type)}))
     (try
       (.addStorageController m name bus)
-      (catch javax.xml.ws.WebServiceException e
+      (catch VBoxException e
         (conditions/wrap-vbox-runtime
          e
-         {:VBOX_E_OBJECT_IN_USE	{:message "A storage controller with given name exists already."}
-          :E_INVALIDARG	{:message "Invalid controllerType."}})))))
+         {:VBOX_E_OBJECT_IN_USE
+          {:message "A storage controller with given name exists already."}
+          :E_INVALIDARG
+          {:message "Invalid controllerType."}})))))
 
 (defn attach-device [m name controller-port device device-type uuid]
   (let [type (enums/key-to-device-type device-type)]
-    (when-not type (conditions/log-and-raise (RuntimeException.)
-                                             {:log-level :error
-                                              :message (str "Device Type not found " device-type)}))
+    (when-not type (conditions/log-and-raise
+                    (RuntimeException.)
+                    {:log-level :error
+                     :message (str "Device Type not found " device-type)}))
     (try
       (.attachDevice m name controller-port device type uuid)
-      (catch javax.xml.ws.WebServiceException e
+      (catch VBoxException e
         (conditions/wrap-vbox-runtime
          e
-         {:E_INVALIDARG {:message "SATA device, SATA port, IDE port or IDE slot out of range."}
-          :VBOX_E_INVALID_OBJECT_STATE {:message "Attempt to attach medium to an unregistered virtual machine."}
-          :VBOX_E_INVALID_VM_STATE {:message "Invalid machine state."}
-          :VBOX_E_OBJECT_IN_USE {:message "Hard disk already attached to this or another virtual machine."}})))))
+         {:E_INVALIDARG
+          {:message
+           "SATA device, SATA port, IDE port or IDE slot out of range."}
+          :VBOX_E_INVALID_OBJECT_STATE
+          {:message
+           "Attempt to attach medium to an unregistered virtual machine."}
+          :VBOX_E_INVALID_VM_STATE
+          {:message "Invalid machine state."}
+          :VBOX_E_OBJECT_IN_USE
+          {:message
+           "Hard disk already attached to this or another virtual machine."}}
+         )))))
 
 (defn set-network-adapter [m port type interface]
   (try
-    (when-let [adapter (.getNetworkAdapter m (long port))] 
+    (when-let [adapter (.getNetworkAdapter m (long port))]
       (condp = type
           :bridged (do (.attachToBridgedInterface adapter)
                        ;; todo: get this from IHost.getNetworkInterfaces
@@ -214,46 +259,58 @@ Optional parameters are:
           :host-only (.attachToHostOnlyInterface adapter)
           :vde (.attachToVDE adapter)))))
 
-(defn stop 
+(defn stop
   [^IConsole c]
   (try
+    (log/trace (format "stop: machine-id: %s"
+                       (.getId (.getMachine c))))
     (.powerButton c)
-    (catch javax.xml.ws.WebServiceException e
+    (catch VBoxException e
+      (log/debug "stop: Caught exception" e)
       (conditions/wrap-vbox-runtime
        e
-       {:VBOX_E_INVALID_VM_STATE {:message "Virtual machine not in Running state."}
-        :VBOX_E_PDM_ERROR {:message "Controlled power off failed."}}))))
+       {:VBOX_E_INVALID_VM_STATE
+        {:message "Virtual machine not in Running state."}
+        :VBOX_E_PDM_ERROR
+        {:message "Controlled power off failed."}}))))
 
 (defn pause
   [^IConsole c]
   (try
     (.pause c)
-    (catch javax.xml.ws.WebServiceException e
+    (catch VBoxException e
       (conditions/wrap-vbox-runtime
        e
-       {:VBOX_E_INVALID_VM_STATE {:message "Virtual machine not in Running state."}
-        :VBOX_E_VM_ERROR {:message "Virtual machine error in suspend operation."}}))))
+       {:VBOX_E_INVALID_VM_STATE
+        {:message "Virtual machine not in Running state."}
+        :VBOX_E_VM_ERROR
+        {:message "Virtual machine error in suspend operation."}}))))
 
 (defn resume
   [^IConsole c]
   (try
     (.resume c)
-    (catch javax.xml.ws.WebServiceException e
+    (catch VBoxException e
       (conditions/wrap-vbox-runtime
        e
-       {:VBOX_E_INVALID_VM_STATE {:message "Virtual machine not in Paused state."}
-        :VBOX_E_VM_ERROR {:message "Virtual machine error in resume operation."}}))))
+       {:VBOX_E_INVALID_VM_STATE
+        {:message "Virtual machine not in Paused state."}
+        :VBOX_E_VM_ERROR
+        {:message "Virtual machine error in resume operation."}}))))
 
 
 (defn power-down
   [^Machine c]
-  (try 
-    (.powerDown c)
-    (catch javax.xml.ws.WebServiceException e
+  (try
+    (let [progress (.powerDown c)]
+      (.waitForCompletion progress 30000))
+    (catch VBoxException e
       (conditions/wrap-vbox-runtime
        e
        {:VBOX_E_INVALID_VM_STATE
-        {:message "Virtual machine must be Running, Paused or Stuck to be powered down."}}))))
+        {:message
+         "Virtual machine must be Running, Paused or Stuck to be powered
+ down."}}))))
 
 (defn detach-device [vb-m medium-attachment]
   (println medium-attachment)
@@ -262,7 +319,9 @@ Optional parameters are:
           controller-port (.getPort medium-attachment)
           name (.getController medium-attachment)]
       (println "medium:" (.getMedium medium-attachment))
-      (println "medium name:" name "controller-port:" controller-port "device:" device)
+      (println "medium name:" name
+               "controller-port:" controller-port
+               "device:" device)
       (println "controller:" (.getController medium-attachment))
       (try
         (.detachDevice vb-m name controller-port device)
@@ -282,7 +341,7 @@ Optional parameters are:
 (defn get-guest-property [^IConsole console key]
   (try
     (.getGuestPropertyValue (.getMachine console) key)
-    (catch javax.xml.ws.WebServiceException e
+    (catch VBoxException e
       (conditions/wrap-vbox-runtime
        e
        {:VBOX_E_INVALID_VM_STATE {:message "Machine session is not open."}}))))
@@ -290,18 +349,21 @@ Optional parameters are:
 (defn set-guest-property [^IMachine machine key value]
   (try
     (.setGuestPropertyValue machine key value)
-    (catch javax.xml.ws.WebServiceException e
+    (catch VBoxException e
       (conditions/wrap-vbox-runtime
        e
        {:E_ACCESSDENIED {:message "Property cannot be changed."}
-        :VBOX_E_INVALID_VM_STATE {:message "Virtual machine is not mutable or session not open."}
-        :VBOX_E_INVALID_OBJECT_STATE {:message "Cannot set transient property when machine not running."}}))))
+        :VBOX_E_INVALID_VM_STATE
+        {:message "Virtual machine is not mutable or session not open."}
+        :VBOX_E_INVALID_OBJECT_STATE
+        {:message
+         "Cannot set transient property when machine not running."}}))))
 
 (defn set-extra-data [^IMachine m key value]
   (try
     (.setExtraData m key value)
     (.saveSettings m)
-    (catch javax.xml.ws.WebServiceException e
+    (catch VBoxException e
       (conditions/wrap-vbox-runtime
        e
        {:VBOX_E_FILE_ERROR {:message "Sttings file not accessible."}
@@ -310,7 +372,7 @@ Optional parameters are:
 (defn get-extra-data [^IMachine m key]
   (try
     (.getExtraData m key)
-    (catch javax.xml.ws.WebServiceException e
+    (catch VBoxException e
       (conditions/wrap-vbox-runtime
        e
        {:VBOX_E_FILE_ERROR {:message "Settings file not accessible."}

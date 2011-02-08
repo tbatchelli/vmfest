@@ -13,9 +13,14 @@
 (defn find-vb-m
   ([vbox id-or-name]
      (try
-       (.findMachine vbox id-or-name)
+       (log/trace (format "find-vb-m: looking for machine '%s'" id-or-name))
+       (let [vb-m (.findMachine vbox id-or-name)]
+         (log/debug (format "find-vb-m: found machine '%s': %s"
+                            id-or-name
+                            vb-m))
+         vb-m)
        (catch Exception e
-         (log/warn (format "Machine identified by '%s' not found."
+         (log/warn (format "find-vb-m: Machine identified by '%s' not found."
                            id-or-name))))))
 
 (defn find-hard-disk

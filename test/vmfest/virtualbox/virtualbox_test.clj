@@ -1,5 +1,5 @@
 (ns vmfest.virtualbox.virtualbox-test
-  (:use vmfest.virtualbox.virtualbox :reload-all)
+  (:use vmfest.virtualbox.virtualbox :reload)
   (:use clojure.test
         vmfest.virtualbox.session
         vmfest.virtualbox.session-test)

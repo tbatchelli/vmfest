@@ -1,5 +1,5 @@
 (ns vmfest.virtualbox.session-test
-  (:use vmfest.virtualbox.session :reload-all)
+  (:use vmfest.virtualbox.session :reload)
   (:use [vmfest.virtualbox.virtualbox :only (find-vb-m)])
   (:use clojure.test
         clojure.contrib.condition)
@@ -90,7 +90,7 @@
 
 (deftest ^{:integration true}
   shared-sessions-can-control-machines
-  ;; todo
+  ;(testing "I")
   )
 
 (deftest ^{:integration true}

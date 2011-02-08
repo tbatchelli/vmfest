@@ -5,7 +5,8 @@
             InvalidObjectFault
             InvalidObjectFaultMsg
             RuntimeFault
-            RuntimeFaultMsg]))
+            RuntimeFaultMsg]
+           [org.virtualbox_4_0 VBoxException]))
 
 (defn unsigned-int-to-long [ui]
   (bit-and (long ui) 0xffffffff))
@@ -39,17 +40,26 @@
 (extend-protocol fault
   java.lang.Exception
   (as-map [this]
-          (log/warn (format "Processing exception %s as a java.lang.Exception. Cause %s" (class this) (.getCause this)))
+          (log/warn
+           (format "Processing exception %s as a java.lang.Exception. Cause %s"
+                   (class this)
+                   (.getCause this)))
           {:original-message (.getMessage this)
            :cause (.getCause this)
-           :type :exception
-           })
+           :type :exception})
   java.net.ConnectException 
   (as-map [this]
           {:type :connection-error})
   com.sun.xml.internal.ws.client.ClientTransportException
   (as-map [this]
           {:type :connection-error})
+  VBoxException
+  (as-map [this]
+          (let [message (.getMessage this)
+                wrapped (.getWrapped this)]
+            (merge
+             (when wrapped (as-map wrapped))
+             {:message message})))
   RuntimeFaultMsg
   (as-map [this]
           (let [message (.getMessage this)
@@ -57,7 +67,9 @@
                         (catch Exception e)) ;; runtime fault
                 interface-id (when info (.getInterfaceID info))
                 component (when info (.getComponent info))
-                result-code (when info (unsigned-int-to-long (int (.getResultCode info)))) ;; originally an unsigned int
+                result-code (when info
+                              (unsigned-int-to-long
+                               (int (.getResultCode info))))
                 text (when info (.getText info))]
             {:type :vbox-runtime
              :original-message message
@@ -92,7 +104,7 @@
 (defn wrap-vbox-runtime [e error-condition-map & default-condition-map]
   (let [condition (condition-from-webservice-exception e)
         error-type (:original-error-type condition)
-        condition-map (error-type error-condition-map) ;; the map corresponding to the error type
+        condition-map (error-type error-condition-map)
         merged-condition (merge default-condition-map condition-map)]
     (log-and-raise e merged-condition)))
 

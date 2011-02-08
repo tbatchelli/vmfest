@@ -10,23 +10,27 @@
    :family-description (.getFamilyDescription o)
    :id (.getId o)
    :description (.getDescription o)
-   :64-bit? (.isIs64Bit o)
-   :recommended-io-apic? (.isRecommendedIOAPIC o)
-   :recommended-virt-ex? (.isRecommendedVirtEx o)
+   :64-bit? (.getIs64Bit o)
+   :recommended-io-apic? (.getRecommendedIOAPIC o)
+   :recommended-virt-ex? (.getRecommendedVirtEx o)
    :recommended-ram (.getRecommendedRAM o)
    :recommended-vram (.getRecommendedVRAM o)
    :recommended-hdd (.getRecommendedHDD o)
    :adapter-type (.getAdapterType o) ;todo: pull the object
-   :recommended-pae? (.isRecommendedPae o)
-   :recommended-dvd-storage-controller (.getRecommendedDvdStorageController o) ;todo: pull object
-   :recommended-dvd-storage-bus (.getRecommendedDvdStorageBus o) ;todo: pull object
-   :recommended-hd-storage-controller (.getRecommendedHdStorageController o) ;todo: pull object
-   :recommended-hd-storage-bus (.getRecommendedHdStorageBus o) ;todo: pull object
+   :recommended-pae? (.getRecommendedPae o)
+   :recommended-dvd-storage-controller
+   (.getRecommendedDvdStorageController o) ;todo: pull object
+   :recommended-dvd-storage-bus
+   (.getRecommendedDvdStorageBus o) ;todo: pull object
+   :recommended-hd-storage-controller
+   (.getRecommendedHdStorageController o) ;todo: pull object
+   :recommended-hd-storage-bus
+   (.getRecommendedHdStorageBus o) ;todo: pull object
    :recommended-firmware (.getRecommendedFirmware o) ;todo: pull object
-   :recommended-usb-hid? (.isRecommendedUsbHid o)
-   :recommended-hpet? (.isRecommendedHpet o)
-   :recommended-usb-tablet? (.isRecommendedUsbTablet o)
-   :recommended-rtc-use-utc? (.isRecommendedRtcUseUtc o)
+   :recommended-usb-hid? (.getRecommendedUsbHid o)
+   :recommended-hpet? (.getRecommendedHpet o)
+   :recommended-usb-tablet? (.getRecommendedUsbTablet o)
+   :recommended-rtc-use-utc? (.getRecommendedRtcUseUtc o)
    })
 
 

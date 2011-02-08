@@ -27,7 +27,7 @@ If no home is passed, it will use the default
        create-session-manager: (String)
              -> VirtualBoxManager"
   [& [home]]
-   (log/debug (str "Creating session manager for home=" (or home "default")))
+   (log/trace (str "Creating session manager for home=" (or home "default")))
    (VirtualBoxManager/createInstance home))
 
 ;; Before we can interact with the server we need to create a Virtual
@@ -42,7 +42,7 @@ VirtualBoxManager object plus the credentials or by a Server object.
        create-vbox: Session
              -> IVirtualBox"
   ([^VirtualBoxManager mgr url username password]
-     (log/debug
+     (log/trace
       (format
        "creating new vbox with a logon for url=%s and username=%s"
        url
@@ -120,8 +120,7 @@ with a virtualbox.
                 {:log-level :error
                  :message
                  (format
-                  "Called a method that is not available with a direct
-session in '%s'"
+                  "Called a method that is not available with a direct session in '%s'"
                   '~body)
                  :type :invalid-method}))
              (finally (.unlockMachine ~session))))))

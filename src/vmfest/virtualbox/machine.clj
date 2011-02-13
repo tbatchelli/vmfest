@@ -380,5 +380,37 @@ See IVirtualbox::openRemoteSession for more details"
 
 ;;;;;;;
 
+(defn unregister [vb-m & [cleanup-key]]
+  ;; todo, make sure the key is valid
+  (try
+    (let [cleanup-mode (if cleanup-key
+                         (enums/key-to-cleanup-mode cleanup-key)
+                         :unregister-only)]
+      (log/info
+       (format "unregister: unregistering machine with name %s with cleanup %s"
+               (.getName vb-m)
+               cleanup-mode))
+      (.unregister vb-m cleanup-mode))
+    (catch VBoxException e
+      (conditions/wrap-vbox-runtime
+       e
+       {:VBOX_E_INVALID_OBJECT_STATE
+        {:message "Machine is currently locked for a session."}}))))
+
+(defn delete [vb-m media]
+  (try
+    (log/info
+     (format "delete: deleting machine %s and it's media"
+             (.getName vb-m)))
+    (.delete vb-m media)
+    (catch VBoxException e
+      (conditions/wrap-vbox-runtime
+       e
+       {:VBOX_E_INVALID_VM_STATE
+        {:message "Machine is registered but not write-locked."}
+        :VBOX_E_IPRT_ERROR
+        {:message "Could not delete the settings file."}}))))
+
+
 (defn state [^IMachine vb-m]
   (enums/machine-state-to-key (.getState vb-m)))

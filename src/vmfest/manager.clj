@@ -41,7 +41,7 @@
     (add-ide-controller m)))
 
 (defn attach-hard-disk [vb-m image-uuid]
-  (session/with-direct-session vb-m [_ m]
+  (session/with-session vb-m :write [_ m]
     (attach-device m "IDE Controller" 0 0 :hard-disk image-uuid)
     (.saveSettings m)))
 
@@ -50,11 +50,13 @@
   (throw (RuntimeException. "Image not found.")))
 
 (defn get-ip [machine]
-  (session/with-remote-session machine [_ console]
-    (machine/get-guest-property console "/VirtualBox/GuestInfo/Net/0/V4/IP")))
+  (session/with-session machine :shared [session _]
+    (machine/get-guest-property
+     (.getConsole session)
+     "/VirtualBox/GuestInfo/Net/0/V4/IP")))
 
 (defn set-extra-data [machine key value]
-  (session/with-direct-session machine [_ vb-m]
+  (session/with-session machine :write [_ vb-m]
     (machine/set-extra-data vb-m key value)))
 
 (defn get-extra-data [machine key]
@@ -63,16 +65,17 @@
   (log/info (str "get-extra-data: getting extra data for " (:id machine)))
   (handler-case :type
     (log/info (str "get-extra-data: trying to get a direct session "))
-    (session/with-direct-session machine [_ vb-m]
+    (session/with-session machine :write [_ vb-m]
       (machine/get-extra-data vb-m key))
     (handle :vbox-runtime
       (handler-case :type
-        (log/info "get-extra-data: trying to get a remote session (direct one failed)")
-        (session/with-remote-session machine [_ console]
-          (let [vb-m (.getMachine console)]
-            (machine/get-extra-data vb-m key)))
+        (log/info
+         "get-extra-data: trying to get a remote session (direct one failed)")
+        (session/with-session machine :shared [_ vb-m]
+          (machine/get-extra-data vb-m key))
         (handle :vbox-runtime
-          (log/info "get-extra-data: No dice. Unable to open any session with machine"))))))
+          (log/info
+           "get-extra-data: No dice. Unable to open any session with machine"))))))
 
 ;;; jclouds/pallet-style infrastructure
 
@@ -81,17 +84,22 @@
 
 (def *images*
   {:cent-os-5-5 {:description "CentOS 5.5 32bit"
-                              :uuid "3a971213-0482-4eb8-8cfd-7eefc9e8b0fe"
-                              :os-type-id "RedHat"}})
+                 :uuid "3a971213-0482-4eb8-8cfd-7eefc9e8b0fe"
+                 :os-type-id "RedHat"}})
 
-(defn create-machine [server name os-type-id config-fn image-uuid & [base-folder]]
+(defn create-machine
+  [server name os-type-id config-fn image-uuid & [base-folder]]
   (let [m (session/with-vbox server [_ vbox]
-            (let [machine (vbox/create-machine vbox name os-type-id (or base-folder (:node-path *location*)))]
+            (let [machine (vbox/create-machine
+                           vbox
+                           name
+                           os-type-id
+                           (or base-folder (:node-path *location*)))]
               (config-fn machine)
               (machine/save-settings machine)
               (vbox/register-machine vbox machine)
               (vmfest.virtualbox.model.Machine. (.getId machine) server nil)))]
-    ;; can't set the drive 
+    ;; can't set the drive
     (attach-hard-disk m image-uuid)
     m))
 
@@ -133,24 +141,24 @@
 
 (defn stop
   [^Machine m]
-  (session/with-remote-session m [_ console]
-    (machine/stop console)))
+  (session/with-session m :shared [s _]
+    (machine/stop (.getConsole s))))
 
 (defn pause
   [^Machine m]
-  (session/with-remote-session m [_ console]
-    (machine/pause console)))
+  (session/with-session m :shared [s _]
+    (machine/pause (.getConsole s))))
 
 (defn resume
   [^Machine m]
-  (session/with-remote-session m [_ console]
-    (machine/resume console)))
+  (session/with-session m :shared [s _]
+    (machine/resume (.getConsole s))))
 
 (defn power-down
   [^Machine m]
-  (handler-case :type 
-    (session/with-remote-session m [_ console]
-      (machine/power-down console))
+  (handler-case :type
+    (session/with-session m :shared [s _]
+      (machine/power-down (.getConsole s)))
     (handle :vbox-runtime
       (log/warn "Trying to stop an already stopped machine"))))
 
@@ -161,10 +169,10 @@
         (let [progress (power-down machine)]
           (when progress
             (.waitForCompletion progress -1)))
-        (session/with-direct-session machine [_ vb-m]
+        (session/with-session machine :write [_ vb-m]
           (machine/remove-all-media vb-m))
         (session/with-vbox vbox [_ vbox]
-          (vbox/unregister-machine vbox machine)) 
+          (vbox/unregister-machine vbox machine))
         (.delete (java.io.File. settings-file))))))
 
 
@@ -183,7 +191,7 @@
   "Will raise a condition if machine cannot be found."
   [server id]
   (session/with-vbox server [mgr vbox]
-    (when-let [vb-m (vbox/get-vb-m vbox id)]
+    (when-let [vb-m (vbox/find-vb-m vbox id)]
       (model/dry vb-m server))))
 
 (defn find-machine [server id-or-name]
@@ -191,10 +199,12 @@
     (when-let [vb-m (vbox/find-vb-m vbox id-or-name)]
       (model/dry vb-m server))))
 
-(defn guest-os-types [server] 
+(defn guest-os-types [server]
   (session/with-vbox server [mgr vbox]
     (let [get-keys (fn [os-type-map]
-                     (select-keys os-type-map [:id :description :family-description :64-bit?]))]
+                     (select-keys
+                      os-type-map
+                      [:id :description :family-description :64-bit?]))]
       (map (comp get-keys vmfest.virtualbox.guest-os-type/map-from-IGuestOSType)
            (.getGuestOSTypes vbox)))))
 
@@ -207,12 +217,13 @@
   (use 'vmfest.manager)
   (def my-server (server "http://localhost:18083"))
   (guest-os-types my-server) ;; see the list of os guests
-  ;; create and start one server with a configuring function 
+  ;; create and start one server with a configuring function
   (def my-machine (create-machine my-server "my-name" "Linux" basic-config))
   (start my-machine)
   ;; create and start many servers
   (def clone-names #{"c1" "c2" "c3" "c4" "c5" "c6"})
-  (def my-machines (map #(create-machine my-server % "Linux" basic-config) clone-names))
+  (def my-machines
+    (map #(create-machine my-server % "Linux" basic-config) clone-names))
   (map start my-machines)
   (map stop my-machines))
 
@@ -220,9 +231,9 @@
   (use 'vmfest.manager)
   ;; create a connection to the vbox server
   (def my-server (server "http://localhost:18083"))
-  
+
   ;; instantiate a new machine based on a supplied hardware model and image
-  (def my-machine (instance my-server "boot14" :cent-os-5-5 :micro))
+  (def my-machine (instance my-server "Test-1" :cent-os-5-5 :micro))
 
   ;; operate the machine
   (start my-machine)
@@ -246,7 +257,11 @@
 (comment "From pallet"
          "start swank with $ mvn -Pno-jclouds,vmfest clojure:swank"
          (require 'pallet.core)
-         (def service (pallet.compute/compute-service-from-config-file "virtualbox"))
-         (def my-node (pallet.core/make-node "pallet-test" {:image-id :cent-os-5-5 :packager :yum :os-family :centos}))
+         (def service
+           (pallet.compute/compute-service-from-config-file "virtualbox"))
+         (def my-node
+           (pallet.core/make-node
+            "pallet-test"
+            {:image-id :cent-os-5-5 :packager :yum :os-family :centos}))
          (pallet.core/converge {my-node 1} :compute service)
          (pallet.core/converge {my-node 0} :compute service))

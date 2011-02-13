@@ -2,7 +2,8 @@
   (:use vmfest.virtualbox.session :reload)
   (:use [vmfest.virtualbox.virtualbox :only (find-vb-m)])
   (:use clojure.test
-        clojure.contrib.condition)
+        clojure.contrib.condition
+        vmfest.fixtures)
   (:import [org.virtualbox_4_0
             VirtualBoxManager]
            [clojure.contrib.condition
@@ -10,11 +11,6 @@
            [vmfest.virtualbox.model
             Server
             Machine]))
-
-(def *url* "http://localhost:18083")
-(def *username* "")
-(def *password* "")
-(def *server* (Server. *url* *username* *password*))
 
 (deftest ^{:integration true}
   ws-session-test

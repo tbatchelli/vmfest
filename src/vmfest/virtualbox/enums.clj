@@ -3,7 +3,7 @@
   (:import
    [org.virtualbox_4_0 IMachine MachineState ClipboardMode PointingHidType
     FirmwareType KeyboardHidType SessionState SessionType StorageBus
-    DeviceType NetworkAttachmentType]))
+    DeviceType NetworkAttachmentType CleanupMode]))
 
 (defmacro find-key-by-value [value table]
   `(let [[v# k# _#] (first (filter (fn [[v# _# _#]] (= ~value v#)) ~table))]
@@ -168,3 +168,22 @@
   (find-key-by-value type network-attachment-type-to-key-table))
 (defn key-to-network-attachment-type [key]
   (find-value-by-key key network-attachment-type-to-key-table))
+
+;;; CleanupMode
+(def cleanup-mode-type-to-key-table
+  [[CleanupMode/UnregisterOnly :unregister-only
+    (str "Unregister only the machine, but"
+         " neither delete snapshots nor detach media.")]
+   [CleanupMode/DetachAllReturnNone :detach-all-return-none
+    (str "Delete all snapshots and detach all media but return none;"
+         " this will keep all media registered.")]
+   [CleanupMode/DetachAllReturnHardDisksOnly :detach-all-return-hard-disks-only
+    (str "Delete all snapshots, detach all media and return hard disks for"
+         " closing, but not removeable media.")]
+   [CleanupMode/Full :full
+    (str "Delete all snapshots, detach all media and return all media"
+         " for closing.")]])
+(defn cleanup-mode-type-to-key [type]
+  (find-key-by-value type cleanup-mode-type-to-key-table))
+(defn key-to-cleanup-mode [key]
+  (find-value-by-key key cleanup-mode-type-to-key-table))

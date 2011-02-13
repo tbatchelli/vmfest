@@ -1,9 +1,11 @@
 (ns vmfest.virtualbox.machine-test
   (:require [vmfest.virtualbox.session :as session]
-            [vmfest.virtualbox.model :as model])
+            [vmfest.virtualbox.model :as model]
+            [clojure.contrib.logging :as log])
   (:use vmfest.virtualbox.machine :reload)
   (:use clojure.test
-        vmfest.virtualbox.session-test)
+        vmfest.fixtures
+        [clojure.contrib.io :only (delete-file-recursively)])
   (:import clojure.contrib.condition.Condition))
 
 (def test-machine-1
@@ -77,3 +79,23 @@
     ;; so it can catch the shutdown event
     (session/with-session test-machine-1 :shared [s m]
       (is (nil? (stop (.getConsole s)))))))
+
+
+(deftest ^{:integration true}
+  building-a-machine
+  (let [machine (get-new-test-machine "aaaabbbcc")
+        sc-name "test-sc"
+        device-name "test-device"]
+    (try
+      (log/debug (format "machine-test: machine id %s server %s"
+                         (:id machine)
+                         (:server machine)))
+      (session/with-session machine :write [_ vb-m]
+        (testing "you can add a storage controller"
+          (add-storage-controller vb-m sc-name :ide)
+          (is (.getStorageControllerByName vb-m sc-name)))
+        #_(testing "you can attach a device to a storage controller"
+            (attach-device m device-name )))
+      (finally
+       (when machine
+         (delete-test-machine "aaaabbbcc"))))))

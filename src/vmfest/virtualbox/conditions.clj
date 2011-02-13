@@ -81,8 +81,7 @@
   InvalidObjectFaultMsg
   (as-map [this]
           {:type :vbox-invalid-object
-           :original-message (.getMessage this)
-           :bad-object-id (.getBadObjectId this)}))
+           :original-message (.getMessage this)}))
 
 (defn condition-from-webservice-exception [e]
   (let [cause (.getCause e)]
@@ -91,20 +90,25 @@
       (as-map e))))
 
 (defn log-and-raise [exception optional-keys]
-  (let [log-level (or (:log-level optional-keys) :error)
-        message (or (:message optional-keys) "An exception occurred.")
-        full-message (str message ": " (.getMessage exception))]
-    (log/log log-level message)
-    (raise (merge {:message full-message
-                   :cause exception
-                   :stack-trace (stack-trace-info exception)}
-                  (condition-from-webservice-exception exception)
-                  optional-keys))))
+  (try
+    (let [log-level (or (:log-level optional-keys) :error)
+          message (or (:message optional-keys) "An exception occurred.")
+          full-message (str message ": " (.getMessage exception))]
+      (log/log log-level message)
+      (raise (merge {:message full-message
+                     :cause exception
+                     :stack-trace (stack-trace-info exception)}
+                    (condition-from-webservice-exception exception)
+                    optional-keys)))
+    (catch Exception e
+      (log/error "condition: Can't process this exeption" e)
+      (throw e))))
 
 (defn wrap-vbox-runtime [e error-condition-map & default-condition-map]
   (let [condition (condition-from-webservice-exception e)
         error-type (:original-error-type condition)
-        condition-map (error-type error-condition-map)
+        ;; HACK... error type should always exist
+        condition-map (when error-type (error-type error-condition-map))
         merged-condition (merge default-condition-map condition-map)]
     (log-and-raise e merged-condition)))
 
@@ -129,7 +133,7 @@
   (use 'vmfest.virtualbox.virtualbox)
   (def my-server (vmfest.virtualbox.model.Server. "http://localhost:18083" "" "") )
   (def my-no-machine (vmfest.virtualbox.model.Machine. "bogus" my-server nil)) ;; a bogus machine
-  
+
   (use 'vmfest.virtualbox.machine)
   (use 'clojure.contrib.condition)
   (require '[vmfest.virtualbox.conditions :as conditions])

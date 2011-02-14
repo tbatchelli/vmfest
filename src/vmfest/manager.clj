@@ -40,14 +40,13 @@
     (set-bridged-network m "en1: AirPort 2")
     (add-ide-controller m)))
 
-(defn attach-hard-disk [vb-m image-uuid]
-  (session/with-session vb-m :write [_ m]
-    (attach-device m "IDE Controller" 0 0 :hard-disk image-uuid)
-    (.saveSettings m)))
+(defn attach-hard-disk [m uuid]
+  (session/with-vbox (:server m) [_ vbox]
+    (let [medium (vbox/find-medium vbox uuid)]
+      (session/with-session m :shared [_ vb-m]
+        (attach-device vb-m "IDE Controller" 0 0 :hard-disk medium)
+        (.saveSettings vb-m)))))
 
-(defn attach-image [vb-m uuid]
-  (attach-hard-disk uuid)
-  (throw (RuntimeException. "Image not found.")))
 
 (defn get-ip [machine]
   (session/with-session machine :shared [session _]
@@ -83,9 +82,10 @@
   {:micro basic-config})
 
 (def *images*
-  {:cent-os-5-5 {:description "CentOS 5.5 32bit"
-                 :uuid "3a971213-0482-4eb8-8cfd-7eefc9e8b0fe"
-                 :os-type-id "RedHat"}})
+  {:cent-os-5-5
+   {:description "CentOS 5.5 32bit"
+    :uuid "/Users/tbatchelli/Library/VirtualBox/HardDisks/Test1.vdi"
+    :os-type-id "RedHat"}})
 
 (defn create-machine
   [server name os-type-id config-fn image-uuid & [base-folder]]
@@ -94,6 +94,8 @@
                            vbox
                            name
                            os-type-id
+                           true ;; overwrite whatever previous
+                           ;; definition was there
                            (or base-folder (:node-path *location*)))]
               (config-fn machine)
               (machine/save-settings machine)
@@ -162,7 +164,10 @@
     (handle :vbox-runtime
       (log/warn "Trying to stop an already stopped machine"))))
 
-(defn destroy [machine]
+;; just keeping the code around in case the new implementation using
+;; the new vbox 4.0 clean-up features don't work as expected.
+;; toni 20110213
+#_(defn destroy [machine]
   (let [vbox (:server machine)]
     (try
       (let [settings-file (:settings-file-path (model/as-map machine))]
@@ -175,6 +180,11 @@
           (vbox/unregister-machine vbox machine))
         (.delete (java.io.File. settings-file))))))
 
+(defn destroy [machine]
+  (let [id (:id machine)]
+    (session/with-no-session machine [vb-m]
+      (let [media (machine/unregister vb-m :detach-all-return-hard-disks-only)]
+        (machine/delete vb-m media)))))
 
 
 ;;; virtualbox-wide functions

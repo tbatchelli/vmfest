@@ -124,7 +124,7 @@ with a virtualbox.
                   '~body)
                  :type :invalid-method}))
              (finally (.unlockMachine ~session))))))
-     (catch Exception e#
+     (catch VBoxException e#
        (conditions/log-and-raise
         e#
         {:log-level :error

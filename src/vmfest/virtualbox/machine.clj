@@ -223,14 +223,16 @@ See IVirtualbox::openRemoteSession for more details"
           :E_INVALIDARG
           {:message "Invalid controllerType."}})))))
 
-(defn attach-device [m name controller-port device device-type uuid]
+(defn attach-device [m name controller-port device device-type medium]
+  (assert (= (class m) IMachine))
+  (assert (#{:locked} (enums/session-state-to-key (.getSessionState m))))
   (let [type (enums/key-to-device-type device-type)]
     (when-not type (conditions/log-and-raise
                     (RuntimeException.)
                     {:log-level :error
                      :message (str "Device Type not found " device-type)}))
     (try
-      (.attachDevice m name controller-port device type uuid)
+      (.attachDevice m name controller-port device type medium)
       (catch VBoxException e
         (conditions/wrap-vbox-runtime
          e

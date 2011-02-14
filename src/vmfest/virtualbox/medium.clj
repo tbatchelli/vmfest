@@ -30,7 +30,7 @@
 (extend-type vmfest.virtualbox.model.HardDisk
   model/vbox-object
   (soak [this vbox]
-        (let [hd (virtualbox/find-hard-disk vbox (:id this))]
+        (let [hd (virtualbox/find-medium vbox (:id this))]
           (.refreshState hd)
           hd))
   (as-map [this]

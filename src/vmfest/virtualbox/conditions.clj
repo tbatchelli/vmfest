@@ -84,10 +84,16 @@
            :original-message (.getMessage this)}))
 
 (defn condition-from-webservice-exception [e]
-  (let [cause (.getCause e)]
-    (if cause
-      (as-map cause)
-      (as-map e))))
+  (try
+    (let [cause (.getCause e)]
+      (if cause
+        (as-map cause)
+        (as-map e)))
+    (catch Exception e
+      (log/warn
+       (format "Cannot parse the error since the object is unavailable %s"
+               e))
+      {})))
 
 (defn log-and-raise [exception optional-keys]
   (try

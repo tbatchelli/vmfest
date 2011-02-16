@@ -19,20 +19,25 @@
 ;; machine configuration stuff
 
 (defn add-ide-controller [m]
+  {:pre [(model/IMachine? m)]}
   (machine/add-storage-controller m "IDE Controller" :ide))
 
 (defn attach-device [m name controller-port device device-type uuid]
+  {:pre [(model/IMachine? m)]}
   (machine/attach-device m name controller-port device device-type uuid))
 
 (defn set-bridged-network [m interface]
+  {:pre [(model/IMachine? m)]}
   (machine/set-network-adapter m 0 :bridged interface)
   (.saveSettings m))
 
 (defn configure-machine [vb-m param-map]
+  {:pre [(model/IMachine? vb-m)]}
   (machine/set-map vb-m param-map)
   (.saveSettings vb-m))
 
 (defn basic-config [m]
+  {:pre [(model/IMachine? m)]}
   (let [parameters
         {:memory-size 512
          :cpu-count 1}]
@@ -41,24 +46,27 @@
     (add-ide-controller m)))
 
 (defn attach-hard-disk [m uuid]
+  {:pre [(model/Machine? m)]}
   (session/with-vbox (:server m) [_ vbox]
     (let [medium (vbox/find-medium vbox uuid)]
       (session/with-session m :shared [_ vb-m]
         (attach-device vb-m "IDE Controller" 0 0 :hard-disk medium)
         (.saveSettings vb-m)))))
 
-
 (defn get-ip [machine]
+  {:pre [(model/Machine? machine)]}
   (session/with-session machine :shared [session _]
     (machine/get-guest-property
      (.getConsole session)
      "/VirtualBox/GuestInfo/Net/0/V4/IP")))
 
 (defn set-extra-data [machine key value]
+  {:pre [(model/Machine? machine)]}
   (session/with-session machine :write [_ vb-m]
     (machine/set-extra-data vb-m key value)))
 
 (defn get-extra-data [machine key]
+  {:pre [(model/Machine? machine)]}
   ;; todo: this might need to try a remote session first, since it
   ;; can't get the extra data if the machine is running
   (log/info (str "get-extra-data: getting extra data for " (:id machine)))
@@ -74,7 +82,8 @@
           (machine/get-extra-data vb-m key))
         (handle :vbox-runtime
           (log/info
-           "get-extra-data: No dice. Unable to open any session with machine"))))))
+           (str "get-extra-data: No dice. Unable to open any session"
+                " with machine")))))))
 
 ;;; jclouds/pallet-style infrastructure
 
@@ -89,6 +98,7 @@
 
 (defn create-machine
   [server name os-type-id config-fn image-uuid & [base-folder]]
+  {:pre [(model/Server? server)]}
   (let [m (session/with-vbox server [_ vbox]
             (let [machine (vbox/create-machine
                            vbox
@@ -106,6 +116,7 @@
     m))
 
 (defn instance [server name image-key machine-key & [base-folder]]
+  {:pre [(model/Server? server)]}
   (let [image (image-key *images*)
         config-fn (machine-key *machine-models*)]
     (when-not (and image config-fn)
@@ -119,6 +130,7 @@
   (System/currentTimeMillis))
 
 (defn wait-for-machine-state [m state-keys & [timeout-in-ms]]
+  {:pre [(model/Machine? m)]}
   (let [begin-time (current-time-millis)
         timeout (or timeout-in-ms 1500)
         target-state? (fn [state-key] (some #(= state-key %) state-keys))]
@@ -136,6 +148,7 @@
 
 (defn start
   [^Machine m & opt-kv]
+  {:pre [(model/Machine? m)]}
   (let [server (:server m)
         machine-id (:id m)]
     (session/with-vbox server [mgr vbox]
@@ -143,21 +156,25 @@
 
 (defn stop
   [^Machine m]
+  {:pre [(model/Machine? m)]}
   (session/with-session m :shared [s _]
     (machine/stop (.getConsole s))))
 
 (defn pause
   [^Machine m]
+  {:pre [(model/Machine? m)]}
   (session/with-session m :shared [s _]
     (machine/pause (.getConsole s))))
 
 (defn resume
   [^Machine m]
+  {:pre [(model/Machine? m)]}
   (session/with-session m :shared [s _]
     (machine/resume (.getConsole s))))
 
 (defn power-down
   [^Machine m]
+  {:pre [(model/Machine? m)]}
   (handler-case :type
     (session/with-session m :shared [s _]
       (machine/power-down (.getConsole s)))
@@ -181,6 +198,7 @@
         (.delete (java.io.File. settings-file))))))
 
 (defn destroy [machine]
+  {:pre [(model/Machine? machine)]}
   (let [id (:id machine)]
     (session/with-no-session machine [vb-m]
       (let [media (machine/unregister vb-m :detach-all-return-hard-disks-only)]
@@ -190,26 +208,31 @@
 ;;; virtualbox-wide functions
 
 (defn hard-disks [server]
+  {:pre [(model/Server? server)]}
   (session/with-vbox server [_ vbox]
     (doall (map #(model/dry % server) (.getHardDisks vbox)))))
 
 (defn machines [server]
+  {:pre [(model/Server? server)]}
   (session/with-vbox server [_ vbox]
     (doall (map #(model/dry % server) (.getMachines vbox)))))
 
 (defn get-machine
   "Will raise a condition if machine cannot be found."
   [server id]
+  {:pre [(model/Server? server)]}
   (session/with-vbox server [mgr vbox]
     (when-let [vb-m (vbox/find-vb-m vbox id)]
       (model/dry vb-m server))))
 
 (defn find-machine [server id-or-name]
+  {:pre [(model/Server? server)]}
   (session/with-vbox server [mgr vbox]
     (when-let [vb-m (vbox/find-vb-m vbox id-or-name)]
       (model/dry vb-m server))))
 
 (defn guest-os-types [server]
+  {:pre [(model/Server? server)]}
   (session/with-vbox server [mgr vbox]
     (let [get-keys (fn [os-type-map]
                      (select-keys

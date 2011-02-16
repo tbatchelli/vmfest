@@ -1,4 +1,4 @@
-(defproject vmfest "0.1.0"
+(defproject vmfest "0.1.1-SNAPSHOT"
   :description "Manage local VMs from the REPL"
   :dependencies [[org.clojure/clojure "1.2.0"]
                  [org.clojure/clojure-contrib "1.2.0"]

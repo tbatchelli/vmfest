@@ -13,20 +13,23 @@
             Machine]))
 
 (defn find-vb-m
-  ([vbox id-or-name]
-     (try
-       (log/trace (format "find-vb-m: looking for machine '%s'" id-or-name))
-       (let [vb-m (.findMachine vbox id-or-name)]
-         (log/debug (format "find-vb-m: found machine '%s': %s"
-                            id-or-name
-                            vb-m))
-         vb-m)
-       (catch Exception e
-         (log/warn (format "find-vb-m: Machine identified by '%s' not found."
-                           id-or-name))))))
+  [vbox id-or-name]
+  {:pre [(model/IVirtualBox? vbox)]}
+  (try
+    (log/trace (format "find-vb-m: looking for machine '%s'" id-or-name))
+    (let [vb-m (.findMachine vbox id-or-name)]
+      (log/debug (format "find-vb-m: found machine '%s': %s"
+                         id-or-name
+                         vb-m))
+      vb-m)
+    (catch Exception e
+      (log/warn (format "find-vb-m: Machine identified by '%s' not found."
+                        id-or-name)))))
 
 (defn find-medium
   [vbox id-or-location & [type]]
+  {:pre [(model/IVirtualBox? vbox)
+         (if type (#{:hard-disk :floppy :dvd} type) true)]}
   (if (and type (not (#{:hard-disk :floppy :dvd} type)))
     ;; todo: throw condition
     (log/warn
@@ -42,6 +45,8 @@
                       id-or-location)))))))
 
 (defn register-machine [vbox machine]
+  {:pre [(model/IVirtualBox? vbox)
+         (model/IMachine? machine)]}
   (try
     (.registerMachine vbox machine)
     (catch VBoxException e
@@ -61,6 +66,7 @@
   ([vbox name os-type-id overwrite]
      (create-machine vbox name os-type-id overwrite nil))
   ([vbox name os-type-id overwrite base-folder]
+     {:pre [(model/IVirtualBox? vbox)]}
      (let [path (when base-folder
                   (.composeMachineFilename vbox name base-folder))]
        (try

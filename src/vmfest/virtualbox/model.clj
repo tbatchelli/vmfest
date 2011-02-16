@@ -1,5 +1,6 @@
 (ns vmfest.virtualbox.model
-  (:import [org.virtualbox_4_0 IVirtualBox]))
+  (:import [org.virtualbox_4_0 IVirtualBox IMachine
+            ISession VirtualBoxManager IMedium IConsole]))
 
 (defrecord Server [url username password])
 (defrecord Location [servers])
@@ -16,3 +17,20 @@
 
 (defprotocol Session
   (check-session [this type]))
+
+(defn IMachine? [o]
+  (instance? IMachine o))
+(defn IVirtualBox? [o]
+  (instance? IVirtualBox o))
+(defn ISession? [o]
+  (instance? ISession o))
+(defn VirtualBoxManager? [o]
+  (instance? VirtualBoxManager o))
+(defn IMedium? [o]
+  (instance? IMedium o))
+(defn IConsole? [o]
+  (instance? IConsole o))
+(defn Server? [o]
+  (instance? Server o))
+(defn Machine? [o]
+  (instance? Machine o))

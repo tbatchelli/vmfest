@@ -67,7 +67,7 @@ VirtualBoxManager object plus the credentials or by a Server object.
        create-vbox: Session
              -> IVirtualBox"
   ([^VirtualBoxManager mgr url username password]
-     {:pre [(instance? VirtualBoxManager mgr)]}
+     {:pre [(model/VirtualBoxManager? mgr)]}
      (log/trace
       (format
        "creating new vbox with a logon for url=%s and username=%s"
@@ -84,7 +84,7 @@ VirtualBoxManager object plus the credentials or by a Server object.
                      "Cannot connect to virtualbox server: '%s'"
                      (.getMessage e))}))))
   ([^Server server]
-     {:pre [(instance? Server server)]}
+     {:pre [(model/Server? server)]}
      (let [{:keys [url username password]} server
            mgr (create-session-manager)]
        (create-vbox mgr url username password))))
@@ -98,7 +98,7 @@ VirtualBoxManager object plus the credentials or by a Server object.
               -> [VirtualBoxManager IVirtualBox]
 "
   ([^Server server]
-     {:pre [(instance? Server server)]}
+     {:pre [(model/Server? server)]}
      (let [{:keys [url username password]} server]
        (create-mgr-vbox url username password)))
   ([url username password]
@@ -118,7 +118,7 @@ VirtualBoxManager object plus the credentials or by a Server object.
 with a virtualbox.
        with-vbox: Server x [symbol symbol] x body
           -> body"
-  {:pre [(instance? VirtualBoxManager server)]}
+  {:pre [(model/VirtualBoxManager? server)]}
   `(let [[~mgr ~vbox] (create-mgr-vbox ~server)]
      (try
        ~@body
@@ -135,7 +135,7 @@ with a virtualbox.
 
 (defmacro with-session
   [machine type [session vb-m] & body]
-  #_{:pre [(instance? Machine machine)]}
+  #_{:pre [(model/Machine? machine)]}
   `(try
      (with-vbox (:server ~machine) [mgr# vbox#]
        (let [~session (.getSessionObject mgr#)
@@ -165,7 +165,7 @@ with a virtualbox.
 
 (defmacro with-no-session
   [^Machine machine [vb-m] & body]
-  #_{:pre [(instance? Machine machine)]}
+  #_{:pre [(model/Machine? machine)]}
   `(try
      (with-vbox (:server ~machine) [_# vbox#]
        (let [~vb-m (.findMachine vbox# (:id ~machine))]

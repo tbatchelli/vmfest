@@ -72,7 +72,7 @@
    :rtc-use-utc? (.getRTCUseUTC vb-m)
    :io-cache-enabled? (.getIoCacheEnabled vb-m)
    :io-cache-size (.getIoCacheSize vb-m)
-                                        ;   :io-bandwidth-max (.getIoBandwidthMax vb-m)
+   ;;   :io-bandwidth-max (.getIoBandwidthMax vb-m)
    })
 
 (def setters
@@ -153,8 +153,8 @@ Optional parameters are:
    :env environment as String to be passed to the machine at startup.
 See IVirtualbox::openRemoteSession for more details"
   [mgr vbox machine-id & opt-kv]
-  {:pre [(instance? VirtualBoxManager mgr)
-         (instance? IVirtualBox vbox)]}
+  {:pre [(model/VirtualBoxManager? mgr)
+         (model/IVirtualBox? vbox)]}
   (let [opts (apply hash-map opt-kv)
         session (.getSessionObject mgr)
         session-type  (or (:session-type opts) "gui")
@@ -193,7 +193,7 @@ See IVirtualbox::openRemoteSession for more details"
              :message "An error occurred while starting machine"})))))
 
 (defn save-settings [machine]
-  {:pre [(instance? IMachine machine)]}
+  {:pre [(model/IMachine? machine)]}
   (try
     (.saveSettings machine)
     (catch VBoxException e
@@ -212,7 +212,7 @@ See IVirtualbox::openRemoteSession for more details"
         :message "An error occurred while saving a machine"}))))
 
 (defn add-storage-controller  [m name bus-type]
-  {:pre [(instance? IMachine m)
+  {:pre [(model/IMachine? m)
          name
          (enums/key-to-storage-bus bus-type)]}
   (let [bus (enums/key-to-storage-bus bus-type)]
@@ -227,7 +227,7 @@ See IVirtualbox::openRemoteSession for more details"
           {:message "Invalid controllerType."}})))))
 
 (defn attach-device [m name controller-port device device-type medium]
-  {:pre [(instance? IMachine m)
+  {:pre [(model/IMachine? m)
          name controller-port device
          (instance? IMedium medium)
          (enums/key-to-device-type device-type)]}
@@ -251,7 +251,7 @@ See IVirtualbox::openRemoteSession for more details"
          )))))
 
 (defn set-network-adapter [m port type interface]
-  {:pre [(instance? IMachine m)
+  {:pre [(model/IMachine? m)
          port interface
          (enums/key-to-network-attachment-type type)]}
   (try
@@ -269,7 +269,7 @@ See IVirtualbox::openRemoteSession for more details"
 
 (defn stop
   [^IConsole c]
-  {:pre [(instance? IConsole c)]}
+  {:pre [(model/IConsole? c)]}
   (try
     (log/trace (format "stop: machine-id: %s"
                        (.getId (.getMachine c))))
@@ -285,7 +285,7 @@ See IVirtualbox::openRemoteSession for more details"
 
 (defn pause
   [^IConsole c]
-  {:pre [(instance? IConsole c)]}
+  {:pre [(model/IConsole? c)]}
   (try
     (.pause c)
     (catch VBoxException e
@@ -298,7 +298,7 @@ See IVirtualbox::openRemoteSession for more details"
 
 (defn resume
   [^IConsole c]
-  {:pre [(instance? IConsole c)]}
+  {:pre [(model/IConsole? c)]}
   (try
     (.resume c)
     (catch VBoxException e
@@ -312,7 +312,7 @@ See IVirtualbox::openRemoteSession for more details"
 
 (defn power-down
   [^IConsole c]
-  {:pre [(instance? IConsole c)]}
+  {:pre [(model/IConsole? c)]}
   (try
     (let [progress (.powerDown c)]
       (.waitForCompletion progress 30000))
@@ -355,7 +355,7 @@ See IVirtualbox::openRemoteSession for more details"
 ;; ======================================================
 
 (defn get-guest-property [^IConsole console key]
-  {:pre [(instance? IConsole console)]}
+  {:pre [(model/IConsole? console)]}
   (try
     (.getGuestPropertyValue (.getMachine console) key)
     (catch VBoxException e
@@ -364,7 +364,7 @@ See IVirtualbox::openRemoteSession for more details"
        {:VBOX_E_INVALID_VM_STATE {:message "Machine session is not open."}}))))
 
 (defn set-guest-property [^IMachine machine key value]
-  {:pre [(instance? IMachine machine)]}
+  {:pre [(model/IMachine? machine)]}
   (try
     (.setGuestPropertyValue machine key value)
     (catch VBoxException e
@@ -378,7 +378,7 @@ See IVirtualbox::openRemoteSession for more details"
          "Cannot set transient property when machine not running."}}))))
 
 (defn set-extra-data [^IMachine m key value]
-  {:pre [(instance? IMachine m)]}
+  {:pre [(model/IMachine? m)]}
   (try
     (.setExtraData m key value)
     (.saveSettings m)
@@ -389,7 +389,7 @@ See IVirtualbox::openRemoteSession for more details"
         :VBOX_E_XML_ERROR {:message "Could not parse the settings file."}}))))
 
 (defn get-extra-data [^IMachine m key]
-  {:pre [(instance? IMachine m)]}
+  {:pre [(model/IMachine? m)]}
   (try
     (.getExtraData m key)
     (catch VBoxException e
@@ -401,7 +401,7 @@ See IVirtualbox::openRemoteSession for more details"
 ;;;;;;;
 
 (defn unregister [vb-m & [cleanup-key]]
-  {:pre [(instance? IMachine vb-m)
+  {:pre [(model/IMachine? vb-m)
          (if cleanup-key (enums/key-to-cleanup-mode cleanup-key) true)]}
   ;; todo, make sure the key is valid
   (try
@@ -420,7 +420,7 @@ See IVirtualbox::openRemoteSession for more details"
         {:message "Machine is currently locked for a session."}}))))
 
 (defn delete [vb-m media]
-  {:pre [(instance? IMachine vb-m)]}
+  {:pre [(model/IMachine? vb-m)]}
   (try
     (log/info
      (format "delete: deleting machine %s and it's media"
@@ -436,5 +436,5 @@ See IVirtualbox::openRemoteSession for more details"
 
 
 (defn state [^IMachine vb-m]
-  {:pre [(instance? IMachine vb-m)]}
+  {:pre [(model/IMachine? vb-m)]}
   (enums/machine-state-to-key (.getState vb-m)))

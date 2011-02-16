@@ -3,7 +3,8 @@
   (:use [vmfest.virtualbox.virtualbox :only (find-vb-m)])
   (:use clojure.test
         clojure.contrib.condition
-        vmfest.fixtures)
+        vmfest.fixtures
+        vmfest.virtualbox.model)
   (:import [org.virtualbox_4_0
             VirtualBoxManager]
            [clojure.contrib.condition
@@ -95,3 +96,19 @@
     (with-no-session valid-machine [vb-m]
       (is (not (nil? vb-m)))
       (is (< 0 (.getMemorySize vb-m))))))
+
+(deftest session-checks
+  (testing "Requiring a session matches with the exact session"
+    (is (check-session-types :shared :shared))
+    (is (check-session-types :write-lock :write-lock)))
+  (testing "Requiring a :shared session will be ok with a :write-lock session"
+    (is (check-session-types :write-lock :shared))))
+
+(deftest ^{:integration true}
+  session-checks-int
+  (testing "Session checks work with actual ISession objects"
+    (with-session valid-machine :write [session _]
+      (is (check-session session :write-lock)))
+    (with-session valid-machine :shared [session _]
+      (is (check-session session :shared))
+      (is (check-session session :write-lock)))))

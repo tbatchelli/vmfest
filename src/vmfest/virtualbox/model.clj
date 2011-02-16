@@ -1,7 +1,7 @@
 (ns vmfest.virtualbox.model
   (:import [org.virtualbox_4_0 IVirtualBox]))
 
-(defrecord Server [url username password]) 
+(defrecord Server [url username password])
 (defrecord Location [servers])
 (defrecord Machine [id server location])
 (defrecord GuestOsType [id server])
@@ -13,3 +13,6 @@
 
 (defprotocol vbox-remote-object
   (dry [this server]))
+
+(defprotocol Session
+  (check-session [this type]))

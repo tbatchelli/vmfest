@@ -2,16 +2,41 @@
   "**session** provides the functionality to abstract the creation and
 destruction of sessions with the VBox servers"
   (:require [clojure.contrib.logging :as log]
-        [vmfest.virtualbox.conditions :as conditions]
-        [vmfest.virtualbox.model :as model])
+            [vmfest.virtualbox.conditions :as conditions]
+            [vmfest.virtualbox.model :as model]
+            [vmfest.virtualbox.enums :as enums])
   (:import [org.virtualbox_4_0
             VirtualBoxManager
             IVirtualBox
             VBoxException
-            LockType]
+            LockType
+            ISession]
            [vmfest.virtualbox.model
             Server
             Machine]))
+
+;; ## Session checks
+
+(defn check-session-types
+  [session-type requested-type]
+  {:pre [(#{:write-lock :shared :remote :null} requested-type)
+         (#{:write-lock :shared :remote :null} session-type)]}
+  (condp =  [requested-type session-type]
+      [:write-lock :write-lock] true
+      [:write-lock :remote] true
+      [:shared :write-lock] true
+      [:shared :shared] true
+      false))
+
+(extend-type ISession
+  model/Session
+  (check-session
+   [this required-type]
+   (let [current-type (enums/session-type-to-key (.getType this))]
+     (assert
+      (check-session-types current-type required-type))
+     true)))
+
 
 ;; ## Low Level Functions
 
@@ -42,6 +67,7 @@ VirtualBoxManager object plus the credentials or by a Server object.
        create-vbox: Session
              -> IVirtualBox"
   ([^VirtualBoxManager mgr url username password]
+     {:pre [(instance? VirtualBoxManager mgr)]}
      (log/trace
       (format
        "creating new vbox with a logon for url=%s and username=%s"
@@ -58,6 +84,7 @@ VirtualBoxManager object plus the credentials or by a Server object.
                      "Cannot connect to virtualbox server: '%s'"
                      (.getMessage e))}))))
   ([^Server server]
+     {:pre [(instance? Server server)]}
      (let [{:keys [url username password]} server
            mgr (create-session-manager)]
        (create-vbox mgr url username password))))
@@ -71,6 +98,7 @@ VirtualBoxManager object plus the credentials or by a Server object.
               -> [VirtualBoxManager IVirtualBox]
 "
   ([^Server server]
+     {:pre [(instance? Server server)]}
      (let [{:keys [url username password]} server]
        (create-mgr-vbox url username password)))
   ([url username password]
@@ -90,6 +118,7 @@ VirtualBoxManager object plus the credentials or by a Server object.
 with a virtualbox.
        with-vbox: Server x [symbol symbol] x body
           -> body"
+  {:pre [(instance? VirtualBoxManager server)]}
   `(let [[~mgr ~vbox] (create-mgr-vbox ~server)]
      (try
        ~@body
@@ -106,6 +135,7 @@ with a virtualbox.
 
 (defmacro with-session
   [machine type [session vb-m] & body]
+  #_{:pre [(instance? Machine machine)]}
   `(try
      (with-vbox (:server ~machine) [mgr# vbox#]
        (let [~session (.getSessionObject mgr#)
@@ -135,6 +165,7 @@ with a virtualbox.
 
 (defmacro with-no-session
   [^Machine machine [vb-m] & body]
+  #_{:pre [(instance? Machine machine)]}
   `(try
      (with-vbox (:server ~machine) [_# vbox#]
        (let [~vb-m (.findMachine vbox# (:id ~machine))]

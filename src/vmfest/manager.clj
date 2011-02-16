@@ -67,23 +67,10 @@
 
 (defn get-extra-data [machine key]
   {:pre [(model/Machine? machine)]}
-  ;; todo: this might need to try a remote session first, since it
-  ;; can't get the extra data if the machine is running
-  (log/info (str "get-extra-data: getting extra data for " (:id machine)))
-  (handler-case :type
-    (log/info (str "get-extra-data: trying to get a direct session "))
-    (session/with-session machine :write [_ vb-m]
-      (machine/get-extra-data vb-m key))
-    (handle :vbox-runtime
-      (handler-case :type
-        (log/info
-         "get-extra-data: trying to get a remote session (direct one failed)")
-        (session/with-session machine :shared [_ vb-m]
-          (machine/get-extra-data vb-m key))
-        (handle :vbox-runtime
-          (log/info
-           (str "get-extra-data: No dice. Unable to open any session"
-                " with machine")))))))
+  (log/trace
+   (format "get-extra-data: getting extra data for %s %s" (:id machine) key))
+  (session/with-no-session machine [vb-m]
+    (machine/get-extra-data vb-m key)))
 
 ;;; jclouds/pallet-style infrastructure
 
@@ -136,15 +123,17 @@
         target-state? (fn [state-key] (some #(= state-key %) state-keys))]
     (loop []
       (let [current-state (session/with-no-session m [vb-m]
-                            (machine/state vb-m))
-            current-time (current-time-millis)]
+                            (machine/state vb-m))]
         (if (target-state? current-state)
           current-state
-          (if (> (- current-time begin-time) timeout)
+          (if (> (- (current-time-millis) begin-time) timeout)
             nil
             (do
-              (Thread/sleep 250)
+              (Thread/sleep 1000)
               (recur))))))))
+
+(defn state [^Machine m]
+  (session/with-no-session m [vb-m] (machine/state vb-m)))
 
 (defn start
   [^Machine m & opt-kv]

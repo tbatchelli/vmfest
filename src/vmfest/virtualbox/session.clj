@@ -2,14 +2,41 @@
   "**session** provides the functionality to abstract the creation and
 destruction of sessions with the VBox servers"
   (:require [clojure.contrib.logging :as log]
-        [vmfest.virtualbox.conditions :as conditions]
-        [vmfest.virtualbox.model :as model])
-  (:import [com.sun.xml.ws.commons.virtualbox_3_2
-            IWebsessionManager
-            IVirtualBox]
+            [vmfest.virtualbox.conditions :as conditions]
+            [vmfest.virtualbox.model :as model]
+            [vmfest.virtualbox.enums :as enums])
+  (:import [org.virtualbox_4_0
+            VirtualBoxManager
+            IVirtualBox
+            VBoxException
+            LockType
+            ISession]
            [vmfest.virtualbox.model
             Server
             Machine]))
+
+;; ## Session checks
+
+(defn check-session-types
+  [session-type requested-type]
+  {:pre [(#{:write-lock :shared :remote :null} requested-type)
+         (#{:write-lock :shared :remote :null} session-type)]}
+  (condp =  [requested-type session-type]
+      [:write-lock :write-lock] true
+      [:write-lock :remote] true
+      [:shared :write-lock] true
+      [:shared :shared] true
+      false))
+
+(extend-type ISession
+  model/Session
+  (check-session
+   [this required-type]
+   (let [current-type (enums/session-type-to-key (.getType this))]
+     (assert
+      (check-session-types current-type required-type))
+     true)))
+
 
 ;; ## Low Level Functions
 
@@ -18,14 +45,15 @@ destruction of sessions with the VBox servers"
 ;; the server yet, it just creates a data structure containing the
 ;; session details.
 
-(defn ^IWebsessionManager create-session-manager
-  "Creates a IWebsessionManager. Note that the default port is 18083
+(defn ^VirtualBoxManager create-session-manager
+  "Creates a VirtualBoxManager. Home is where the vbox binaries are.
+If no home is passed, it will use the default
 
-       create-session-manager: String
-             -> IWebSessionManager"
-   [url]
-   (log/debug (str "Creating session manager for " url))
-   (IWebsessionManager. url))
+       create-session-manager: (String)
+             -> VirtualBoxManager"
+  [& [home]]
+   (log/trace (str "Creating session manager for home=" (or home "default")))
+   (VirtualBoxManager/createInstance home))
 
 ;; Before we can interact with the server we need to create a Virtual
 ;; Box object trhough our session, to keep track of our actions on the
@@ -33,16 +61,22 @@ destruction of sessions with the VBox servers"
 
 (defn ^IVirtualBox create-vbox
   "Create a vbox object on the server represented by either the
-IWebSessionManager object plus the credentials or by a Server object.
+VirtualBoxManager object plus the credentials or by a Server object.
 
-       create-vbox: IWebsessionManager x String x String 
+       create-vbox: VirtualBoxManager String x String x String
        create-vbox: Session
              -> IVirtualBox"
-  ([^IWebsessionManager mgr username password]
-     (log/debug (str "creating new vbox with a logon for user " username))
-     (try 
-       (.logon mgr username password)
-       (catch com.sun.xml.internal.ws.client.ClientTransportException e
+  ([^VirtualBoxManager mgr url username password]
+     {:pre [(model/VirtualBoxManager? mgr)]}
+     (log/trace
+      (format
+       "creating new vbox with a logon for url=%s and username=%s"
+       url
+       username))
+     (try
+       (.connect mgr url username password)
+       (.getVBox mgr)
+       (catch VBoxException e
          (conditions/log-and-raise
           e
           {:log-level :error
@@ -50,24 +84,26 @@ IWebSessionManager object plus the credentials or by a Server object.
                      "Cannot connect to virtualbox server: '%s'"
                      (.getMessage e))}))))
   ([^Server server]
+     {:pre [(model/Server? server)]}
      (let [{:keys [url username password]} server
-           mgr (create-session-manager url)]
-       (create-vbox mgr username password))))
+           mgr (create-session-manager)]
+       (create-vbox mgr url username password))))
 
 (defn create-mgr-vbox
   "A convenience function that will create both a session manager and
   a vbox at once
 
-        create-mgr-vbox: Server 
+        create-mgr-vbox: Server
         create-mgr-vbox: String x String x String
-              -> [IWebSessionManager IVirtualBox]
+              -> [VirtualBoxManager IVirtualBox]
 "
   ([^Server server]
+     {:pre [(model/Server? server)]}
      (let [{:keys [url username password]} server]
        (create-mgr-vbox url username password)))
   ([url username password]
-     (let [mgr (create-session-manager url)
-           vbox (create-vbox mgr username password)]
+     (let [mgr (create-session-manager )
+           vbox (create-vbox mgr url username password)]
        [mgr vbox])))
 
 ;; When interacting with the server it is important that the objects
@@ -78,97 +114,89 @@ IWebSessionManager object plus the credentials or by a Server object.
 ;; block has been executed, thus cleaning up the session.
 
 (defmacro with-vbox [^Server server [mgr vbox] & body]
-  "Wraps a code block with the creation and the destruction of a session with a virtualbox.
+  "Wraps a code block with the creation and the destruction of a session
+with a virtualbox.
        with-vbox: Server x [symbol symbol] x body
           -> body"
+  {:pre [(model/VirtualBoxManager? server)]}
   `(let [[~mgr ~vbox] (create-mgr-vbox ~server)]
      (try
        ~@body
-       (finally (when ~vbox
-                  (try (.disconnect ~mgr ~vbox)
+       (finally (when ~mgr
+                  (try (.disconnect ~mgr)
                        (catch Exception e#
-                         (conditions/log-and-raise e# {:log-level :error
-                                                       :message "unable to close session"}))))))))
+                         (conditions/log-and-raise
+                          e# {:log-level :error
+                              :message "unable to close session"}))))))))
 
-;; When we want to manipulate the configuration of a VM, we need to
-;; acquire a lock on such VM to prevent others from modifying it
-;; concurrently. To do so we need to acquire a **direct session** with
-;; the VM through the vbox hosting it.
+(def lock-type-constant
+  {:write org.virtualbox_4_0.LockType/Write
+   :shared org.virtualbox_4_0.LockType/Shared})
 
-(defmacro with-direct-session
-  "Wraps the body with a session with a machine. "
-  [machine [session vb-m] & body]
+(defmacro with-session
+  [machine type [session vb-m] & body]
+  #_{:pre [(model/Machine? machine)]}
   `(try
-     (let [machine-id# (:id ~machine)]
-       (with-vbox (:server ~machine) [mgr# vbox#]
-         (with-open [~session (.getSessionObject mgr# vbox#)]
-           (.openSession vbox# ~session machine-id#)
-           (log/trace (format "direct session is open for machine-id='%s'" machine-id#))
-           (let [~vb-m (.getMachine ~session)]
-             (try
-               ~@body
-               (catch java.lang.IllegalArgumentException e#
-                 (conditions/log-and-raise e#
-                                           {:log-level :error
-                                            :message
-                                            (format "Called a method that is not available with a direct session in '%s'" '~body)
-                                            :type :invalid-method})))))))
-     (catch Exception e# 
-       (conditions/log-and-raise e# {:log-level :error
-                                     :message (format "Cannot open session with machine '%s' reason:%s"
-                                                      (:id ~machine)
-                                                      (.getMessage e#))}))))
+     (with-vbox (:server ~machine) [mgr# vbox#]
+       (let [~session (.getSessionObject mgr#)
+             immutable-vb-m# (.findMachine vbox# (:id ~machine))]
+         (.lockMachine immutable-vb-m# ~session (~type lock-type-constant))
+         (let [~vb-m (.getMachine ~session)]
+           (try
+             ~@body
+             (catch java.lang.IllegalArgumentException e#
+               (conditions/log-and-raise
+                e#
+                {:log-level :error
+                 :message
+                 (format
+                  "Called a method that is not available with a direct session in '%s'"
+                  '~body)
+                 :type :invalid-method}))
+             (finally (.unlockMachine ~session))))))
+     (catch VBoxException e#
+       (conditions/log-and-raise
+        e#
+        {:log-level :error
+         :message (format "Cannot open session with machine '%s' reason:%s"
+                          (:id ~machine)
+                          (.getMessage e#))}))))
+
 
 (defmacro with-no-session
   [^Machine machine [vb-m] & body]
+  #_{:pre [(model/Machine? machine)]}
   `(try
      (with-vbox (:server ~machine) [_# vbox#]
-       (let [~vb-m (model/soak ~machine vbox#)] 
+       (let [~vb-m (.findMachine vbox# (:id ~machine))]
          ~@body))
       (catch java.lang.IllegalArgumentException e#
-        (conditions/log-and-raise e# {:log-level :error
-                                      :message "Called a method that is not available without a session"
-                                      :type :invalid-method}))
+        (conditions/log-and-raise
+         e#
+         {:log-level :error
+          :message "Called a method that is not available without a session"
+          :type :invalid-method}))
        (catch Exception e#
          (conditions/log-and-raise e# {:log-level :error
                                        :message "An error occurred"}))))
 
-(defmacro with-remote-session
-  [^Machine machine [session console] & body]
-  `(try
-     (let [machine-id# (:id ~machine)]
-       (with-vbox (:server ~machine) [mgr# vbox#]
-         (with-open [~session (.getSessionObject mgr# vbox#)]
-           (log/info (format "with-remote-session: Opening existing session for machine %s" ~machine))
-           (.openExistingSession vbox# ~session machine-id#)
-           (log/trace (str "new remote session is open for machine-id=" machine-id#))
-           (let [~console (.getConsole ~session)]
-             (try
-               ~@body
-               (catch java.lang.IllegalArgumentException e#
-                 (conditions/log-and-raise e# {:log-level :error
-                                               :message "Called a method that is not available without a session"
-                                               :type :invalid-method})))))))
-     (catch Exception e#
-       (conditions/log-and-raise e# {:log-level :error
-                                     :message "An error occurred"}))))
 
 
 (comment
   ;; how to create the mgr and vbox independently
-  (def mgr (create-session-manager "http://localhost:18083"))
-  (def vbox (create-vbox mgr "" ""))
+  (def mgr (create-session-manager))
+  (def vbox (create-vbox mgr "http://localhost:18083" "" ""))
 
   ;; Creating Server and Machine to use with session
   (def server (vmfest.virtualbox.model.Server. "http://localhost:18083" "" ""))
   (def vb-m (vmfest.virtualbox.model.Machine. machine-id server nil))
-  
+
   ;; read config values with a session
-  (with-direct-session vb-m [session machine]
+  (with-session vb-m :write [session machine]
     (.getMemorySize machine))
 
   ;; set config values
-  (with-direct-session vb-m [session machine]
+  (with-session vb-m :direct [session machine]
     (.setMemorySize machine (long 2048))
     (.saveSettings machine))
 

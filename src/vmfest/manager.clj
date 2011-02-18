@@ -3,7 +3,9 @@
            [vmfest.virtualbox.machine :as machine]
            [vmfest.virtualbox.session :as session]
            [vmfest.virtualbox.model :as model]
+           [clojure.contrib.condition :as condition]
            [clojure.contrib.logging :as log]
+           [clojure.java.io :as io]
            vmfest.virtualbox.medium)
   (use clojure.contrib.condition))
 
@@ -86,6 +88,11 @@
 (defn create-machine
   [server name os-type-id config-fn image-uuid & [base-folder]]
   {:pre [(model/Server? server)]}
+  (when-let [f (or base-folder (:node-path *location*))]
+    (when-not (.exists (io/file f))
+      (condition/raise
+       :type :path-not-found
+       :message (format "Path for saving nodes doesn't exist: %s" f))))
   (let [m (session/with-vbox server [_ vbox]
             (let [machine (vbox/create-machine
                            vbox

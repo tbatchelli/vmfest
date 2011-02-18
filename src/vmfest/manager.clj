@@ -7,7 +7,8 @@
            [clojure.contrib.logging :as log]
            [clojure.java.io :as io]
            vmfest.virtualbox.medium)
-  (:use clojure.contrib.condition))
+  (:use clojure.contrib.condition)
+  (:import org.virtualbox_4_0.SessionState))
 
 (defn server [url & [identity credentials]]
   (vmfest.virtualbox.model.Server. url (or identity "") (or credentials "")))

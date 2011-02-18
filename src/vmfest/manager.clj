@@ -75,6 +75,10 @@
   (session/with-no-session machine [vb-m]
     (machine/get-extra-data vb-m key)))
 
+(defn get-machine-attribute [machine key]
+  (session/with-no-session machine [m]
+    (machine/get-attribute m key)))
+
 ;;; jclouds/pallet-style infrastructure
 
 (def *machine-models*
@@ -201,7 +205,7 @@
 #_(defn destroy [machine]
   (let [vbox (:server machine)]
     (try
-      (let [settings-file (:settings-file-path (model/as-map machine))]
+      (let [settings-file (get-machine-attribute machine :settings-file-path)]
         (let [progress (power-down machine)]
           (when progress
             (.waitForCompletion progress -1)))

@@ -10,6 +10,76 @@
             VirtualBoxManager IVirtualBox IMedium]
            [vmfest.virtualbox.model GuestOsType Machine]))
 
+
+(def getters
+  {:name #(.getName %)
+   :description #(.getDescription %)
+   :acessible? #(.getAccessible %)
+   :access-error #(.getAccessError %) ;; todo. get object
+;;;   :os-type #(let [type-id (.getOSTypeId %)
+;;;                  object (GuestOsType. type-id server)]
+;;;              (model/as-map object))
+   :hardware-version #(.getHardwareVersion %)
+   :hardware-uuid #(.getHardwareUUID %)
+   :cpu-count #(.getCPUCount %)
+   :cpu-hot-plug-enabled? #(.getCPUHotPlugEnabled %)
+   :memory-size #(.getMemorySize %)
+   :memory-ballon-size #(.getMemoryBalloonSize %)
+   :page-fusion-enabled? #(.getPageFusionEnabled %)
+   :vram-size #(.getVRAMSize %)
+   :accelerate-3d-enabled? #(.getAccelerate3DEnabled %)
+   :accelerate-2d-video-enabled? #(.getAccelerate2DVideoEnabled %)
+   :monitor-count #(.getMonitorCount %)
+   :bios-settings #(.getBIOSSettings %) ;todo: get object
+   :firmware-type #(enums/firmware-type-to-key
+                   (.getFirmwareType %)) ;todo: get object
+   :pointing-hid-type #(enums/pointing-hid-type-to-key
+                       (.getPointingHidType %)) ;todo: get object
+   :keyboard-hid-type #(enums/keyboard-hid-type-to-key
+                       (.getKeyboardHidType %)) ;todo: get object
+   :hpet-enabled #(.getHpetEnabled %)
+   :snapshot-folder #(.getSnapshotFolder %)
+   :vrde-server #(.getVRDEServer %) ;todo: get object
+   :medium-attachments #(.getMediumAttachments %) ;todo: get
+                                        ;objects
+   :usb-controller #(.getUSBController %) ;todo: get object
+   :audio-adapter #(.getAudioAdapter %) ; todo: get object
+   :storage-controllers #(.getStorageControllers %) ;todo: get
+                                        ;objects
+   :settings-file-path #(.getSettingsFilePath %)
+   :settings-modified? #(try (.getSettingsModified %)
+                            (catch Exception e (comment "Do nothing")))
+   :session-state #(enums/session-state-to-key
+                   (.getSessionState %)) ;todo: get object
+   :session-type #(enums/session-type-to-key (.getSessionType %))
+   :session-pid #(.getSessionPid %)
+   :state #(enums/machine-state-to-key (.getState %)) ;todo: get object
+   :last-state-change #(.getLastStateChange %) ;todo: make-date?
+   :state-file-path #(.getStateFilePath %)
+   :logFolder #(.getLogFolder %)
+   :current-snapshot #(.getCurrentSnapshot %)
+   :snapshot-count #(.getSnapshotCount %)
+   :current-state-modified? #(.getCurrentStateModified %)
+   :shared-folders #(.getSharedFolders %) ;todo: get objects
+   :clipboard-mode #(enums/clipboard-mode-to-key
+                    (.getClipboardMode %)) ;todo: get object
+   :guest-property-notification-patterns
+   #(.getGuestPropertyNotificationPatterns %)
+   :teleporter-enabled? #(.getTeleporterEnabled %)
+   :teleporter-port #(.getTeleporterPort %)
+   :teleporter-address #(.getTeleporterAddress %)
+   :teleporter-password #(.getTeleporterPassword %)
+   :rtc-use-utc? #(.getRTCUseUTC %)
+   :io-cache-enabled? #(.getIoCacheEnabled %)
+   :io-cache-size #(.getIoCacheSize %)
+   ;;   :io-bandwidth-max #(.getIoBandwidthMax %)
+   })
+
+(defn get-attribute [vb-m key]
+  {:pre (model/IMachine? vb-m)}
+  (when-let [getter (key getters)]
+    (getter vb-m)))
+
 (defn map-from-IMachine
   [^IMachine vb-m server]
   {:name (.getName vb-m)
@@ -137,7 +207,13 @@
                                    (:id this)) e)
                 (merge this
                        {:error "Machine not found"
-                        :exception e}))))))
+                        :exception e})))))
+  #_(get-attribute
+   [this key]
+   (when-let [getter (:key map-from-IMachine)]
+     (session/with-vbox (:server this) [_ vbox]
+       (session/with-no-session this [m]
+         (getter m))))))
 
 (extend-type IMachine
   model/vbox-remote-object

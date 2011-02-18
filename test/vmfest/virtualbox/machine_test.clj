@@ -78,7 +78,12 @@
     (Thread/sleep 200000) ;; give some time to the OS to come up enough
     ;; so it can catch the shutdown event
     (session/with-session test-machine-1 :shared [s m]
-      (is (nil? (stop (.getConsole s)))))))
+      (is (nil? (stop (.getConsole s))))))
+  (testing "attributes can be read from the machine"
+    (session/with-no-session test-machine-1 [m]
+      (is (get-attribute m :name)))))
+
+
 
 
 (deftest ^{:integration true}

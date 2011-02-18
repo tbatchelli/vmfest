@@ -1,5 +1,5 @@
 (ns vmfest.manager
-  (require [vmfest.virtualbox.virtualbox :as vbox]
+  (:require [vmfest.virtualbox.virtualbox :as vbox]
            [vmfest.virtualbox.machine :as machine]
            [vmfest.virtualbox.session :as session]
            [vmfest.virtualbox.model :as model]
@@ -7,7 +7,7 @@
            [clojure.contrib.logging :as log]
            [clojure.java.io :as io]
            vmfest.virtualbox.medium)
-  (use clojure.contrib.condition))
+  (:use clojure.contrib.condition))
 
 (defn server [url & [identity credentials]]
   (vmfest.virtualbox.model.Server. url (or identity "") (or credentials "")))

@@ -4,7 +4,7 @@
             [vmfest.virtualbox.virtualbox :as virtualbox]
             [vmfest.virtualbox.conditions :as conditions]
             [vmfest.virtualbox.session :as session])
-  (:import [com.sun.xml.ws.commons.virtualbox_3_2 IMedium]))
+  (:import [org.virtualbox_4_0 IMedium]))
 
 (defn map-from-IMedium
   [^IMedium m server]
@@ -30,7 +30,7 @@
 (extend-type vmfest.virtualbox.model.HardDisk
   model/vbox-object
   (soak [this vbox]
-        (let [hd (virtualbox/get-hard-disk vbox (:id this))]
+        (let [hd (virtualbox/find-medium vbox (:id this))]
           (.refreshState hd)
           hd))
   (as-map [this]

@@ -1,7 +1,8 @@
 (ns vmfest.virtualbox.model
-  (:import [com.sun.xml.ws.commons.virtualbox_3_2 IVirtualBox]))
+  (:import [org.virtualbox_4_0 IVirtualBox IMachine
+            ISession VirtualBoxManager IMedium IConsole]))
 
-(defrecord Server [url username password]) 
+(defrecord Server [url username password])
 (defrecord Location [servers])
 (defrecord Machine [id server location])
 (defrecord GuestOsType [id server])
@@ -9,7 +10,27 @@
 
 (defprotocol vbox-object
   (as-map [this])
-  (soak [this ^IVirtualBox vbox]))
+  (soak [this vbox]))
 
 (defprotocol vbox-remote-object
   (dry [this server]))
+
+(defprotocol Session
+  (check-session [this type]))
+
+(defn IMachine? [o]
+  (instance? IMachine o))
+(defn IVirtualBox? [o]
+  (instance? IVirtualBox o))
+(defn ISession? [o]
+  (instance? ISession o))
+(defn VirtualBoxManager? [o]
+  (instance? VirtualBoxManager o))
+(defn IMedium? [o]
+  (instance? IMedium o))
+(defn IConsole? [o]
+  (instance? IConsole o))
+(defn Server? [o]
+  (instance? Server o))
+(defn Machine? [o]
+  (instance? Machine o))

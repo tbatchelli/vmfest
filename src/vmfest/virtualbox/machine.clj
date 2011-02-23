@@ -446,3 +446,8 @@ See IVirtualbox::openRemoteSession for more details"
 (defn state [^IMachine vb-m]
   {:pre [(model/IMachine? vb-m)]}
   (enums/machine-state-to-key (.getState vb-m)))
+
+(defn get-storage-controller-by-name [m name]
+  {:pre [(model/IMachine? m)]}
+  (.getStorageControllerByName m name))
+

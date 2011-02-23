@@ -144,15 +144,6 @@ with a virtualbox.
          (let [~vb-m (.getMachine ~session)]
            (try
              ~@body
-             (catch java.lang.IllegalArgumentException e#
-               (conditions/log-and-raise
-                e#
-                {:log-level :error
-                 :message
-                 (format
-                  "Called a method that is not available with a direct session in '%s'"
-                  '~body)
-                 :type :invalid-method}))
              (finally (.unlockMachine ~session))))))
      (catch VBoxException e#
        (conditions/log-and-raise

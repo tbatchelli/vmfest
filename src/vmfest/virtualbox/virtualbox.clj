@@ -47,18 +47,11 @@
 (defn register-machine [vbox machine]
   {:pre [(model/IVirtualBox? vbox)
          (model/IMachine? machine)]}
-  (try
-    (.registerMachine vbox machine)
-    (catch VBoxException e
-      (conditions/wrap-vbox-runtime
-       e
-       {:VBOX_E_OBJECT_NOT_FOUND
-        {:message "No matching virtual machine found"}
-        :VBOX_E_INVALID_OBJECT_STATE
-        {:message
-         (str
-          "Virtual machine was not created within this VirtualBox"
-          " instance.")}}))))
+  (conditions/with-vbox-exception-translation
+    {:VBOX_E_OBJECT_NOT_FOUND "No matching virtual machine found"
+     :VBOX_E_INVALID_OBJECT_STATE
+     "Virtual machine was not created within this VirtualBox instance."}
+    (.registerMachine vbox machine)))
 
 (defn create-machine
   ([vbox name os-type-id]
@@ -69,7 +62,13 @@
      {:pre [(model/IVirtualBox? vbox)]}
      (let [path (when base-folder
                   (.composeMachineFilename vbox name base-folder))]
-       (try
+       (conditions/with-vbox-exception-translation
+         {:VBOX_E_OBJECT_NOT_FOUND "invalid os type ID."
+          :VBOX_E_FILE_ERROR
+          (str "Resulting settings file name is invalid or the settings"
+               " file already exists or could not be created due to an"
+               " I/O error.")
+          :E_INVALIDARG "name is empty or null."}
          (log/info
           (format
            (str "create-machine: "
@@ -77,19 +76,7 @@
            name
            path
            (if overwrite "" "not")))
-          (.createMachine vbox path name os-type-id nil overwrite)
-          (catch VBoxException e
-            (conditions/wrap-vbox-runtime
-             e
-             {:VBOX_E_OBJECT_NOT_FOUND
-              {:message "invalid os type ID."}
-              :VBOX_E_FILE_ERROR
-              {:message
-               (str "Resulting settings file name is invalid or the settings"
-                    " file already exists or could not be created due to an"
-                    " I/O error.")}
-              :E_INVALIDARG
-              {:message "name is empty or null."}}))))))
+          (.createMachine vbox path name os-type-id nil overwrite)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

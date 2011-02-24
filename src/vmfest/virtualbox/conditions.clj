@@ -47,7 +47,7 @@
           {:original-message (.getMessage this)
            :cause (.getCause this)
            :type :exception})
-  java.net.ConnectException 
+  java.net.ConnectException
   (as-map [this]
           {:type :connection-error})
   com.sun.xml.internal.ws.client.ClientTransportException
@@ -83,19 +83,21 @@
           {:type :vbox-invalid-object
            :original-message (.getMessage this)}))
 
-(defn condition-from-webservice-exception [e]
+(defn condition-from-exception [e]
   (try
-    (let [cause (.getCause e)]
-      (if cause
-        (as-map cause)
-        (as-map e)))
+    (if-let [cause (.getWrapped e)]
+      (let [condition (as-map cause)]
+        (log/debug (format "formatting wrapped exception %s" condition))
+        condition)
+      (let [condition (as-map e)]
+        (log/debug (format "formatting exception %s" condition))
+        condition))
     (catch Exception e
-      (log/warn
-       (format "Cannot parse the error since the object is unavailable %s"
-               e))
+      (log/error
+       (format "Cannot parse the error since the object is unavailable %s" e))
       {})))
 
-(defn log-and-raise [exception optional-keys]
+#_(defn log-and-raise [exception optional-keys]
   (try
     (let [log-level (or (:log-level optional-keys) :error)
           message (or (:message optional-keys) "An exception occurred.")
@@ -110,13 +112,32 @@
       (log/error "condition: Can't process this exeption" e)
       (throw e))))
 
-(defn wrap-vbox-runtime [e error-condition-map & default-condition-map]
-  (let [condition (condition-from-webservice-exception e)
-        error-type (:original-error-type condition)
-        ;; HACK... error type should always exist
-        condition-map (when error-type (error-type error-condition-map))
-        merged-condition (merge default-condition-map condition-map)]
-    (log-and-raise e merged-condition)))
+(defn wrap-exception [exception optional-keys]
+  (try
+    (let [message (or (:message optional-keys) "An exception occurred.")
+          full-message (format "%s: %s" message (.getMessage exception))]
+      (raise (merge {:full-message full-message
+                     :cause exception
+                     :stack-trace (stack-trace-info exception)}
+                    (condition-from-exception exception)
+                    optional-keys)))
+    (catch Exception e
+      (log/error "condition: Cannot process exception" e)
+      (throw e))))
+
+(defn wrap-vbox-exception [e error-condition-map & default-condition-map]
+  (if (instance? VBoxException e)
+    (let [condition (condition-from-exception e)
+          error-type (:original-error-type condition)
+          ;; HACK... error type should always exist
+          condition-map (when error-type (error-type error-condition-map))
+          merged-condition (merge default-condition-map condition-map)]
+      (when-not error-type
+        (log/error
+         (format
+          "conditions: This VBoxException does not have an error type %s" e)))
+      (wrap-exception e merged-condition))
+    (wrap-exception e {})))
 
 (defn handle-vbox-runtime* [condition type-action-map]
   (let [error-type (:original-error-type condition)
@@ -128,11 +149,27 @@
   `(handle-vbox-runtime* *condition* ~type-action-map))
 
 (defn re-log-and-raise* [condition optional-keys]
-  (log-and-raise (:cause condition)
+  (wrap-exception (:cause condition)
                  (merge condition optional-keys)))
 
 (defmacro re-log-and-raise [optional-keys]
   `(re-log-and-raise* *condition* ~optional-keys))
+
+(defn message-map-to-condition-map [message-map]
+  (into {}
+        (map (fn [[k v]]
+               (if (map? v)
+                 {k v}
+                 {k {:message v}}))
+             message-map)))
+
+(defmacro with-vbox-exception-translation [type-to-condition-map & body]
+  `(try
+     ~@body
+     (catch VBoxException e#
+       (conditions/wrap-vbox-exception
+        e#
+        (message-map-to-condition-map ~type-to-condition-map)))))
 
 (comment
   ;; error handling using conditions

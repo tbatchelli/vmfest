@@ -77,10 +77,9 @@ VirtualBoxManager object plus the credentials or by a Server object.
        (.connect mgr url username password)
        (.getVBox mgr)
        (catch VBoxException e
-         (conditions/log-and-raise
+         (conditions/wrap-exception
           e
-          {:log-level :error
-           :message (format
+          {:message (format
                      "Cannot connect to virtualbox server: '%s'"
                      (.getMessage e))}))))
   ([^Server server]
@@ -125,9 +124,8 @@ with a virtualbox.
        (finally (when ~mgr
                   (try (.disconnect ~mgr)
                        (catch Exception e#
-                         (conditions/log-and-raise
-                          e# {:log-level :error
-                              :message "unable to close session"}))))))))
+                         (conditions/wrap-exception
+                          e# {:message "unable to close session"}))))))))
 
 (def lock-type-constant
   {:write org.virtualbox_4_0.LockType/Write
@@ -146,10 +144,9 @@ with a virtualbox.
              ~@body
              (finally (.unlockMachine ~session))))))
      (catch VBoxException e#
-       (conditions/log-and-raise
+       (conditions/wrap-exception
         e#
-        {:log-level :error
-         :message (format "Cannot open session with machine '%s' reason:%s"
+        {:message (format "Cannot open session with machine '%s' reason:%s"
                           (:id ~machine)
                           (.getMessage e#))}))))
 
@@ -161,14 +158,8 @@ with a virtualbox.
      (with-vbox (:server ~machine) [_# vbox#]
        (let [~vb-m (.findMachine vbox# (:id ~machine))]
          ~@body))
-      (catch java.lang.IllegalArgumentException e#
-        (conditions/log-and-raise
-         e#
-         {:log-level :error
-          :message "Called a method that is not available without a session"
-          :type :invalid-method}))
        (catch Exception e#
-         (conditions/log-and-raise e# {:log-level :error
+         (conditions/wrap-exception e# {:log-level :error
                                        :message "An error occurred"}))))
 
 

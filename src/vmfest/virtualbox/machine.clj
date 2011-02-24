@@ -235,72 +235,56 @@ See IVirtualbox::openRemoteSession for more details"
         session (.getSessionObject mgr)
         session-type  (or (:session-type opts) "gui")
         env (or (:env opts) "DISPLAY:0.0")]
-    (try (let [vb-m (virtualbox/find-vb-m vbox machine-id)
-               progress
-               (.launchVMProcess vb-m session session-type env)
-               #_(.openRemoteSession vbox session machine-id session-type env)]
-           (log/debug (str "start: Starting session for VM " machine-id "..."))
-           (.waitForCompletion progress 30000)
-           (let [result-code (.getResultCode progress)]
-             (log/debug (format "start: VM %s started with result code %s"
-                                machine-id
-                                result-code))
-             result-code))
-         (catch VBoxException e
-           (conditions/wrap-vbox-runtime
-            e
-            {:E_UNEXPECTED
-             {:message "Virtual Machine not registered."}
-             :E_INVALIDARG
-             {:message (format "Invalid session type '%s'" session-type)}
-             :VBOX_E_OBJECT_NOT_FOUND
-             {:message (format "No machine matching id '%s' found." machine-id)}
-             :VBOX_E_INVALID_OBJECT_STATE
-             {:message "Session already open or opening."}
-             :VBOX_E_IPTR_ERROR
-             {:message "Launching process for machine failed."}
-             :VBOX_E_VM_ERROR
-             {:message "Failed to assign machine to session."}}))
-         (catch Exception e
-           (log/error "Cannot start machine" e)
-           (conditions/log-and-raise
-            e
-            {:log-level :error
-             :message "An error occurred while starting machine"})))))
+    (try
+      (conditions/with-vbox-exception-translation
+        {:E_UNEXPECTED "Virtual Machine not registered."
+         :E_INVALIDARG (format "Invalid session type '%s'" session-type)
+         :VBOX_E_OBJECT_NOT_FOUND
+         (format "No machine matching id '%s' found." machine-id)
+         :VBOX_E_INVALID_OBJECT_STATE "Session already open or opening."
+         :VBOX_E_IPTR_ERROR "Launching process for machine failed."
+         :VBOX_E_VM_ERROR "Failed to assign machine to session."}
+        (let [vb-m (virtualbox/find-vb-m vbox machine-id)
+              progress
+              (.launchVMProcess vb-m session session-type env)
+              #_(.openRemoteSession vbox session machine-id session-type env)]
+          (log/debug (str "start: Starting session for VM " machine-id "..."))
+          (.waitForCompletion progress 30000)
+          (let [result-code (.getResultCode progress)]
+            (log/debug (format "start: VM %s started with result code %s"
+                               machine-id
+                               result-code))
+            result-code)))
+      (catch Exception e
+        (log/error "Cannot start machine" e)
+        (conditions/wrap-exception
+         e
+         {:message "An error occurred while starting machine"})))))
 
 (defn save-settings [machine]
   {:pre [(model/IMachine? machine)]}
   (try
-    (.saveSettings machine)
-    (catch VBoxException e
-      (conditions/wrap-vbox-runtime
-       e
-       {:VBOX_E_FILE_ERROR
-        {:message "Settings file not accessible while trying to save them"}
-        :VBOX_E_XML_ERROR
-        {:message "Cannot parse settings XML file"}
-        :E_ACCESSDENIED
-        {:message "Saving of the settings has been refused"}}))
+    (conditions/with-vbox-exception-translation
+      {:VBOX_E_FILE_ERROR
+       "Settings file not accessible while trying to save them"
+       :VBOX_E_XML_ERROR "Cannot parse settings XML file"
+       :E_ACCESSDENIED "Saving of the settings has been refused"}
+      (.saveSettings machine))
     (catch Exception e
-      (conditions/log-and-raise
+      (conditions/wrap-exception
        e
-       {:log-level :error
-        :message "An error occurred while saving a machine"}))))
+       {:message "An error occurred while saving a machine"}))))
 
 (defn add-storage-controller  [m name bus-type]
   {:pre [(model/IMachine? m)
          name
          (enums/key-to-storage-bus bus-type)]}
   (let [bus (enums/key-to-storage-bus bus-type)]
-    (try
-      (.addStorageController m name bus)
-      (catch VBoxException e
-        (conditions/wrap-vbox-runtime
-         e
-         {:VBOX_E_OBJECT_IN_USE
-          {:message "A storage controller with given name exists already."}
-          :E_INVALIDARG
-          {:message "Invalid controllerType."}})))))
+    (conditions/with-vbox-exception-translation
+      {:VBOX_E_OBJECT_IN_USE
+       "A storage controller with given name exists already."
+       :E_INVALIDARG "Invalid controllerType."}
+      (.addStorageController m name bus))))
 
 (defn attach-device [m name controller-port device device-type medium]
   {:pre [(model/IMachine? m)
@@ -308,23 +292,16 @@ See IVirtualbox::openRemoteSession for more details"
          (instance? IMedium medium)
          (enums/key-to-device-type device-type)]}
   (let [type (enums/key-to-device-type device-type)]
-    (try
-      (.attachDevice m name controller-port device type medium)
-      (catch VBoxException e
-        (conditions/wrap-vbox-runtime
-         e
-         {:E_INVALIDARG
-          {:message
-           "SATA device, SATA port, IDE port or IDE slot out of range."}
-          :VBOX_E_INVALID_OBJECT_STATE
-          {:message
-           "Attempt to attach medium to an unregistered virtual machine."}
-          :VBOX_E_INVALID_VM_STATE
-          {:message "Invalid machine state."}
-          :VBOX_E_OBJECT_IN_USE
-          {:message
-           "Hard disk already attached to this or another virtual machine."}}
-         )))))
+    (conditions/with-vbox-exception-translation
+      {:E_INVALIDARG
+       "SATA device, SATA port, IDE port or IDE slot out of range."
+       :VBOX_E_INVALID_OBJECT_STATE
+       "Attempt to attach medium to an unregistered virtual machine."
+       :VBOX_E_INVALID_VM_STATE
+       "Invalid machine state."
+       :VBOX_E_OBJECT_IN_USE
+       "Hard disk already attached to this or another virtual machine."}
+      (.attachDevice m name controller-port device type medium))))
 
 (defn set-network-adapter [m port type interface]
   {:pre [(model/IMachine? m)
@@ -346,59 +323,36 @@ See IVirtualbox::openRemoteSession for more details"
 (defn stop
   [^IConsole c]
   {:pre [(model/IConsole? c)]}
-  (try
-    (log/trace (format "stop: machine-id: %s"
-                       (.getId (.getMachine c))))
-    (.powerButton c)
-    (catch VBoxException e
-      (log/debug "stop: Caught exception" e)
-      (conditions/wrap-vbox-runtime
-       e
-       {:VBOX_E_INVALID_VM_STATE
-        {:message "Virtual machine not in Running state."}
-        :VBOX_E_PDM_ERROR
-        {:message "Controlled power off failed."}}))))
+  (conditions/with-vbox-exception-translation
+    {:VBOX_E_INVALID_VM_STATE "Virtual machine not in Running state."
+     :VBOX_E_PDM_ERROR "Controlled power off failed."}
+    (log/trace (format "stop: machine-id: %s" (.getId (.getMachine c))))
+    (.powerButton c)))
 
 (defn pause
   [^IConsole c]
   {:pre [(model/IConsole? c)]}
-  (try
-    (.pause c)
-    (catch VBoxException e
-      (conditions/wrap-vbox-runtime
-       e
-       {:VBOX_E_INVALID_VM_STATE
-        {:message "Virtual machine not in Running state."}
-        :VBOX_E_VM_ERROR
-        {:message "Virtual machine error in suspend operation."}}))))
+  (conditions/with-vbox-exception-translation
+     {:VBOX_E_INVALID_VM_STATE "Virtual machine not in Running state."
+      :VBOX_E_VM_ERROR "Virtual machine error in suspend operation."}
+    (.pause c)))
 
 (defn resume
   [^IConsole c]
   {:pre [(model/IConsole? c)]}
-  (try
-    (.resume c)
-    (catch VBoxException e
-      (conditions/wrap-vbox-runtime
-       e
-       {:VBOX_E_INVALID_VM_STATE
-        {:message "Virtual machine not in Paused state."}
-        :VBOX_E_VM_ERROR
-        {:message "Virtual machine error in resume operation."}}))))
-
+  (conditions/with-vbox-exception-translation
+    {:VBOX_E_INVALID_VM_STATE "Virtual machine not in Paused state."
+        :VBOX_E_VM_ERROR "Virtual machine error in resume operation."}
+    (.resume c)))
 
 (defn power-down
   [^IConsole c]
   {:pre [(model/IConsole? c)]}
-  (try
+  (conditions/with-vbox-exception-translation
+    {:VBOX_E_INVALID_VM_STATE
+     "Virtual machine must be Running, Paused or Stuck to be powered down."}
     (let [progress (.powerDown c)]
-      (.waitForCompletion progress 30000))
-    (catch VBoxException e
-      (conditions/wrap-vbox-runtime
-       e
-       {:VBOX_E_INVALID_VM_STATE
-        {:message
-         (str "Virtual machine must be Running, Paused or Stuck to be "
-              "powered down.")}}))))
+      (.waitForCompletion progress 30000))))
 
 
 ;; ==== DELETE WHEN CONFIRMED IT IS NOT NEEDED ANYMORE =====
@@ -432,47 +386,34 @@ See IVirtualbox::openRemoteSession for more details"
 
 (defn get-guest-property [^IConsole console key]
   {:pre [(model/IConsole? console)]}
-  (try
-    (.getGuestPropertyValue (.getMachine console) key)
-    (catch VBoxException e
-      (conditions/wrap-vbox-runtime
-       e
-       {:VBOX_E_INVALID_VM_STATE {:message "Machine session is not open."}}))))
+  (conditions/with-vbox-exception-translation
+    {:VBOX_E_INVALID_VM_STATE "Machine session is not open."}
+    (.getGuestPropertyValue (.getMachine console) key)))
 
 (defn set-guest-property [^IMachine machine key value]
   {:pre [(model/IMachine? machine)]}
-  (try
-    (.setGuestPropertyValue machine key value)
-    (catch VBoxException e
-      (conditions/wrap-vbox-runtime
-       e
-       {:E_ACCESSDENIED {:message "Property cannot be changed."}
-        :VBOX_E_INVALID_VM_STATE
-        {:message "Virtual machine is not mutable or session not open."}
-        :VBOX_E_INVALID_OBJECT_STATE
-        {:message
-         "Cannot set transient property when machine not running."}}))))
+  (conditions/with-vbox-exception-translation
+    {:E_ACCESSDENIED "Property cannot be changed."
+     :VBOX_E_INVALID_VM_STATE
+     "Virtual machine is not mutable or session not open."
+     :VBOX_E_INVALID_OBJECT_STATE
+     "Cannot set transient property when machine not running."}
+    (.setGuestPropertyValue machine key value)))
 
 (defn set-extra-data [^IMachine m key value]
   {:pre [(model/IMachine? m)]}
-  (try
+  (conditions/with-vbox-exception-translation
+    {:VBOX_E_FILE_ERROR "Sttings file not accessible."
+     :VBOX_E_XML_ERROR "Could not parse the settings file."}
     (.setExtraData m key value)
-    (.saveSettings m)
-    (catch VBoxException e
-      (conditions/wrap-vbox-runtime
-       e
-       {:VBOX_E_FILE_ERROR {:message "Sttings file not accessible."}
-        :VBOX_E_XML_ERROR {:message "Could not parse the settings file."}}))))
+    (.saveSettings m)))
 
 (defn get-extra-data [^IMachine m key]
   {:pre [(model/IMachine? m)]}
-  (try
-    (.getExtraData m key)
-    (catch VBoxException e
-      (conditions/wrap-vbox-runtime
-       e
-       {:VBOX_E_FILE_ERROR {:message "Settings file not accessible."}
-        :VBOX_E_XML_ERROR {:message "Could not parse the settings file."}}))))
+  (conditions/with-vbox-exception-translation
+    {:VBOX_E_FILE_ERROR "Settings file not accessible."
+     :VBOX_E_XML_ERROR "Could not parse the settings file."}
+    (.getExtraData m key)))
 
 ;;;;;;;
 
@@ -480,7 +421,9 @@ See IVirtualbox::openRemoteSession for more details"
   {:pre [(model/IMachine? vb-m)
          (if cleanup-key (enums/key-to-cleanup-mode cleanup-key) true)]}
   ;; todo, make sure the key is valid
-  (try
+  (conditions/with-vbox-exception-translation
+    {:VBOX_E_INVALID_OBJECT_STATE
+     "Machine is currently locked for a session."}
     (let [cleanup-mode (if cleanup-key
                          (enums/key-to-cleanup-mode cleanup-key)
                          :unregister-only)]
@@ -488,27 +431,19 @@ See IVirtualbox::openRemoteSession for more details"
        (format "unregister: unregistering machine with name %s with cleanup %s"
                (.getName vb-m)
                cleanup-mode))
-      (.unregister vb-m cleanup-mode))
-    (catch VBoxException e
-      (conditions/wrap-vbox-runtime
-       e
-       {:VBOX_E_INVALID_OBJECT_STATE
-        {:message "Machine is currently locked for a session."}}))))
+      (.unregister vb-m cleanup-mode))))
 
 (defn delete [vb-m media]
   {:pre [(model/IMachine? vb-m)]}
-  (try
+  (conditions/with-vbox-exception-translation
+    {:VBOX_E_INVALID_VM_STATE
+     "Machine is registered but not write-locked."
+     :VBOX_E_IPRT_ERROR
+     "Could not delete the settings file."}
     (log/info
      (format "delete: deleting machine %s and it's media"
              (.getName vb-m)))
-    (.delete vb-m media)
-    (catch VBoxException e
-      (conditions/wrap-vbox-runtime
-       e
-       {:VBOX_E_INVALID_VM_STATE
-        {:message "Machine is registered but not write-locked."}
-        :VBOX_E_IPRT_ERROR
-        {:message "Could not delete the settings file."}}))))
+    (.delete vb-m media)))
 
 
 (defn state [^IMachine vb-m]

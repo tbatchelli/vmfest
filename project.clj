@@ -1,4 +1,4 @@
-(defproject vmfest "0.2.2"
+(defproject vmfest "0.2.3-SNAPSHOT"
   :description "Manage local VMs from the REPL"
   :dependencies [[org.clojure/clojure "1.2.0"]
                  [org.clojure/clojure-contrib "1.2.0"]
@@ -10,4 +10,5 @@
                      [lein-clojars "0.6.0"]]
   :test-selectors {:default (fn [v] (not (:integration v)))
                    :integration :integration
-                   :all (fn [_] true)})
+                   :all (fn [_] true)}
+  :jar-exclusions [#"log4j.xml"])

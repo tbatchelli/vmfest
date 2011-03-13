@@ -3,8 +3,8 @@
 2. Disable login credential: 
         $ VBoxManage setproperty websrvauthlibrary null
 3. Download and uncompress the following [image](https://s3.amazonaws.com/vmfest-images/ubuntu-10-10-64bit-server.vdi.gz "image")
-4. Clone the image to its final destination (~/.vmfest/models):
-        $ mkdir -p ~/.vmfest/models
+4. Clone the image to its final destination (~/vmfest/models):
+        $ mkdir -p ~/vmfest/models
         $ VBoxManage clonehd /path/to/downloaded/ubuntu-10-10-64bit-server.vdi ~/vmfest/models/ubuntu-10-10-64bit-server.vdi
     * This should produce a uuid for your new image. Keep it around
 5. Start VirtualBox (the GUI) and:

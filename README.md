@@ -2,9 +2,10 @@
 1. Install VirtualBox on your machine
 2. Disable login credential: 
         $ VBoxManage setproperty websrvauthlibrary null
-3. Download and uncompress the following image https://s3.amazonaws.com/vmfest-images/ubuntu-10-10-64bit-server.vdi.gz
-4. Clone the image to the directory where you want it to be permanently stored:
-        $ VBoxManage clonehd /path/to/downloaded/ubuntu-10-10-64bit-server.vdi /path/to/permanent/location/ubuntu...-server.vdi
+3. Download and uncompress the following [image](https://s3.amazonaws.com/vmfest-images/ubuntu-10-10-64bit-server.vdi.gz "image")
+4. Clone the image to its final destination (~/.vmfest/models):
+        $ mkdir -p ~/.vmfest/models
+        $ VBoxManage clonehd /path/to/downloaded/ubuntu-10-10-64bit-server.vdi ~/vmfest/models/ubuntu-10-10-64bit-server.vdi
     * This should produce a uuid for your new image. Keep it around
 5. Start VirtualBox (the GUI) and:
     1. Create an new image Linux - Ubuntu (64bit)
@@ -13,7 +14,7 @@
     4. The credentials are user/superduper
 5. Now stop the machine and detach the hard drive from it (in settings)
 6. Make the disk image immutable
-        $ VBoxManage modifyhd /path/to/permanent/location/ubuntu-10-10-64bit-server.vdi --type immutable
+        $ VBoxManage modifyhd ~/vmfest/models/ubuntu-10-10-64bit-server.vdi --type immutable
 6. Get the name of your bridged network interface by running: 
         $ VBoxManage list bridgedifs | grep ^Name 
     e.g. "Name: en1: AirPort 2"  --> the interface name is "en1: Airport 2"
@@ -34,8 +35,8 @@
              :os-64-bit true
              :no-sudo false
              :sudo-password "superduper"}}
-         :model-path "/Users/tbatchlelli/.vmfest/models" ;; this should point to your home
-         :node-path "/Users/tbatchelli/.vmfest/nodes" ;; this should point to your home
+         :model-path "~/vmfest/models"
+         :node-path "~/vmfest/nodes"
          :url "http://localhost:18083"
          :identity ""
          :credential ""

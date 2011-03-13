@@ -1,4 +1,4 @@
-# Instructions to setup vmfest with [pallet]: https://github.com/pallet/pallet
+# Instructions to setup vmfest with [pallet](https://github.com/pallet/pallet "pallet")
 1. Install VirtualBox on your machine
 2. Disable login credential: 
         $ VBoxManage setproperty websrvauthlibrary null

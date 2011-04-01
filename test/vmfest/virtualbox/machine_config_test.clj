@@ -26,6 +26,19 @@
      :type :intel-ahci
      :bootable :true}]})
 
+(def test-network-adapters
+  [{:attachment-type :nat ;;default? ;; NetworkAttachmentType
+    :adapter-type nil ;; NetworkAdapterTypes
+    :network "name" ;; only if attachment type is :nat :internal :vde
+    :host-interface "en1: Airport 2" ;;only if attachment type is :host
+    ;; host interface can come from IHost::getNetworkInterfaces
+    :enabled true ;; default
+    :cable-connected true ;;default
+    :mac-address "231q334"
+    :line-speed 123 ;; in kbps
+    :nat-driver "TBD"}]) ;; tbd (not implemented)
+  
+
 (deftest ^{:integration true}
   configuration-function-tests
   (let [machine (fixtures/get-new-test-machine "configuration-tests")]
@@ -136,3 +149,27 @@
     (is (check-controller-type :scsi :lsi-logic))
     (is (not (check-controller-type :ide :lsi-logic)))
     (is (check-controller-type :sata :intel-ahci))))
+
+
+(deftest ^{:integration true}
+  network-config-tests
+  (testing "You can configure one network adapter"
+    (with-config-machine
+      (let [config
+            [{:attachment-type :bridged
+              :host-interface "en1: Airport 2"}
+             nil
+             {:attachment-type :bridged
+              :host-interface "nothing"}]]
+        (configure-network m config)
+        (let [configured-adapter (.getNetworkAdapter m (long 0))]
+          (is (= (:bridged
+                  (enums/network-attachment-type-to-key
+                   (.getAttachmentType configured-adapter)))))
+          (is (= "en1: Airport 2"
+                 (.getHostInterface configured-adapter))))
+        (is (not (.getEnabled (.getNetworkAdapter m (long 1))))
+            "The nil adapters don't get configured")
+        (let [configured-adapter (.getNetworkAdapter m (long 2))]
+          (is (= "nothing"
+                 (.getHostInterface configured-adapter))))))))

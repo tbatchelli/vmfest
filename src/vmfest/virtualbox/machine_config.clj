@@ -100,3 +100,58 @@
   (doseq [controller-config config]
     (log/debug (format "Configuring controller for %s" controller-config))
     (when controller-config (configure-controller m controller-config))))
+
+
+;;; network
+
+(defn set-adapter-property [adapter property-key value]
+  (when value
+    (condp = property-key
+        :adapter-type (.setAdapterType adapter value)
+        :network (.setNetwork adapter value)
+        :host-interface (.setHostInterface adapter value)
+        :enabled (.setEnabled adapter value)
+        :cable-connected (.setCableConnected adapter value)
+        :mac-address (.setMACAddress adapter value)
+        :line-speed (.setLineSpeed adapter value)
+        :nat-driver (log/error "Setting NAT driver not supported")
+        :attachment-type nil ;; do nothing
+        (log/error (format "set-adapter-property: unknown property %s" property-key)))))
+
+(defn configure-adapter-object [adapter config]
+  (doseq [[k v] config]
+    (set-adapter-property adapter k v)))
+
+(defn attach-to-bridged [adapter]
+  (.attachToBridgedInterface adapter))
+
+(defn attach-adapter [adapter attachment-type]
+  (condp = attachment-type 
+        :bridged (attach-to-bridged adapter)
+        :nat (log/error "Setting up NAT interfaces is not yet supported ")
+        :internal (log/error "Setting up NAT interfaces is not yet supported %s")
+        :host-only (log/error "Setting up NAT interfaces is not yet supported %s")
+        :shared-folder (log/error "Setting up NAT interfaces is not yet supported %s")
+        (log/error
+         (format "configure-adapter: unrecognized attachment type %s" attachment-type))))
+
+(defn configure-adapter
+  [m slot config]
+  (let [attachment-type (:attachment-type config)]
+    (log/debug
+     (format "configure-adapter: Configuring network adapter for machine '%s' slot %s with %s"
+             (.getName m) slot config))
+    (let [adapter (.getNetworkAdapter m (long slot))]
+      (configure-adapter-object adapter config)
+      (attach-adapter adapter attachment-type))))
+
+(defn configure-network [m config]
+  (log/debug (format "Configuring network for machine %s with %s"
+                     (.getName m) config))
+  (let [vbox (.getParent m)
+        system-properties (.getSystemProperties vbox)
+        adapter-count (.getNetworkAdapterCount system-properties)
+        adapter-configs (partition 2 (interleave (range adapter-count) config))]
+    (doseq [[slot adapter-config] adapter-configs]
+      (log/debug (format "Configuring adapter %s with %s" slot adapter-config))
+      (when adapter-config (configure-adapter m slot adapter-config)))))

@@ -90,7 +90,11 @@
   {:cent-os-5-5
    {:description "CentOS 5.5 32bit"
     :uuid "/Users/tbatchelli/Library/VirtualBox/HardDisks/Test1.vdi"
-    :os-type-id "RedHat"}})
+    :os-type-id "RedHat"}
+   :ubuntu-10-10-64bit
+   {:description "Ubuntu 10.10 64bit"
+    :uuid "/Users/tbatchelli/VBOX-HDS/Ubuntu-10-10-64bit.vdi"
+    :os-type-id "Ubuntu_64"}})
 
 (defn create-machine
   [server name os-type-id config-fn image-uuid & [base-folder]]

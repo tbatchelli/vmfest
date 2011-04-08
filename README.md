@@ -1,3 +1,98 @@
+# Quick and dirty introduction to vmfest
+    ;; load vmfest
+    (use 'vmfest.manager)
+
+    ;; define a connection to the vbox server. It doesn't create any socket
+    (def my-server (server "http://localhost:18083"))
+
+    ;; see what images are available
+    (hard-disks my-server)
+
+    ;; get all the data about the registered images
+    (pprint (map as-map (hard-disks my-server)))
+
+    ;; see what guest OSs are supported by vbox
+    (guest-os-types my-server)
+
+    ;; create a new VM ...
+    (def my-machine (create-machine my-server "bacug-machine" "Ubuntu_64" basic-config
+                                    "/Users/tbatchelli/VBOX-HDS/Ubuntu-10-10-64bit.vdi"))
+
+    ;; ... start it ...
+    (start my-machine)
+
+    ;; ... pause it ...
+    (pause my-machine)
+
+    ;; ... resume it ...
+    (resume my-machine)
+
+    ;; ... send a shut down key ... (won't work on this ubuntu)
+    (stop my-machine)
+
+    ;; ... turn the machine off ...
+    (power-down my-machine)
+
+    ;; ... aaaand, get rid of it.
+    (destroy my-machine)
+
+    ;; Let's use this in a functional way:
+    ;; 1) define the machine again
+    (def my-machine (create-machine my-server "bacug-machine" "Ubuntu_64" basic-config
+                                    "/Users/tbatchelli/VBOX-HDS/Ubuntu-10-10-64bit.vdi"))
+
+    ;; 2) Define the names of the machiens
+    (def clone-names #{"c1" "c2" "c3" "c4" "c5" "c6"})
+
+    ;; 3) Create a bunch a seq of machines same image based on the names defined
+    (def my-machines
+      (map #(create-machine my-server % "Ubuntu_64" basic-config
+                            "/Users/tbatchelli/VBOX-HDS/Ubuntu-10-10-64bit.vdi")
+           clone-names))
+
+    ;; 4) Start them all
+    (map start my-machines)
+
+    ;; 5) Power them all down
+    (map power-down my-machines)
+
+    ;; 6) clean up
+    (map destroy my-machines)
+
+
+    ;; Now, this was pretty low level. Let's build some infrastructure on
+    ;; top of it. This infrastructure defines *machines* and *images* that
+    ;; can be used to instantiate machines
+    (def my-machine (instance my-server "bacug-machine" :ubuntu-10-10-64bit :micro))
+    (def my-machine-2 (instance my-server "bacug-machine-2" :cent-os-5-5 :micro))
+
+    ;; now we can use the same operations as before
+    (start my-machine)
+    (start my-machine-2)
+    (power-down my-machine)
+    (power-down my-machine-2)
+    (destroy my-machine)
+    (destroy my-machine-2)
+
+    ;; View currently defined machines
+    (pprint (map as-map (machines my-server)))
+
+    ;; you can search machines too
+    (def my-test-machine (find-machine my-server "Ubuntu-10-10-64bit-Immutable")))
+
+    (start my-test-machine)
+
+    ;; now, what ip did this machine get?
+    (get-ip my-test-machine)
+
+    ;; ssh into it
+    ;; $ ssh user@<ip>
+
+    ;; kill it again
+    (power-down my-test-machine)
+    (destroy my-test-machine)
+
+
 # Instructions to setup vmfest with [pallet](https://github.com/pallet/pallet "pallet")
 1. Install VirtualBox on your machine
 2. Disable login credential: 

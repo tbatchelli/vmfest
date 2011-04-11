@@ -8,14 +8,16 @@
            [clojure.java.io :as io]
            vmfest.virtualbox.medium)
   (:use clojure.contrib.condition)
-  (:import org.virtualbox_4_0.SessionState))
+  (:import org.virtualbox_4_0.SessionState java.io.File))
 
 (defn server [url & [identity credentials]]
   (vmfest.virtualbox.model.Server. url (or identity "") (or credentials "")))
 
+(def user-home (System/getProperty "user.home"))
+
 (def *locations*
-  {:local {:model-path "/Users/tbatchlelli/.vmfest/models"
-           :node-path "/Users/tbatchelli/.vmfest/nodes"}})
+  {:local {:model-path (str user-home File/separator ".vmfest/models")
+           :node-path (str user-home File/separator ".vmfest/nodes")}})
 
 (def *location* (:local *locations*))
 
@@ -85,14 +87,42 @@
   {:micro basic-config})
 
 (def *images*
-  {:cent-os-5-5
+  #_{:cent-os-5-5
    {:description "CentOS 5.5 32bit"
     :uuid "/Users/tbatchelli/Library/VirtualBox/HardDisks/Test1.vdi"
     :os-type-id "RedHat"}
-   :ubuntu-10-10-64bit
+   (:ubuntu-10-10-64bit
    {:description "Ubuntu 10.10 64bit"
     :uuid "/Users/tbatchelli/VBOX-HDS/Ubuntu-10-10-64bit.vdi"
+    :os-type-id "Ubuntu_64"})
+   :cloned
+   {:description "Ubuntu 10.10 64bit"
+    :uuid "/tmp/clone3.vdi"
     :os-type-id "Ubuntu_64"}})
+
+(defn fs-dir [path]
+  (seq (.listFiles (java.io.File. path))))
+
+(defn filter-meta [^java.io.File file]
+  (let [name (.getName file)]
+    (.endsWith name ".meta")))
+
+(defn load-models []
+  (let [models-dir (:model-path *location*)
+        meta-files (filter filter-meta (fs-dir models-dir))]
+    (reduce merge {}
+          (map #(try
+                  (let [contents (slurp %)]
+                    (read-string contents))
+                  (catch Exception e
+                    (log/error (format "Wrong file format %s. Skipping" (.getName %)))))
+               meta-files))))
+
+(defn update-models []
+  (alter-var-root #'*images* (fn [_] (load-models))))
+
+;; force an model DB update
+(update-models)
 
 (defn create-machine
   [server name os-type-id config-fn image-uuid & [base-folder]]

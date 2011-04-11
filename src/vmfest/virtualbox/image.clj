@@ -80,6 +80,7 @@
      :model-name model-name
      :models-dir models-dir
      :model-file (str models-dir File/separator model-name ".vdi")
+     :model-meta (str models-dir File/separator model-name ".meta")
      :temp-dir temp-dir
      :meta meta
      :meta-url (when-not meta meta-url)
@@ -124,6 +125,14 @@
     (register-model image-file model-file vbox))
   options)
 
+(defn threaded-create-meta
+  [{:keys [model-name meta model-meta model-file] :as options}]
+  (let [meta (assoc meta :uuid model-file)
+        meta {(keyword model-name) meta}]
+    (log/info (format "%s: Creating meta file %s with %s" model-name model-meta meta))
+    (when-not *dry-run*
+      (spit model-meta meta))))
+
 (defn setup-model [image-url vbox & {:as options}]
   (let [job (apply prepare-job image-url vbox (reduce into [] options))]
     (log/info (str "About to execute job \n" (with-out-str (pprint job))))
@@ -137,7 +146,8 @@
           threaded-download
           threaded-gunzip
           threaded-get-metadata
-          threaded-register-model))))
+          threaded-register-model
+          threaded-create-meta))))
 
 (comment
  (use 'vmfest.manager)

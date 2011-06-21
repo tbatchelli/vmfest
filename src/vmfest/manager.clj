@@ -53,7 +53,10 @@
   (session/with-vbox (:server m) [_ vbox]
     (let [medium (vbox/find-medium vbox uuid)]
       (session/with-session m :shared [_ vb-m]
-        (attach-device vb-m "IDE Controller" 0 0 :hard-disk medium)
+        (try
+          (attach-device vb-m "SATA Controller" 0 0 :hard-disk medium)
+          (catch clojure.contrib.condition.Condition _
+            (attach-device vb-m "IDE Controller" 0 0 :hard-disk medium)))
         (.saveSettings vb-m)))))
 
 (defn get-ip [machine]

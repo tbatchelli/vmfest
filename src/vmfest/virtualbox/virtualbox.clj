@@ -1,5 +1,5 @@
 (ns vmfest.virtualbox.virtualbox
-  (:require [clojure.contrib.logging :as log]
+  (:require [clojure.tools.logging :as log]
             [vmfest.virtualbox.model :as model]
             [vmfest.virtualbox.conditions :as conditions]
             [vmfest.virtualbox.enums :as enums]
@@ -16,15 +16,13 @@
   [vbox id-or-name]
   {:pre [(model/IVirtualBox? vbox)]}
   (try
-    (log/trace (format "find-vb-m: looking for machine '%s'" id-or-name))
+    (log/tracef "find-vb-m: looking for machine '%s'" id-or-name)
     (let [vb-m (.findMachine vbox id-or-name)]
-      (log/debug (format "find-vb-m: found machine '%s': %s"
-                         id-or-name
-                         vb-m))
+      (log/debugf "find-vb-m: found machine '%s': %s" id-or-name vb-m)
       vb-m)
     (catch Exception e
-      (log/warn (format "find-vb-m: Machine identified by '%s' not found."
-                        id-or-name)))))
+      (log/warnf
+       "find-vb-m: Machine identified by '%s' not found." id-or-name))))
 
 (defn find-medium
   [vbox id-or-location & [type]]
@@ -32,17 +30,15 @@
          (if type (#{:hard-disk :floppy :dvd} type) true)]}
   (if (and type (not (#{:hard-disk :floppy :dvd} type)))
     ;; todo: throw condition
-    (log/warn
-     (format "find-medium: medium type %s not in #{:hard-disk :floppy :dvd}"
-             type))
+    (log/warnf
+     "find-medium: medium type %s not in #{:hard-disk :floppy :dvd}" type)
     (let [type-key (or type :hard-disk)
           type (enums/key-to-device-type type-key)]
       (try (.findMedium vbox id-or-location type)
            (catch Exception e
-             (log/warn
-              (format "Can't find a medium of type %s located in/with id '%s'."
-                      type
-                      id-or-location)))))))
+             (log/warnf
+              "Can't find a medium of type %s located in/with id '%s'."
+              type id-or-location))))))
 
 (defn register-machine [vbox machine]
   {:pre [(model/IVirtualBox? vbox)
@@ -69,13 +65,11 @@
                " file already exists or could not be created due to an"
                " I/O error.")
           :E_INVALIDARG "name is empty or null."}
-         (log/info
-          (format
-           (str "create-machine: "
-                "Creating machine %s in %s, %s overwriting previous contents")
+         (log/infof
+           "create-machine: Creating machine %s in %s, %s overwriting previous contents"
            name
            path
-           (if overwrite "" "not")))
+           (if overwrite "" "not"))
           (.createMachine vbox path name os-type-id nil overwrite)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

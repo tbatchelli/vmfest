@@ -1,6 +1,6 @@
 (ns vmfest.virtualbox.conditions
   (:use clojure.contrib.condition)
-  (:require [clojure.contrib.logging :as log])
+  (:require [clojure.tools.logging :as log])
   (:import [org.virtualbox_4_0.jaxws
             InvalidObjectFault
             InvalidObjectFaultMsg
@@ -40,48 +40,48 @@
 (extend-protocol fault
   java.lang.Exception
   (as-map [this]
-          (log/warn
-           (format "Processing exception %s as a java.lang.Exception. Cause %s"
-                   (class this)
-                   (.getCause this)))
-          {:original-message (.getMessage this)
-           :cause (.getCause this)
-           :type :exception})
+    (log/warnf
+     "Processing exception %s as a java.lang.Exception. Cause %s"
+     (class this)
+     (.getCause this))
+    {:original-message (.getMessage this)
+     :cause (.getCause this)
+     :type :exception})
   java.net.ConnectException
   (as-map [this]
-          {:type :connection-error})
+    {:type :connection-error})
   com.sun.xml.internal.ws.client.ClientTransportException
   (as-map [this]
-          {:type :connection-error})
+    {:type :connection-error})
   VBoxException
   (as-map [this]
-          (let [message (.getMessage this)
-                wrapped (.getWrapped this)]
-            (merge
-             (when wrapped (as-map wrapped))
-             {:message message})))
+    (let [message (.getMessage this)
+          wrapped (.getWrapped this)]
+      (merge
+       (when wrapped (as-map wrapped))
+       {:message message})))
   RuntimeFaultMsg
   (as-map [this]
-          (let [message (.getMessage this)
-                info (try (.getFaultInfo this)
-                        (catch Exception e)) ;; runtime fault
-                interface-id (when info (.getInterfaceID info))
-                component (when info (.getComponent info))
-                result-code (when info
-                              (unsigned-int-to-long
-                               (int (.getResultCode info))))
-                text (when info (.getText info))]
-            {:type :vbox-runtime
-             :original-message message
-             :origin-id interface-id
-             :origin-component component
-             :error-code result-code
-             :original-error-type (*error-code-map* result-code)
-             :text text}))
+    (let [message (.getMessage this)
+          info (try (.getFaultInfo this)
+                    (catch Exception e)) ;; runtime fault
+          interface-id (when info (.getInterfaceID info))
+          component (when info (.getComponent info))
+          result-code (when info
+                        (unsigned-int-to-long
+                         (int (.getResultCode info))))
+          text (when info (.getText info))]
+      {:type :vbox-runtime
+       :original-message message
+       :origin-id interface-id
+       :origin-component component
+       :error-code result-code
+       :original-error-type (*error-code-map* result-code)
+       :text text}))
   InvalidObjectFaultMsg
   (as-map [this]
-          {:type :vbox-invalid-object
-           :original-message (.getMessage this)}))
+    {:type :vbox-invalid-object
+     :original-message (.getMessage this)}))
 
 (defn condition-from-exception [e]
   (try
@@ -93,8 +93,8 @@
         (log/debug (format "formatting exception %s" condition))
         condition))
     (catch Exception e
-      (log/error
-       (format "Cannot parse the error since the object is unavailable %s" e))
+      (log/errorf
+       "Cannot parse the error since the object is unavailable %s" e)
       {})))
 
 #_(defn log-and-raise [exception optional-keys]
@@ -109,7 +109,7 @@
                     (condition-from-webservice-exception exception)
                     optional-keys)))
     (catch Exception e
-      (log/error "condition: Can't process this exeption" e)
+      (log/error e "condition: Can't process this exeption")
       (throw e))))
 
 (defn wrap-exception [exception optional-keys]

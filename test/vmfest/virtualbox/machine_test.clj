@@ -1,7 +1,7 @@
 (ns vmfest.virtualbox.machine-test
   (:require [vmfest.virtualbox.session :as session]
             [vmfest.virtualbox.model :as model]
-            [clojure.contrib.logging :as log])
+            [clojure.tools.logging :as log])
   (:use vmfest.virtualbox.machine :reload)
   (:use clojure.test
         vmfest.fixtures

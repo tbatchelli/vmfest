@@ -4,7 +4,7 @@
            [vmfest.virtualbox.session :as session]
            [vmfest.virtualbox.model :as model]
            [clojure.contrib.condition :as condition]
-           [clojure.contrib.logging :as log]
+           [clojure.tools.logging :as log]
            [clojure.java.io :as io]
            vmfest.virtualbox.medium)
   (:use clojure.contrib.condition)
@@ -70,8 +70,7 @@
 
 (defn get-extra-data [machine key]
   {:pre [(model/Machine? machine)]}
-  (log/trace
-   (format "get-extra-data: getting extra data for %s %s" (:id machine) key))
+  (log/tracef "get-extra-data: getting extra data for %s %s" (:id machine) key)
   (session/with-no-session machine [vb-m]
     (machine/get-extra-data vb-m key)))
 
@@ -154,8 +153,7 @@
         (if  (not= SessionState/Locked state)
           (if (< (current-time-millis) end-time)
             (do
-              (log/trace
-               (format "wait-for-lockable-session-state: state %s" state))
+              (log/tracef "wait-for-lockable-session-state: state %s" state)
               (Thread/sleep 250)
               (recur))
             nil)

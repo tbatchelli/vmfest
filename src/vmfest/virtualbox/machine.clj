@@ -1,6 +1,6 @@
 (ns vmfest.virtualbox.machine
   (:use clojure.contrib.condition)
-  (:require [clojure.contrib.logging :as log]
+  (:require [clojure.tools.logging :as log]
             [vmfest.virtualbox.virtualbox :as virtualbox]
             [vmfest.virtualbox.conditions :as conditions]
             [vmfest.virtualbox.model :as model]
@@ -193,8 +193,7 @@
   model/vbox-object
   (soak [this vbox]
         (let [vb-m (virtualbox/find-vb-m vbox (:id this))]
-          (log/trace
-           (format "soak: soaking %s into %s" this vb-m))
+          (log/tracef "soak: soaking %s into %s" this vb-m)
           vb-m))
   (as-map [this]
           (session/with-vbox (:server this) [_ vbox]
@@ -203,8 +202,7 @@
                 (merge this
                        (map-from-IMachine machine (:server this))))
               (catch Exception e
-                (log/error (format "as-map: Machine %s not found. Reason"
-                                   (:id this)) e)
+                (log/errorf e "as-map: Machine %s not found. Reason" (:id this))
                 (merge this
                        {:error "Machine not found"
                         :exception e})))))
@@ -251,15 +249,16 @@ See IVirtualbox::openRemoteSession for more details"
           (log/debug (str "start: Starting session for VM " machine-id "..."))
           (.waitForCompletion progress 30000)
           (let [result-code (.getResultCode progress)]
-            (log/debug (format "start: VM %s started with result code %s"
+            (log/debugf "start: VM %s started with result code %s"
                                machine-id
-                               result-code))
+                               result-code)
             result-code)))
       (catch Exception e
-        (log/error "Cannot start machine" e)
+        (log/error e "Cannot start machine")
         (conditions/wrap-exception
          e
          {:message "An error occurred while starting machine"})))))
+
 
 (defn save-settings [machine]
   {:pre [(model/IMachine? machine)]}
@@ -326,7 +325,7 @@ See IVirtualbox::openRemoteSession for more details"
   (conditions/with-vbox-exception-translation
     {:VBOX_E_INVALID_VM_STATE "Virtual machine not in Running state."
      :VBOX_E_PDM_ERROR "Controlled power off failed."}
-    (log/trace (format "stop: machine-id: %s" (.getId (.getMachine c))))
+    (log/tracef "stop: machine-id: %s" (.getId (.getMachine c)))
     (.powerButton c)))
 
 (defn pause
@@ -427,10 +426,10 @@ See IVirtualbox::openRemoteSession for more details"
     (let [cleanup-mode (if cleanup-key
                          (enums/key-to-cleanup-mode cleanup-key)
                          :unregister-only)]
-      (log/info
-       (format "unregister: unregistering machine with name %s with cleanup %s"
-               (.getName vb-m)
-               cleanup-mode))
+      (log/infof
+       "unregister: unregistering machine with name %s with cleanup %s"
+       (.getName vb-m)
+       cleanup-mode)
       (.unregister vb-m cleanup-mode))))
 
 (defn delete [vb-m media]
@@ -440,9 +439,7 @@ See IVirtualbox::openRemoteSession for more details"
      "Machine is registered but not write-locked."
      :VBOX_E_IPRT_ERROR
      "Could not delete the settings file."}
-    (log/info
-     (format "delete: deleting machine %s and it's media"
-             (.getName vb-m)))
+    (log/infof "delete: deleting machine %s and it's media" (.getName vb-m))
     (.delete vb-m media)))
 
 

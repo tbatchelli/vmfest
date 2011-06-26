@@ -115,7 +115,7 @@
       options)
     (do
       (log/info (format "%s: Loading metadata from %s" model-name meta-url))
-      (assoc options :meta (slurp meta-url)))))
+      (assoc options :meta (load-string (slurp meta-url))))))
 
 (defn threaded-register-model
   [{:keys [image-file model-file vbox model-name] :as options}]
@@ -153,4 +153,4 @@
  (use 'vmfest.manager)
  (use 'vmfest.virtualbox.image)
  (def my-server (server "http://localhost:18083"))
- (setup-model "https://s3.amazonaws.com/vmfest-images/ubuntu-10-10-64bit-server.vdi.gz" server)) 
+ (setup-model "https://s3.amazonaws.com/vmfest-images/ubuntu-10-10-64bit-server.vdi.gz" my-server)) 

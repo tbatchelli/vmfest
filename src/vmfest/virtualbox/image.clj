@@ -132,7 +132,8 @@
     (log/info
      (format "%s: Creating meta file %s with %s" model-name model-meta meta))
     (when-not *dry-run*
-      (spit model-meta meta))))
+      (spit model-meta meta))
+    (assoc options :meta meta)))
 
 (defn setup-model
   "Download a disk image from `image-url` and register it with `vbox`."

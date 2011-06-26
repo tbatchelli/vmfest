@@ -15,11 +15,21 @@
 
 (def user-home (System/getProperty "user.home"))
 
-(def *locations*
-  {:local {:model-path (str user-home File/separator ".vmfest/models")
-           :node-path (str user-home File/separator ".vmfest/nodes")}})
+(defn default-model-path
+  "Return the default model-path for images"
+  [& {:keys [home] :or {home user-home}}]
+  (.getPath (io/file home ".vmfest" "models")))
 
-(def *location* (:local *locations*))
+(defn default-node-path
+  "Return the default node-path for images"
+  [& {:keys [home] :or {home user-home}}]
+  (.getPath (io/file home ".vmfest" "nodes")))
+
+(def ^{:dynamic true} *locations*
+  {:local {:model-path (default-model-path)
+           :node-path (default-node-path)}})
+
+(def ^{:dynamic true} *location* (:local *locations*))
 
 ;; machine configuration stuff
 
@@ -83,10 +93,10 @@
 
 ;;; jclouds/pallet-style infrastructure
 
-(def *machine-models*
+(def ^{:dynamic true} *machine-models*
   {:micro basic-config})
 
-(def *images* nil
+(def ^{:dynamic true} *images* nil
   #_{:cent-os-5-5
    {:description "CentOS 5.5 32bit"
     :uuid "/Users/tbatchelli/Library/VirtualBox/HardDisks/Test1.vdi"
@@ -103,26 +113,28 @@
 (defn fs-dir [path]
   (seq (.listFiles (java.io.File. path))))
 
-(defn filter-meta [^java.io.File file]
-  (let [name (.getName file)]
-    (.endsWith name ".meta")))
+(defn image-meta-file? [^java.io.File file]
+  (.. (.getName file) (endsWith ".meta")))
 
-(defn load-models []
-  (let [models-dir (:model-path *location*)
-        meta-files (filter filter-meta (fs-dir models-dir))]
-    (reduce merge {}
-          (map #(try
-                  (let [contents (slurp %)]
-                    (read-string contents))
-                  (catch Exception e
-                    (log/error (format "Wrong file format %s. Skipping" (.getName %)))))
-               meta-files))))
+(defn read-meta-file [^java.io.File file]
+  (try
+    (read-string (slurp file))
+    (catch Exception e
+      (log/warn (format "Wrong file format %s. Skipping" (.getName file))))))
 
-(defn update-models []
-  (alter-var-root #'*images* (fn [_] (load-models))))
+(defn load-models
+  "Return a map of all image metadata from the model-path"
+  [& {:keys [model-path] :or {model-path (:model-path *location*)}}]
+  (let [meta-files (filter image-meta-file? (fs-dir model-path))]
+    (reduce merge {} (map read-meta-file meta-files))))
+
+(defn update-models
+  "Update model metadata in *images*"
+  [& {:keys [model-path] :or {model-path (:model-path *location*)}}]
+  (alter-var-root #'*images* (fn [_] (load-models :model-path model-path))))
 
 ;; force an model DB update
-(update-models)
+;; (update-models)
 
 (defn create-machine
   [server name os-type-id config-fn image-uuid & [base-folder]]

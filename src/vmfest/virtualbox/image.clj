@@ -129,11 +129,14 @@
   [{:keys [model-name meta model-meta model-file] :as options}]
   (let [meta (assoc meta :uuid model-file)
         meta {(keyword model-name) meta}]
-    (log/info (format "%s: Creating meta file %s with %s" model-name model-meta meta))
+    (log/info
+     (format "%s: Creating meta file %s with %s" model-name model-meta meta))
     (when-not *dry-run*
       (spit model-meta meta))))
 
-(defn setup-model [image-url vbox & {:as options}]
+(defn setup-model
+  "Download a disk image from `image-url` and register it with `vbox`."
+  [image-url vbox & {:as options}]
   (let [job (apply prepare-job image-url vbox (reduce into [] options))]
     (log/info (str "About to execute job \n" (with-out-str (pprint job))))
     (if (.exists (File. (:model-file job)))

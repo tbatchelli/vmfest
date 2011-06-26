@@ -67,7 +67,7 @@
         image-name (file-name-without-extensions image-file-name)
         gzipped? (.endsWith image-file-name ".gz")
         model-name (str "vmfest-" (or model-name image-name))
-        meta-url (or meta-url (str directory File/separator (or meta-file-name (str image-name ".meta"))))
+        meta-url (or meta-url (str directory (or meta-file-name (str image-name ".meta"))))
         temp-dir (make-temp-dir model-name)
         models-dir (or models-dir (str (System/getProperty "user.home")
                                      File/separator
@@ -153,4 +153,4 @@
  (use 'vmfest.manager)
  (use 'vmfest.virtualbox.image)
  (def my-server (server "http://localhost:18083"))
- (setup-model "https://s3.amazonaws.com/vmfest-images/ubuntu-10-10-64bit-server.vdi.gz" server))
+ (setup-model "https://s3.amazonaws.com/vmfest-images/ubuntu-10-10-64bit-server.vdi.gz" server)) 

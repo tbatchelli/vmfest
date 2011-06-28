@@ -2,7 +2,8 @@
   (:use [clojure.java.io]
         [vmfest.virtualbox.session :only (with-vbox)]
         [clojure.pprint :only (pprint)])
-  (:require [clojure.contrib.logging :as log])
+  (:require [clojure.contrib.logging :as log]
+            [clojure.contrib.str-utils2 :as string])
   (:import [org.virtualbox_4_0 DeviceType AccessMode MediumVariant
             MediumType]
            [java.util.zip GZIPInputStream]
@@ -31,8 +32,9 @@
      (.substring url last-forward-slash-index )]))
 
 (defn file-name-without-extensions [file-name]
-  (let [first-dot-index (.indexOf file-name ".")]
-    (.substring file-name 0 first-dot-index)))
+  (-> file-name
+      (string/replace #"\.gz$" "")
+      (string/replace #"\.[^.]+$" "")))
 
 (defn register-model [orig dest vbox]
   (with-vbox vbox [_ vb]

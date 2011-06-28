@@ -4,7 +4,7 @@
                  [org.clojure/clojure-contrib "1.2.0"]
                  [org.clojars.tbatchelli/vboxjws "4.0.2"]
                  [log4j/log4j "1.2.14"]]
-  :dev-dependencies [[swank-clojure/swank-clojure "1.2.1"]
+  :dev-dependencies [[swank-clj "0.1.6"]
                      [marginalia "0.5.0-alpha"]
                      [robert/hooke "1.1.0"]
                      [lein-clojars "0.6.0"]]

@@ -137,6 +137,12 @@
       (spit model-meta meta))
     (assoc options :meta meta)))
 
+(defn threaded-cleanup-temp-files
+  [{:keys [gzipped-image-file image-file] :as options}]
+  (delete-file gzipped-image-file true)
+  (delete-file image-file true)
+  options)
+
 (defn setup-model
   "Download a disk image from `image-url` and register it with `vbox`."
   [image-url vbox & {:as options}]
@@ -153,7 +159,8 @@
           threaded-gunzip
           threaded-get-metadata
           threaded-register-model
-          threaded-create-meta))))
+          threaded-create-meta
+          threaded-cleanup-temp-files))))
 
 (comment
  (use 'vmfest.manager)

@@ -74,16 +74,7 @@
               (with-session valid-machine :write [s2 m2]))))))
   (testing "a session with a bogus machine will throw a condition"
       (is (thrown-with-msg? Condition #"Cannot open session with machine"
-            (with-session bogus-machine :write [s m]))))
-  (testing "write session method call -- wrong method,"
-    (is (thrown?
-         Condition
-         (with-session valid-machine :write [session machine]
-           (.setBogusVariable machine nil))))
-    (is (handler-case :type
-          (with-session valid-machine :write [session machine]
-            (.setBogusVariable machine nil))
-          (handle :invalid-method true)))))
+            (with-session bogus-machine :write [s m])))))
 
 (deftest ^{:integration true}
   shared-sessions-can-control-machines

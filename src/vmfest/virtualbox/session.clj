@@ -1,7 +1,7 @@
 (ns vmfest.virtualbox.session
   "**session** provides the functionality to abstract the creation and
 destruction of sessions with the VBox servers"
-  (:require [clojure.contrib.logging :as log]
+  (:require [clojure.tools.logging :as log]
             [vmfest.virtualbox.conditions :as conditions]
             [vmfest.virtualbox.model :as model]
             [vmfest.virtualbox.enums :as enums])
@@ -68,19 +68,15 @@ VirtualBoxManager object plus the credentials or by a Server object.
              -> IVirtualBox"
   ([^VirtualBoxManager mgr url username password]
      {:pre [(model/VirtualBoxManager? mgr)]}
-     (log/trace
-      (format
-       "creating new vbox with a logon for url=%s and username=%s"
-       url
-       username))
+     (log/tracef
+      "creating new vbox with a logon for url=%s and username=%s" url username)
      (try
        (.connect mgr url username password)
        (.getVBox mgr)
        (catch VBoxException e
-         (conditions/log-and-raise
+         (conditions/wrap-exception
           e
-          {:log-level :error
-           :message (format
+          {:message (format
                      "Cannot connect to virtualbox server: '%s'"
                      (.getMessage e))}))))
   ([^Server server]
@@ -125,9 +121,8 @@ with a virtualbox.
        (finally (when ~mgr
                   (try (.disconnect ~mgr)
                        (catch Exception e#
-                         (conditions/log-and-raise
-                          e# {:log-level :error
-                              :message "unable to close session"}))))))))
+                         (conditions/wrap-exception
+                          e# {:message "unable to close session"}))))))))
 
 (def lock-type-constant
   {:write org.virtualbox_4_0.LockType/Write
@@ -144,21 +139,11 @@ with a virtualbox.
          (let [~vb-m (.getMachine ~session)]
            (try
              ~@body
-             (catch java.lang.IllegalArgumentException e#
-               (conditions/log-and-raise
-                e#
-                {:log-level :error
-                 :message
-                 (format
-                  "Called a method that is not available with a direct session in '%s'"
-                  '~body)
-                 :type :invalid-method}))
              (finally (.unlockMachine ~session))))))
      (catch VBoxException e#
-       (conditions/log-and-raise
+       (conditions/wrap-exception
         e#
-        {:log-level :error
-         :message (format "Cannot open session with machine '%s' reason:%s"
+        {:message (format "Cannot open session with machine '%s' reason:%s"
                           (:id ~machine)
                           (.getMessage e#))}))))
 
@@ -170,14 +155,8 @@ with a virtualbox.
      (with-vbox (:server ~machine) [_# vbox#]
        (let [~vb-m (.findMachine vbox# (:id ~machine))]
          ~@body))
-      (catch java.lang.IllegalArgumentException e#
-        (conditions/log-and-raise
-         e#
-         {:log-level :error
-          :message "Called a method that is not available without a session"
-          :type :invalid-method}))
        (catch Exception e#
-         (conditions/log-and-raise e# {:log-level :error
+         (conditions/wrap-exception e# {:log-level :error
                                        :message "An error occurred"}))))
 
 

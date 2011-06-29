@@ -1,5 +1,5 @@
 (ns vmfest.virtualbox.virtualbox
-  (:require [clojure.contrib.logging :as log]
+  (:require [clojure.tools.logging :as log]
             [vmfest.virtualbox.model :as model]
             [vmfest.virtualbox.conditions :as conditions]
             [vmfest.virtualbox.enums :as enums]
@@ -16,15 +16,13 @@
   [vbox id-or-name]
   {:pre [(model/IVirtualBox? vbox)]}
   (try
-    (log/trace (format "find-vb-m: looking for machine '%s'" id-or-name))
+    (log/tracef "find-vb-m: looking for machine '%s'" id-or-name)
     (let [vb-m (.findMachine vbox id-or-name)]
-      (log/debug (format "find-vb-m: found machine '%s': %s"
-                         id-or-name
-                         vb-m))
+      (log/debugf "find-vb-m: found machine '%s': %s" id-or-name vb-m)
       vb-m)
     (catch Exception e
-      (log/warn (format "find-vb-m: Machine identified by '%s' not found."
-                        id-or-name)))))
+      (log/warnf
+       "find-vb-m: Machine identified by '%s' not found." id-or-name))))
 
 (defn find-medium
   [vbox id-or-location & [type]]
@@ -32,33 +30,24 @@
          (if type (#{:hard-disk :floppy :dvd} type) true)]}
   (if (and type (not (#{:hard-disk :floppy :dvd} type)))
     ;; todo: throw condition
-    (log/warn
-     (format "find-medium: medium type %s not in #{:hard-disk :floppy :dvd}"
-             type))
+    (log/warnf
+     "find-medium: medium type %s not in #{:hard-disk :floppy :dvd}" type)
     (let [type-key (or type :hard-disk)
           type (enums/key-to-device-type type-key)]
       (try (.findMedium vbox id-or-location type)
            (catch Exception e
-             (log/warn
-              (format "Can't find a medium of type %s located in/with id '%s'."
-                      type
-                      id-or-location)))))))
+             (log/warnf
+              "Can't find a medium of type %s located in/with id '%s'."
+              type id-or-location))))))
 
 (defn register-machine [vbox machine]
   {:pre [(model/IVirtualBox? vbox)
          (model/IMachine? machine)]}
-  (try
-    (.registerMachine vbox machine)
-    (catch VBoxException e
-      (conditions/wrap-vbox-runtime
-       e
-       {:VBOX_E_OBJECT_NOT_FOUND
-        {:message "No matching virtual machine found"}
-        :VBOX_E_INVALID_OBJECT_STATE
-        {:message
-         (str
-          "Virtual machine was not created within this VirtualBox"
-          " instance.")}}))))
+  (conditions/with-vbox-exception-translation
+    {:VBOX_E_OBJECT_NOT_FOUND "No matching virtual machine found"
+     :VBOX_E_INVALID_OBJECT_STATE
+     "Virtual machine was not created within this VirtualBox instance."}
+    (.registerMachine vbox machine)))
 
 (defn create-machine
   ([vbox name os-type-id]
@@ -69,27 +58,19 @@
      {:pre [(model/IVirtualBox? vbox)]}
      (let [path (when base-folder
                   (.composeMachineFilename vbox name base-folder))]
-       (try
-         (log/info
-          (format
-           (str "create-machine: "
-                "Creating machine %s in %s, %s overwriting previous contents")
+       (conditions/with-vbox-exception-translation
+         {:VBOX_E_OBJECT_NOT_FOUND "invalid os type ID."
+          :VBOX_E_FILE_ERROR
+          (str "Resulting settings file name is invalid or the settings"
+               " file already exists or could not be created due to an"
+               " I/O error.")
+          :E_INVALIDARG "name is empty or null."}
+         (log/infof
+           "create-machine: Creating machine %s in %s, %s overwriting previous contents"
            name
            path
-           (if overwrite "" "not")))
-          (.createMachine vbox path name os-type-id nil overwrite)
-          (catch VBoxException e
-            (conditions/wrap-vbox-runtime
-             e
-             {:VBOX_E_OBJECT_NOT_FOUND
-              {:message "invalid os type ID."}
-              :VBOX_E_FILE_ERROR
-              {:message
-               (str "Resulting settings file name is invalid or the settings"
-                    " file already exists or could not be created due to an"
-                    " I/O error.")}
-              :E_INVALIDARG
-              {:message "name is empty or null."}}))))))
+           (if overwrite "" "not"))
+          (.createMachine vbox path name os-type-id nil overwrite)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

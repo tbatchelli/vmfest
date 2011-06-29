@@ -4,20 +4,32 @@
            [vmfest.virtualbox.session :as session]
            [vmfest.virtualbox.model :as model]
            [clojure.contrib.condition :as condition]
-           [clojure.contrib.logging :as log]
+           [clojure.tools.logging :as log]
            [clojure.java.io :as io]
            vmfest.virtualbox.medium)
   (:use clojure.contrib.condition)
-  (:import org.virtualbox_4_0.SessionState))
+  (:import org.virtualbox_4_0.SessionState java.io.File))
 
 (defn server [url & [identity credentials]]
   (vmfest.virtualbox.model.Server. url (or identity "") (or credentials "")))
 
-(def *locations*
-  {:local {:model-path "/Users/tbatchlelli/.vmfest/models"
-           :node-path "/Users/tbatchelli/.vmfest/nodes"}})
+(def user-home (System/getProperty "user.home"))
 
-(def *location* (:local *locations*))
+(defn default-model-path
+  "Return the default model-path for images"
+  [& {:keys [home] :or {home user-home}}]
+  (.getPath (io/file home ".vmfest" "models")))
+
+(defn default-node-path
+  "Return the default node-path for images"
+  [& {:keys [home] :or {home user-home}}]
+  (.getPath (io/file home ".vmfest" "nodes")))
+
+(def ^{:dynamic true} *locations*
+  {:local {:model-path (default-model-path)
+           :node-path (default-node-path)}})
+
+(def ^{:dynamic true} *location* (:local *locations*))
 
 ;; machine configuration stuff
 
@@ -53,7 +65,10 @@
   (session/with-vbox (:server m) [_ vbox]
     (let [medium (vbox/find-medium vbox uuid)]
       (session/with-session m :shared [_ vb-m]
-        (attach-device vb-m "IDE Controller" 0 0 :hard-disk medium)
+        (try
+          (attach-device vb-m "SATA Controller" 0 0 :hard-disk medium)
+          (catch clojure.contrib.condition.Condition _
+            (attach-device vb-m "IDE Controller" 0 0 :hard-disk medium)))
         (.saveSettings vb-m)))))
 
 (defn get-ip [machine]
@@ -70,8 +85,7 @@
 
 (defn get-extra-data [machine key]
   {:pre [(model/Machine? machine)]}
-  (log/trace
-   (format "get-extra-data: getting extra data for %s %s" (:id machine) key))
+  (log/tracef "get-extra-data: getting extra data for %s %s" (:id machine) key)
   (session/with-no-session machine [vb-m]
     (machine/get-extra-data vb-m key)))
 
@@ -81,14 +95,48 @@
 
 ;;; jclouds/pallet-style infrastructure
 
-(def *machine-models*
+(def ^{:dynamic true} *machine-models*
   {:micro basic-config})
 
-(def *images*
-  {:cent-os-5-5
+(def ^{:dynamic true} *images* nil
+  #_{:cent-os-5-5
    {:description "CentOS 5.5 32bit"
     :uuid "/Users/tbatchelli/Library/VirtualBox/HardDisks/Test1.vdi"
-    :os-type-id "RedHat"}})
+    :os-type-id "RedHat"}
+   :ubuntu-10-10-64bit
+   {:description "Ubuntu 10.10 64bit"
+    :uuid "/Users/tbatchelli/VBOX-HDS/Ubuntu-10-10-64bit.vdi"
+    :os-type-id "Ubuntu_64"}
+   :cloned
+   {:description "Ubuntu 10.10 64bit"
+    :uuid "/tmp/clone3.vdi"
+    :os-type-id "Ubuntu_64"}})
+
+(defn fs-dir [path]
+  (seq (.listFiles (java.io.File. path))))
+
+(defn image-meta-file? [^java.io.File file]
+  (.. (.getName file) (endsWith ".meta")))
+
+(defn read-meta-file [^java.io.File file]
+  (try
+    (read-string (slurp file))
+    (catch Exception e
+      (log/warn (format "Wrong file format %s. Skipping" (.getName file))))))
+
+(defn load-models
+  "Return a map of all image metadata from the model-path"
+  [& {:keys [model-path] :or {model-path (:model-path *location*)}}]
+  (let [meta-files (filter image-meta-file? (fs-dir model-path))]
+    (reduce merge {} (map read-meta-file meta-files))))
+
+(defn update-models
+  "Update model metadata in *images*"
+  [& {:keys [model-path] :or {model-path (:model-path *location*)}}]
+  (alter-var-root #'*images* (fn [_] (load-models :model-path model-path))))
+
+;; force an model DB update
+;; (update-models)
 
 (defn create-machine
   [server name os-type-id config-fn image-uuid & [base-folder]]
@@ -154,8 +202,7 @@
         (if  (not= SessionState/Locked state)
           (if (< (current-time-millis) end-time)
             (do
-              (log/trace
-               (format "wait-for-lockable-session-state: state %s" state))
+              (log/tracef "wait-for-lockable-session-state: state %s" state)
               (Thread/sleep 250)
               (recur))
             nil)

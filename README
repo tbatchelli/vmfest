@@ -1,0 +1,78 @@
+# vmfest
+
+VMFest is a clojure wrapper to (currently) [VirtualBox] [vbox], a virtualization platform that is pretty good with virtualizing servers. 
+
+VMFest is a library, although it provides tool-like functionality.
+
+[vbox]: http://www.virtualbox.org 
+
+With VMFest you can easily create and operate virtual machines, with emphasis on creating many clones of the same model VMs. 
+
+## Models and Instances
+
+(NOTE: Explain that there are two main way to run VMFest, mutable and immutable images)
+
+In VMFest, a *model* is a VM image. Although it is possible to run an actual VM off of this image in VMFest, this is not the common usage scenario. The common usage scenario is to run an *instance* of the model. 
+
+An instance is a transient VM that will be created dynamically from the model and destroyed after being used. You can start as many instances as you need from the same model. Each instance created is virtually a clone of the model, but the way VirtualBox works makes this cloning a space efficient operation, namely, each clone takes significant less disk space than the model image.
+
+It is possible to use VMFest in a more standard way, in which each VM uses a permanent image. A permanent image is an image that keeps its changes beyond the lifetime of the VM that runs on it. 
+
+## Usage
+
+First of all, we might want to install a model. The following will download an install an ubuntu 10.10 64-bit model image.
+
+```clojure
+(use 'vmfest.manager)
+(use 'vmfest.virtualbox.image)
+
+;; crate a connection to the local VirtualBox server
+(def my-server (server "http://localhost:18083"))
+
+;; download and install a model
+(setup-model "https://s3.amazonaws.com/vmfest-images/ubuntu-10-10-64bit-server.vdi.gz" server)
+```
+
+Once the model image is installed, you can create an instance off of it.
+
+```clojure
+(def my-machine (instance my-server "bacug-machine" :ubuntu-10-10-64bit :micro))
+```
+
+At this point, you can operate your instance.
+
+```clojure
+(start my-machine) ;; starts your vm instance
+(pause my-machine) ;; pauses your running instance
+(resume my-machine) ;; resumes your paused instance
+(power-down my-machine) ;; turns off your machine. The changes in the filesystem will be lost
+(destroy-my machine) ;; removes any trace of this instance having ever existed
+```
+
+Now let's say you want to start 10 instances of the same model.
+
+```clojure
+;; find some names for those instances
+(def clone-names #{"c1" "c2" "c3" "c4" "c5" "c6"})
+
+;; create the instances
+(def my-machines (map #(instance my-server % :ubuntu-10-10-64bit :micro)))
+
+;; start them all!
+(map start my-machines)
+
+;; stop them all
+(map power-down my-machines)
+
+;; remove them all
+(map destroy my-machines)
+```
+
+## Installation
+
+## License
+
+
+
+
+   

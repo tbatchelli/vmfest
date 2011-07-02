@@ -63,7 +63,7 @@
 
 (defn prepare-job
   [image-url vbox
-   & {:keys [model-name temp-dir meta-file-name meta-url meta model-file-name models-dir]
+   & {:keys [model-name temp-dir meta-file-name meta-url meta model-file-name model-path]
       :as options}]
   (let [[directory image-file-name] (directory-and-file-name-from-url image-url)
         image-name (file-name-without-extensions image-file-name)
@@ -71,7 +71,7 @@
         model-name (str "vmfest-" (or model-name image-name))
         meta-url (or meta-url (str directory (or meta-file-name (str image-name ".meta"))))
         temp-dir (make-temp-dir model-name)
-        models-dir (or models-dir (str (System/getProperty "user.home")
+        model-path (or model-path (str (System/getProperty "user.home")
                                      File/separator
                                      ".vmfest/models"))]
     {:image-url image-url
@@ -80,9 +80,9 @@
      :gzipped-image-file (str temp-dir File/separator image-file-name)
      :image-file (str temp-dir File/separator image-name ".vdi")
      :model-name model-name
-     :models-dir models-dir
-     :model-file (str models-dir File/separator model-name ".vdi")
-     :model-meta (str models-dir File/separator model-name ".meta")
+     :model-path model-path
+     :model-file (str model-path File/separator model-name ".vdi")
+     :model-meta (str model-path File/separator model-name ".meta")
      :temp-dir temp-dir
      :meta meta
      :meta-url (when-not meta meta-url)

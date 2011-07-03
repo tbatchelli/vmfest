@@ -185,8 +185,8 @@
                  (let [setter (get-setter k)]
                    (if setter
                      (setter v m)
-                     (log/error
-                      (str "IMachine has no setter defined for " k)))))]
+                     (log/errorf
+                      "IMachine has no setter defined for %s" k))))]
     (doall (map set-fn value-map))))
 
 (extend-type vmfest.virtualbox.model.Machine

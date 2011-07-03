@@ -173,3 +173,34 @@
         (let [configured-adapter (.getNetworkAdapter m (long 2))]
           (is (= "nothing"
                  (.getHostInterface configured-adapter))))))))
+
+(def machine-config
+  {:cpu-count 2
+   :memory-size 555
+   :network [{:attachment-type :bridged
+              :host-interface "en1: Airport 2"}
+             nil
+             {:attachment-type :bridged
+              :host-interface "nothing"}]
+   :storage  [{:name "IDE Controller"
+               :bus :ide
+               :devices [nil nil {:device-type :dvd}]}]})
+
+(deftest ^{:integration true}
+  test-full-machine-config
+  (with-config-machine
+    (configure-machine m machine-config)
+    (configure-machine-storage m machine-config)
+    (testing "The machine settings are properly set"
+      (is (= (long 555) (machine/get-attribute m :memory-size))
+          (= (long 2) (machine/get-attribute m :cpu-count))))
+    (testing "The network settings are properly set"
+      (let [configured-adapter (.getNetworkAdapter m (long 0))]
+        (is (= (:bridged
+                (enums/network-attachment-type-to-key
+                 (.getAttachmentType configured-adapter)))))
+        (is (= "en1: Airport 2"
+               (.getHostInterface configured-adapter)))))
+    (testing "The storage settings are properly set"
+      (let [device (find-device m "IDE Controller" 1 0)]
+          (is device)))))

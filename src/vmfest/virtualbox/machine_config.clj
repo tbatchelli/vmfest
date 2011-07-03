@@ -2,7 +2,7 @@
   (:require [vmfest.virtualbox.machine :as machine]
             [vmfest.virtualbox.enums :as enums]
             [vmfest.virtualbox.model :as model]
-            [clojure.contrib.logging :as log]
+            [clojure.tools.logging :as log]
             [vmfest.virtualbox.virtualbox :as vbox]
             [clojure.contrib.condition :as cond])
   (:import [org.virtualbox_4_0 AccessMode VBoxException]))
@@ -10,7 +10,7 @@
 (defn get-medium [m device]
   (let [vbox (.getParent m)
         location (:location device)
-        device-type (enums/key-to-device-type (:type device))]
+        device-type (:device-type device)]
     (vbox/find-medium vbox location device-type)))
 
 (def controller-type-checkers
@@ -26,7 +26,7 @@
   (when (and controller-type-key
              (not (check-controller-type storage-bus-key controller-type-key)))
     (cond/raise {:type :machine-builder
-            :message
+                 :message
                  (format "Bus of type %s is not compatible with controller %s"
                          storage-bus-key
                          controller-type-key)}))
@@ -34,18 +34,17 @@
         controller-type (when controller-type-key
                           (enums/key-to-storage-controller-type
                            controller-type-key))]
-    (log/debug (format "add-storage-controller: m=%s name='%s' storage-bus %s"
-                       m name storage-bus))
+    (log/debugf "add-storage-controller: m=%s name='%s' storage-bus %s"
+                m name storage-bus)
     (let [sc (.addStorageController m name storage-bus)]
-       (when controller-type
-      (.setControllerType sc controller-type)))))
+      (when controller-type
+        (.setControllerType sc controller-type)))))
 
 (defn attach-device [m controller-name device port slot]
   {:pre (model/IMachine? m)}
-  (log/debug (format
-              (str "attach-device: Attaching %s in controller %s"
-                   " slot %s port %s for machine %s")
-              device controller-name slot port (.getName m)))
+  (log/debugf
+   "attach-device: Attaching %s in controller %s slot %s port %s for machine %s"
+   device controller-name slot port (.getName m))
   (let [device-type (enums/key-to-device-type (:device-type device))
         medium (get-medium m device)]
     (when-not device-type
@@ -59,9 +58,9 @@
   (fn [m bus-type controller-name devices] bus-type))
 
 (defmethod attach-devices :ide [m bus-type controller-name devices]
-  (log/debug
-   (format "attach-devices: Attaching devices to %s in controller %s: %s"
-           (.getName m) controller-name devices))
+  (log/debugf
+   "attach-devices: Attaching devices to %s in controller %s: %s"
+   (.getName m) controller-name devices)
   (doall
    (map (fn [device slot port]
           (when device
@@ -69,9 +68,9 @@
         devices [0 1 0 1] [0 0 1 1])))
 
 (defn simple-attach-devices [m controller-name devices]
-  (log/debug
-   (format "attach-devices: Attaching devices to %s in controller %s: %s"
-           (.getName m) controller-name devices))
+  (log/debugf
+   "attach-devices: Attaching devices to %s in controller %s: %s"
+   (.getName m) controller-name devices)
   (doall (map (fn [device port]
                 (when device
                   (attach-device m controller-name device port 0)))
@@ -87,18 +86,18 @@
   (simple-attach-devices m controller-name devices) )
 
 (defn configure-controller [m config]
-  (log/debug
-   (format "configure-controller: Configuring controller for machine '%s': %s"
-           (.getName m) config))
+  (log/debugf
+   "configure-controller: Configuring controller for machine '%s': %s"
+   (.getName m) config)
   (let [{:keys [name bus devices type]} config
         controller (add-storage-controller m name bus type)]
     (attach-devices m bus name devices)))
 
 (defn configure-storage [m config]
-  (log/debug (format "Configuring storage for machine %s: %s"
-                     (.getName m) config))
+  (log/debugf "Configuring storage for machine %s: %s"
+              (.getName m) config)
   (doseq [controller-config config]
-    (log/debug (format "Configuring controller for %s" controller-config))
+    (log/debugf "Configuring controller for %s" controller-config)
     (when controller-config (configure-controller m controller-config))))
 
 
@@ -116,7 +115,7 @@
         :line-speed (.setLineSpeed adapter value)
         :nat-driver (log/error "Setting NAT driver not supported")
         :attachment-type nil ;; do nothing
-        (log/error (format "set-adapter-property: unknown property %s" property-key)))))
+        (log/errorf "set-adapter-property: unknown property %s" property-key))))
 
 (defn configure-adapter-object [adapter config]
   (doseq [[k v] config]
@@ -132,26 +131,46 @@
         :internal (log/error "Setting up NAT interfaces is not yet supported %s")
         :host-only (log/error "Setting up NAT interfaces is not yet supported %s")
         :shared-folder (log/error "Setting up NAT interfaces is not yet supported %s")
-        (log/error
-         (format "configure-adapter: unrecognized attachment type %s" attachment-type))))
+        (log/errorf
+         "configure-adapter: unrecognized attachment type %s" attachment-type)))
 
 (defn configure-adapter
   [m slot config]
   (let [attachment-type (:attachment-type config)]
-    (log/debug
-     (format "configure-adapter: Configuring network adapter for machine '%s' slot %s with %s"
-             (.getName m) slot config))
+    (log/debugf
+     "configure-adapter: Configuring network adapter for machine '%s' slot %s with %s"
+     (.getName m) slot config)
     (let [adapter (.getNetworkAdapter m (long slot))]
       (configure-adapter-object adapter config)
       (attach-adapter adapter attachment-type))))
 
 (defn configure-network [m config]
-  (log/debug (format "Configuring network for machine %s with %s"
-                     (.getName m) config))
+  (log/debugf "Configuring network for machine %s with %s"
+              (.getName m) config)
   (let [vbox (.getParent m)
         system-properties (.getSystemProperties vbox)
         adapter-count (.getNetworkAdapterCount system-properties)
         adapter-configs (partition 2 (interleave (range adapter-count) config))]
     (doseq [[slot adapter-config] adapter-configs]
-      (log/debug (format "Configuring adapter %s with %s" slot adapter-config))
+      (log/debugf "Configuring adapter %s with %s" slot adapter-config)
       (when adapter-config (configure-adapter m slot adapter-config)))))
+
+(defn configure-machine [m config]
+  (doseq [[entry value] config]
+    (condp = entry
+        :network (configure-network m value)
+        :storage nil ;; ignored. 
+        :boot-mount-point nil ;; ignored.
+        (if-let [setter (entry machine/setters)]
+          (setter value m)
+          (log/warnf
+           "There is no such setting %s in a machine configuration"
+           entry)))))
+
+(defn configure-machine-storage [m {:keys [storage]}]
+   (when storage
+    (configure-storage m storage)))
+
+(defn attach-storage [m config]
+  (when-let [storage-config (:storage config)]
+    (configure-storage m storage-config)))

@@ -37,8 +37,8 @@
       (try (.findMedium vbox id-or-location type)
            (catch Exception e
              (log/warnf
-              "Can't find a medium of type %s located in/with id '%s'."
-              type id-or-location))))))
+              "Can't find a medium of type %s located in/with id '%s'. Reason: %s"
+              type id-or-location e))))))
 
 (defn register-machine [vbox machine]
   {:pre [(model/IVirtualBox? vbox)

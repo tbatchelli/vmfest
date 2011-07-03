@@ -1,12 +1,13 @@
 (ns vmfest.manager
   (:require [vmfest.virtualbox.virtualbox :as vbox]
-           [vmfest.virtualbox.machine :as machine]
-           [vmfest.virtualbox.session :as session]
-           [vmfest.virtualbox.model :as model]
-           [clojure.contrib.condition :as condition]
-           [clojure.tools.logging :as log]
-           [clojure.java.io :as io]
-           vmfest.virtualbox.medium)
+            [vmfest.virtualbox.machine :as machine]
+            [vmfest.virtualbox.machine-config :as machine-config]
+            [vmfest.virtualbox.session :as session]
+            [vmfest.virtualbox.model :as model]
+            [clojure.contrib.condition :as condition]
+            [clojure.tools.logging :as log]
+            [clojure.java.io :as io]
+            vmfest.virtualbox.medium)
   (:use clojure.contrib.condition)
   (:import org.virtualbox_4_0.SessionState java.io.File))
 
@@ -31,45 +32,6 @@
 
 (def ^{:dynamic true} *location* (:local *locations*))
 
-;; machine configuration stuff
-
-(defn add-ide-controller [m]
-  {:pre [(model/IMachine? m)]}
-  (machine/add-storage-controller m "IDE Controller" :ide))
-
-(defn attach-device [m name controller-port device device-type uuid]
-  {:pre [(model/IMachine? m)]}
-  (machine/attach-device m name controller-port device device-type uuid))
-
-(defn set-bridged-network [m interface]
-  {:pre [(model/IMachine? m)]}
-  (machine/set-network-adapter m 0 :bridged interface)
-  (.saveSettings m))
-
-(defn configure-machine [vb-m param-map]
-  {:pre [(model/IMachine? vb-m)]}
-  (machine/set-map vb-m param-map)
-  (.saveSettings vb-m))
-
-(defn basic-config [m]
-  {:pre [(model/IMachine? m)]}
-  (let [parameters
-        {:memory-size 512
-         :cpu-count 1}]
-    (configure-machine m parameters)
-    (set-bridged-network m "en1: AirPort 2")
-    (add-ide-controller m)))
-
-(defn attach-hard-disk [m uuid]
-  {:pre [(model/Machine? m)]}
-  (session/with-vbox (:server m) [_ vbox]
-    (let [medium (vbox/find-medium vbox uuid)]
-      (session/with-session m :shared [_ vb-m]
-        (try
-          (attach-device vb-m "SATA Controller" 0 0 :hard-disk medium)
-          (catch clojure.contrib.condition.Condition _
-            (attach-device vb-m "IDE Controller" 0 0 :hard-disk medium)))
-        (.saveSettings vb-m)))))
 
 (defn get-ip [machine]
   {:pre [(model/Machine? machine)]}
@@ -96,21 +58,16 @@
 ;;; jclouds/pallet-style infrastructure
 
 (def ^{:dynamic true} *machine-models*
-  {:micro basic-config})
+  {:micro {:memory-size 512
+           :cpu-count 1
+           :network [{:attachment-type :bridged
+                      :host-interface "en1: Airport 2"}]
+           :storage [{:name "IDE Controller"
+                      :bus :ide
+                      :devices [nil nil {:device-type :dvd} nil]}]
+           :boot-mount-point ["IDE Controller" 0]}})
 
-(def ^{:dynamic true} *images* nil
-  #_{:cent-os-5-5
-   {:description "CentOS 5.5 32bit"
-    :uuid "/Users/tbatchelli/Library/VirtualBox/HardDisks/Test1.vdi"
-    :os-type-id "RedHat"}
-   :ubuntu-10-10-64bit
-   {:description "Ubuntu 10.10 64bit"
-    :uuid "/Users/tbatchelli/VBOX-HDS/Ubuntu-10-10-64bit.vdi"
-    :os-type-id "Ubuntu_64"}
-   :cloned
-   {:description "Ubuntu 10.10 64bit"
-    :uuid "/tmp/clone3.vdi"
-    :os-type-id "Ubuntu_64"}})
+(def ^{:dynamic true} *images* nil)
 
 (defn fs-dir [path]
   (seq (.listFiles (java.io.File. path))))
@@ -138,8 +95,34 @@
 ;; force an model DB update
 ;; (update-models)
 
+(defn mount-boot-image
+  "For a machine configuration with an entry :boot-mount-point
+  containing a vector [<storage bus name> <device id>], it will
+  configure the machine so that the supplied HardDisk image is mounted
+  in said bus and device id. Returns an updated machine configuration map"
+  [config image-uuid]
+  ;; TODO: This needs unit testing!
+  (if-let [[storage-bus-name device-id] (:boot-mount-point config)]
+    (let [boot-disk-config  {:device-type :hard-disk
+                             :location image-uuid
+                             :attachment-type :multi-attach}
+          image-mounter (fn [{:keys [name] :as storage-bus}]
+                          ;; When the storage bus is named with storage-bus-name,
+                          ;; mount the image in the right device
+                          (if (= name storage-bus-name)
+                            ;; this is the controller: add image to devices
+                            (update-in storage-bus
+                                       [:devices]
+                                       #(assoc %1 device-id boot-disk-config))
+                            ;; not the right controller. Leave it as is.
+                            storage-bus))]
+      (update-in config [:storage] #(map image-mounter %1)))
+    (do
+      (log/warnf "Image not mounted. No mount point found for %s." config)
+      config)))
+
 (defn create-machine
-  [server name os-type-id config-fn image-uuid & [base-folder]]
+  [server name os-type-id config image-uuid & [base-folder]]
   {:pre [(model/Server? server)]}
   (when-let [f (or base-folder (:node-path *location*))]
     (when-not (.exists (io/file f))
@@ -154,23 +137,29 @@
                            true ;; overwrite whatever previous
                            ;; definition was there
                            (or base-folder (:node-path *location*)))]
-              (config-fn machine)
+              (machine-config/configure-machine machine config)
               (machine/save-settings machine)
               (vbox/register-machine vbox machine)
               (vmfest.virtualbox.model.Machine. (.getId machine) server nil)))]
-    ;; can't set the drive
-    (attach-hard-disk m image-uuid)
+    ;; Configure the storage buses in the machine
+    (let [boot-image-mounted-config ;; first mount the image if needed
+          (mount-boot-image config image-uuid)]
+      (log/debugf "Configuring storage for %s" boot-image-mounted-config)
+      (session/with-vbox server [_ vbox]
+        (session/with-session m :shared [_ vb-m]
+          (machine-config/configure-machine-storage vb-m boot-image-mounted-config)
+          (machine/save-settings vb-m))))
     m))
 
 (defn instance [server name image-key machine-key & [base-folder]]
   {:pre [(model/Server? server)]}
   (let [image (image-key *images*)
-        config-fn (machine-key *machine-models*)]
-    (when-not (and image config-fn)
+        config (machine-key *machine-models*)]
+    (when-not (and image config)
       (throw (RuntimeException. "Image or Machine not found")))
     (let [uuid (:uuid image)
           os-type-id (:os-type-id image)]
-      (create-machine server name os-type-id config-fn uuid base-folder))))
+      (create-machine server name os-type-id config uuid base-folder))))
 
 ;;; machine control
 (defn current-time-millis []

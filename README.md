@@ -103,7 +103,7 @@
     ```
 
 3. Download and uncompress the following [image](https://s3.amazonaws.com/vmfest-images/ubuntu-10-10-64bit-server.vdi.gz "image")
-4. Clone the image to its final destination (~/vmfest/models):
+4. Clone the image to its final destination (```~/vmfest/models```):
 
     ``` 
     $ mkdir -p ~/vmfest/models
@@ -136,7 +136,7 @@
     $ vboxwebsrv -t0
     ```
     
-8. In ~/.pallet/config.clj add the following new provider:
+8. In ```~/.pallet/config.clj``` add the following new provider:
 
     ``` clojure
     :virtualbox 
@@ -168,8 +168,8 @@
        }}
     ```
 
-9. Add the following dependency to your project's ```[vmfest "0.2.2"]``` (under dev-dependencies)
-10. Test pallet/vmfest. Download the dependencies (lein/cake/maven, whatever you use) and fire up the REPL
+9. Add the following dependency to your (lein/cake) project  ```[vmfest "0.2.2"]``` (under ```:dev-dependencies```)
+10. Test pallet/vmfest. Download the dependencies and fire up the REPL. Then enter the following
 
     ``` clojure
     (use 'pallet.core)
@@ -184,16 +184,16 @@
     
     * from a terminal, ssh into your newly created machine
     * pat yourself in the back
-    * kill your machine
+    * now kill your machine
     
         ``` clojure
-                (converge {test-node 0} :compute service)
+        (converge {test-node 0} :compute service)
         ```
         
     * test the limits of your computer 
     
         ``` clojure
-                (converge {test-node 10} :compute service) 
+        (converge {test-node 10} :compute service) 
         ```
         
     * ... enjoy the music your computer fan makes!

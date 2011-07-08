@@ -3,7 +3,7 @@
   (:import
    [org.virtualbox_4_0 IMachine MachineState ClipboardMode PointingHidType
     FirmwareType KeyboardHidType SessionState SessionType StorageBus
-    DeviceType NetworkAttachmentType CleanupMode]))
+    DeviceType NetworkAttachmentType CleanupMode StorageControllerType]))
 
 (defmacro find-key-by-value [value table]
   `(let [[v# k# _#] (first (filter (fn [[v# _# _#]] (= ~value v#)) ~table))]
@@ -140,6 +140,21 @@
   (find-key-by-value bus storage-bus-to-key-table))
 (defn key-to-storage-bus [key]
   (find-value-by-key key storage-bus-to-key-table))
+
+(def storage-controller-type-to-key-table
+  [[StorageControllerType/LsiLogic :lsi-logic ""]
+   [StorageControllerType/BusLogic :bus-logic ""]
+   [StorageControllerType/IntelAhci :intel-ahci ""]
+   [StorageControllerType/Null :null ""]
+   [StorageControllerType/PIIX3 :piix3 ""]
+   [StorageControllerType/PIIX4 :piix4 ""]
+   [StorageControllerType/ICH6 :ich6 ""]
+   [StorageControllerType/I82078 :i82087 ""]
+   [StorageControllerType/LsiLogicSas :lsi-logic-sas ""]])
+(defn storage-controller-type-to-key [type]
+  (find-key-by-value type storage-controller-type-to-key-table))
+(defn key-to-storage-controller-type [key]
+  (find-value-by-key key storage-controller-type-to-key-table))
 
 ;;; DeviceType
 (def device-type-to-key-table

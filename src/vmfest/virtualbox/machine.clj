@@ -185,8 +185,8 @@
                  (let [setter (get-setter k)]
                    (if setter
                      (setter v m)
-                     (log/error
-                      (str "IMachine has no setter defined for " k)))))]
+                     (log/errorf
+                      "IMachine has no setter defined for %s" k))))]
     (doall (map set-fn value-map))))
 
 (extend-type vmfest.virtualbox.model.Machine
@@ -446,3 +446,8 @@ See IVirtualbox::openRemoteSession for more details"
 (defn state [^IMachine vb-m]
   {:pre [(model/IMachine? vb-m)]}
   (enums/machine-state-to-key (.getState vb-m)))
+
+(defn get-storage-controller-by-name [m name]
+  {:pre [(model/IMachine? m)]}
+  (.getStorageControllerByName m name))
+

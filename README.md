@@ -1,5 +1,5 @@
 # Quick and dirty introduction to vmfest
-```
+``` clojure
     ;; load vmfest
     (use 'vmfest.manager)
 

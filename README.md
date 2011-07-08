@@ -97,15 +97,19 @@
 # Instructions to setup vmfest with [pallet](https://github.com/pallet/pallet "pallet")
 1. Install VirtualBox on your machine
 2. Disable login credential: 
-``` 
-$ VBoxManage setproperty websrvauthlibrary null
-```
+
+    ``` 
+    $ VBoxManage setproperty websrvauthlibrary null
+    ```
+
 3. Download and uncompress the following [image](https://s3.amazonaws.com/vmfest-images/ubuntu-10-10-64bit-server.vdi.gz "image")
 4. Clone the image to its final destination (~/vmfest/models):
+
 ``` 
 $ mkdir -p ~/vmfest/models
 $ VBoxManage clonehd /path/to/downloaded/ubuntu-10-10-64bit-server.vdi ~/vmfest/models/ubuntu-10-10-64bit-server.vdi
 ```
+
     * This should produce a uuid for your new image. Keep it around
 5. Start VirtualBox (the GUI) and:
     1. Create an new image Linux - Ubuntu (64bit)
@@ -114,12 +118,15 @@ $ VBoxManage clonehd /path/to/downloaded/ubuntu-10-10-64bit-server.vdi ~/vmfest/
     4. The credentials are user/superduper
 5. Now stop the machine and detach the hard drive from it (in settings)
 6. Make the disk image immutable
+
 ``` 
 $ VBoxManage modifyhd ~/vmfest/models/ubuntu-10-10-64bit-server.vdi --type immutable
 ```
+
 6. Get the name of your bridged network interface by running: 
 ```
 $ VBoxManage list bridgedifs | grep ^Name 
+
 ```
     e.g. "Name: en1: AirPort 2"  --> the interface name is "en1: Airport 2"
 7. Start VBbox Web Services: 

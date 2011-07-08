@@ -1,4 +1,86 @@
-# Quick and dirty introduction to vmfest
+# vmfest
+
+VMFest is a clojure wrapper to (currently) [VirtualBox] [vbox], a virtualization platform that is pretty good with virtualizing servers. 
+
+Although VMFest provides tool-like functionality, VMFest is also a library that you can use to create your own virtualization environment.
+
+[vbox]: http://www.virtualbox.org 
+
+With VMFest you can easily create and operate virtual machines, with emphasis on creating many clones of the same model VMs. 
+
+## Models and Instances
+
+In VMFest, a *model* is a VM image. Although it is possible to run an actual VM off of this image in VMFest, this is not the common usage scenario. The common usage scenario is to run an *instance* of the model. 
+
+An instance is a transient VM that will be created dynamically from the model and destroyed after being used. You can start as many instances as you need from the same model. Each instance created is virtually a clone of the model, but the way VirtualBox works makes this cloning a space efficient operation, namely, each clone takes significant less disk space than the model image.
+
+It is possible to use VMFest in a more standard way, in which each VM uses a permanent image. A permanent image is an image that keeps its changes beyond the lifetime of the VM that runs on it. 
+
+## Prerequisites to use VMFest
+
+To use VMFest you first need to install [VirtualBox 4.0x][vbox] in your machine. 
+
+VMFest uses a web service that VirtualBox installs. This service is authenticated and there are many ways to authenticate, but for simplicity you can disable authentication by running the following in your shell:
+
+```
+$ VBoxManage setproperty websrvauthlibrary null
+```
+
+## Usage ( vmfest v 0.2.3)
+
+### Installing a Model Image
+
+Before we can instantiate n image, we need to install it as model image. To make things easy I have published a model image (more to come). The following will download an install an ubuntu 10.10 64-bit model image.
+
+```clojure
+(use 'vmfest.manager)
+(use 'vmfest.virtualbox.image)
+
+;; crate a connection to the local VirtualBox server
+(def my-server (server "http://localhost:18083"))
+
+;; download and install a model
+(setup-model "https://s3.amazonaws.com/vmfest-images/ubuntu-10-10-64bit-server.vdi.gz" server)
+```
+
+### Creating and Running Images from a Model Image
+Once the model image is installed, you can create an instance off of it.
+
+```clojure
+(def my-machine (instance my-server "bacug-machine" :ubuntu-10-10-64bit :micro))
+```
+
+At this point, you can operate your instance.
+
+```clojure
+(start my-machine) ;; starts your vm instance
+(pause my-machine) ;; pauses your running instance
+(resume my-machine) ;; resumes your paused instance
+(power-down my-machine) ;; turns off your machine. The changes in the filesystem will be lost
+(destroy-my machine) ;; removes any trace of this instance having ever existed
+```
+
+Now let's say you want to start 10 instances of the same model.
+
+```clojure
+;; find some names for those instances
+(def clone-names #{"c1" "c2" "c3" "c4" "c5" "c6"})
+
+;; create the instances
+(def my-machines (map #(instance my-server % :ubuntu-10-10-64bit :micro)))
+
+;; start them all!
+(map start my-machines)
+
+;; stop them all
+(map power-down my-machines)
+
+;; remove them all
+(map destroy my-machines)
+```
+
+### More stuff you can do ... (old documentation, still works for v0.2.3)
+
 ``` clojure
 ;; load vmfest
 (use 'vmfest.manager)
@@ -94,7 +176,10 @@
 (destroy my-test-machine)
 ```
 
-# Instructions to setup vmfest with [pallet](https://github.com/pallet/pallet "pallet")
+# Instructions to setup vmfest v0.2.2 with [pallet 0.4.x](https://github.com/pallet/pallet "pallet")
+
+NOTE: This process has been greatly simplified with VMFest v0.2.3 and Pallet v0.6.2+. The setup instructions will come soon (I promise).
+
 1. Install VirtualBox on your machine
 2. Disable login credential: 
 

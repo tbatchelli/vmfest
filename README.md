@@ -1,4 +1,5 @@
 # Quick and dirty introduction to vmfest
+```
     ;; load vmfest
     (use 'vmfest.manager)
 
@@ -91,7 +92,7 @@
     ;; kill it again
     (power-down my-test-machine)
     (destroy my-test-machine)
-
+```
 
 # Instructions to setup vmfest with [pallet](https://github.com/pallet/pallet "pallet")
 1. Install VirtualBox on your machine

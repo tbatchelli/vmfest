@@ -1,4 +1,16 @@
 (ns vmfest.manager
+  "High level API for VMFest. If you don't want to do anything too fancy, start here.
+
+   Manager provides a cloud-like interface to vmfest. You can set it
+up with a number of model images that later can be used to create
+ephemeral machines that will boot from those model images. Many
+machines, all based on those models. An ephemeral machine will see its
+boot HD reset when it is stopped, so they're always guaranteed to
+reboot to a fresh state. Also, destroying a machine will remove any
+trace of it ever having existed.
+
+By default, image models are stored in ~/.vmfest/models and the instantiated
+machines are stored in ~/.vmfest/nodes ."
   (:require [vmfest.virtualbox.virtualbox :as vbox]
             [vmfest.virtualbox.machine :as machine]
             [vmfest.virtualbox.machine-config :as machine-config]
@@ -9,9 +21,15 @@
             [clojure.java.io :as io]
             vmfest.virtualbox.medium)
   (:use clojure.contrib.condition)
-  (:import org.virtualbox_4_0.SessionState java.io.File))
+  (:import [org.virtualbox_4_0
+            SessionState
+            HostNetworkInterfaceType
+            HostNetworkInterfaceStatus] java.io.File)
+  (:import [java.net NetworkInterface InetAddress]))
 
-(defn server [url & [identity credentials]]
+(defn server
+  "Builds a connection definition to the VM Host"
+  [url & [identity credentials]]
   (vmfest.virtualbox.model.Server. url (or identity "") (or credentials "")))
 
 (def user-home (System/getProperty "user.home"))
@@ -26,26 +44,36 @@
   [& {:keys [home] :or {home user-home}}]
   (.getPath (io/file home ".vmfest" "nodes")))
 
+;; In the future, vmfest will be able to handle more than just one VM
+;; host. *locations* will hold the locations. For now, it only holds
+;; one location: local.
 (def ^{:dynamic true} *locations*
   {:local {:model-path (default-model-path)
            :node-path (default-node-path)}})
 
+;; current location. See *locations* 
 (def ^{:dynamic true} *location* (:local *locations*))
 
 
-(defn get-ip [machine]
-  {:pre [(model/Machine? machine)]}
+(defn get-ip
+  "Gets the IP Address of a machine, if available. It does so by
+  querying the first ethernet interface (interface 0)"
+  [machine] {:pre
+  [(model/Machine? machine)]}
   (session/with-session machine :shared [session _]
     (machine/get-guest-property
      (.getConsole session)
      "/VirtualBox/GuestInfo/Net/0/V4/IP")))
 
-(defn set-extra-data [machine key value]
+(defn set-extra-data
+  "Adds metadata to a machine, in the form of a key, value pair"
+  [machine key value]
   {:pre [(model/Machine? machine)]}
   (session/with-session machine :write [_ vb-m]
     (machine/set-extra-data vb-m key value)))
 
 (defn get-extra-data [machine key]
+  "Gets metadata from a machine by its key"
   {:pre [(model/Machine? machine)]}
   (log/tracef "get-extra-data: getting extra data for %s %s" (:id machine) key)
   (session/with-no-session machine [vb-m]
@@ -55,8 +83,95 @@
   (session/with-no-session machine [m]
     (machine/get-attribute m key)))
 
+
+;;; host functions
+
+(defn get-usable-network-interfaces-from-vbox
+  "Finds what host network interfaces are usable for bridging
+  according to VirtualBox. It excludes the ones that are either not of
+  type Bridged or they are not up. Returns a sequence of interfaces as
+  maps with:
+  [:name :os-name :ip-address :status :interface-type :medium-type].
+
+Note: :os-name is how vbox identifies the host network interfaces."
+  [server]
+  (session/with-vbox server [vbox mgr]
+    (let [os-interface-name
+          ;; needed because of how OSX adds a name to the OS i/f name
+          ;; e.g. "en1: Airport" vs. "en1"
+          (fn [name]
+            (let [index  (.indexOf name ":")]
+              (if (> index 0)
+                (.substring name 0 index)
+                name)))
+          all-interfaces
+          (map (fn [ni] {:name (.getName ni) ;; the full OSX name
+                        :os-name (os-interface-name (.getName ni))
+                        :ip-address (.getIPAddress ni)
+                        :status (.getStatus ni)
+                        :interface-type (.getInterfaceType ni)
+                        :medium-type (.getMediumType ni)})
+               (.getNetworkInterfaces (.getHost mgr)))
+          usable? ;; determine if an I/F is usable
+          (fn [if]
+            (and
+             (= (:interface-type if) HostNetworkInterfaceType/Bridged)
+             (= (:status if) HostNetworkInterfaceStatus/Up)))]
+      (doall (filter usable? all-interfaces)) ;; force execution
+      )))
+
+(defn get-usable-network-interfaces-from-java
+  "Finds what host network interfaces are usable for bridging according to the JVM. This excludes interfaces that have no reachable ip addresses, or that are either loopback, virtual or point-to-point.
+
+Returns a sequence of interfaces as maps containing:
+  [:name :ip-addresses :virtual? :loopback? :point-to-point? :up?]
+  where :ip-addresses is a sequence of maps with
+  [:ip-address :reachable?]."  []
+  (let [any-reachable? (fn [ips]
+                         (some true? (map :reachable? ips)))
+        nis (enumeration-seq (NetworkInterface/getNetworkInterfaces))
+        ni-infos
+        (map (fn [ni]
+               (let [ip-addresses (enumeration-seq (.getInetAddresses ni))
+                     ip-info (map
+                              (fn [ip]
+                                {:ip-address ip
+                                 :reachable? (.isReachable ip 1000)})
+                              ip-addresses)]
+                 {:name (.getName ni)
+                  :ip-addresses ip-info
+                  :virtual? (.isVirtual ni)
+                  :loopback? (.isLoopback ni)
+                  :point-to-point? (.isPointToPoint ni)
+                  :up? (.isUp ni)}))
+             nis)
+        usable?
+        (fn [if]
+          (and (not (or (:virtual? if)
+                        (:loopback? if)
+                        (:point-to-point? if)
+                        (not (:up? if))))
+               (any-reachable? (:ip-addresses if))))]
+    (filter usable? ni-infos)))
+
+(defn find-usable-network-interface
+  "Provides a list of interface names that are usable for bridging in VirtualBox"
+  [server]
+  (let [vbox-ifs(get-usable-network-interfaces-from-vbox server)
+        usable-by-vbox ;; only their names
+        (into #{} (map :os-name vbox-ifs))
+        usable-by-java ;; only their names
+        (into #{}
+              (map :name (get-usable-network-interfaces-from-java)))
+        usable-by-both ;; only their names
+        (clojure.set/intersection usable-by-vbox usable-by-java)
+        find-interface-by-os-name (fn [ifs os-name]
+                  (first (filter #(= (:os-name %) os-name) ifs)))]
+    (map #(:name (find-interface-by-os-name vbox-ifs %)) usable-by-both)))
+
 ;;; jclouds/pallet-style infrastructure
 
+;; These are the hardware models to be instantiated. 
 (def ^{:dynamic true} *machine-models*
   {:micro {:memory-size 512
            :cpu-count 1
@@ -234,22 +349,6 @@
       (machine/power-down (.getConsole s)))
     (handle :vbox-runtime
       (log/warn "Trying to stop an already stopped machine"))))
-
-;; just keeping the code around in case the new implementation using
-;; the new vbox 4.0 clean-up features don't work as expected.
-;; toni 20110213
-#_(defn destroy [machine]
-  (let [vbox (:server machine)]
-    (try
-      (let [settings-file (get-machine-attribute machine :settings-file-path)]
-        (let [progress (power-down machine)]
-          (when progress
-            (.waitForCompletion progress -1)))
-        (session/with-session machine :write [_ vb-m]
-          (machine/remove-all-media vb-m))
-        (session/with-vbox vbox [_ vbox]
-          (vbox/unregister-machine vbox machine))
-        (.delete (java.io.File. settings-file))))))
 
 (defn destroy [machine]
   {:pre [(model/Machine? machine)]}

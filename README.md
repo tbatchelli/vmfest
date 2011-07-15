@@ -40,7 +40,7 @@ Before we can instantiate n image, we need to install it as model image. To make
 (def my-server (server "http://localhost:18083"))
 
 ;; download and install a model
-(setup-model "https://s3.amazonaws.com/vmfest-images/ubuntu-10-10-64bit-server.vdi.gz" server)
+(setup-model "https://s3.amazonaws.com/vmfest-images/ubuntu-10-10-64bit-server.vdi.gz" my-server)
 ```
 
 ### Creating and Running Images from a Model Image

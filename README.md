@@ -47,7 +47,7 @@ Before we can instantiate n image, we need to install it as model image. To make
 Once the model image is installed, you can create an instance off of it.
 
 ```clojure
-(def my-machine (instance my-server "bacug-machine" :ubuntu-10-10-64bit :micro))
+(def my-machine (instance my-server "bacug-machine" :vmfest-ubuntu-10-10-64bit-server :micro))
 ```
 
 At this point, you can operate your instance.

@@ -18,7 +18,8 @@ It is possible to use VMFest in a more standard way, in which each VM uses a per
 
 ## Prerequisites to use VMFest
 
-To use VMFest you first need to install [VirtualBox 4.0x][vbox] in your machine. 
+To use VMFest you first need to install [VirtualBox 4.0x][vbox] in
+your machine.  (NOTE: Virtualbox 4.1.x and above will not work for now)
 
 VMFest uses a web service that VirtualBox installs. This service is authenticated and there are many ways to authenticate, but for simplicity you can disable authentication by running the following in your shell:
 
@@ -82,7 +83,7 @@ Now let's say you want to start 10 instances of the same model.
 ### More stuff you can do ... (old documentation, still works for v0.2.3)
 
 ``` clojure
-;; load vmfest
+;; load vmfest 
 (use 'vmfest.manager)
 
 ;; define a connection to the vbox server. It doesn't create any socket

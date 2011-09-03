@@ -15,7 +15,9 @@
 
 (defn initialize-test-dir []
   (clojure.java.io/make-parents *dir*)
-  (delete-file-recursively *dir*))
+  (try
+    (delete-file-recursively *dir*)
+    (catch Exception e)))
 
 (defn get-new-test-machine
   ([]

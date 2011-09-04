@@ -5,7 +5,8 @@
             [clojure.tools.logging :as log]
             [vmfest.virtualbox.virtualbox :as vbox]
             [clojure.contrib.condition :as cond])
-  (:import [org.virtualbox_4_0 AccessMode VBoxException]))
+  (:import [org.virtualbox_4_0 AccessMode VBoxException
+            HostNetworkInterfaceType]))
 
 (defn get-medium [m device]
   (let [vbox (.getParent m)
@@ -108,7 +109,13 @@
     (condp = property-key
         :adapter-type (.setAdapterType adapter value)
         :network (.setNetwork adapter value)
+        ;; equiv. to bridged-interface 4.0.x and below
         :host-interface (.setHostInterface adapter value)
+        ;; change for 4.1
+        :bridged-interface (.setHostInterface adapter value) 
+        :internal-network (.setInternalNetwork adapter value)
+        ;; change for 4.1
+        :host-only-interface (.setHostInterface adapter value) 
         :enabled (.setEnabled adapter value)
         :cable-connected (.setCableConnected adapter value)
         :mac-address (.setMACAddress adapter value)
@@ -118,19 +125,48 @@
         (log/errorf "set-adapter-property: unknown property %s" property-key))))
 
 (defn configure-adapter-object [adapter config]
-  (doseq [[k v] config]
-    (set-adapter-property adapter k v)))
+  (let [nat-forwards (:nat-forwards config)
+        config (dissoc config :nat-forwards)
+        ;; enable the adapters by default
+        config (assoc config :enabled (or (:enabled config) true))]
+    (doseq [[k v] config]
+      (set-adapter-property adapter k v))))
 
 (defn attach-to-bridged [adapter]
   (.attachToBridgedInterface adapter))
 
-(defn attach-adapter [adapter attachment-type]
+(defn attach-to-nat [adapter]
+  (.attachToNAT adapter))
+
+(defn attach-to-host-only [adapter machine]
+  (let [host (.getHost (.getParent machine))
+        host-only-ifs
+        (.findHostNetworkInterfacesOfType
+         host
+         HostNetworkInterfaceType/HostOnly)
+        host-if-names
+        (map #(.getName %) host-only-ifs)
+        if-name
+        (.getHostInterface adapter)]
+    (when-not (some (partial = if-name) host-if-names)
+      (log/error
+       (format
+        (str
+         "Trying to configure a network adapter with inexistent host interface named %s"
+         " for machine %s")
+        if-name (.getName machine)))))
+  (.attachToHostOnlyInterface adapter))
+
+(defn attach-to-internal [adapter]
+  (.attachToInternalNetwork adapter))
+
+(defn attach-adapter [machine adapter attachment-type]
   (condp = attachment-type 
         :bridged (attach-to-bridged adapter)
-        :nat (log/error "Setting up NAT interfaces is not yet supported ")
-        :internal (log/error "Setting up NAT interfaces is not yet supported %s")
-        :host-only (log/error "Setting up NAT interfaces is not yet supported %s")
-        :shared-folder (log/error "Setting up NAT interfaces is not yet supported %s")
+        :nat (attach-to-nat adapter)
+        :internal (attach-to-internal adapter)
+        :host-only (attach-to-host-only adapter machine)
+        :vde (log/error "Setting up VDE interfaces is not yet supported.")
         (log/errorf
          "configure-adapter: unrecognized attachment type %s" attachment-type)))
 
@@ -142,7 +178,7 @@
      (.getName m) slot config)
     (let [adapter (.getNetworkAdapter m (long slot))]
       (configure-adapter-object adapter config)
-      (attach-adapter adapter attachment-type))))
+      (attach-adapter m adapter attachment-type))))
 
 (defn configure-network [m config]
   (log/debugf "Configuring network for machine %s with %s"

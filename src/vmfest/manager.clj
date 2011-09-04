@@ -174,14 +174,25 @@ Returns a sequence of interfaces as maps containing:
 
 ;; These are the hardware models to be instantiated. 
 (def ^{:dynamic true} *machine-models*
-  {:micro {:memory-size 512
-           :cpu-count 1
-           :network [{:attachment-type :bridged
-                      :host-interface "en1: Airport 2"}]
-           :storage [{:name "IDE Controller"
-                      :bus :ide
-                      :devices [nil nil {:device-type :dvd} nil]}]
-           :boot-mount-point ["IDE Controller" 0]}})
+  {:micro
+   {:memory-size 512
+    :cpu-count 1
+    :network [{:attachment-type :bridged
+               :host-interface "Wi-Fi 2 (AirPort)"}]
+    :storage [{:name "IDE Controller"
+               :bus :ide
+               :devices [nil nil {:device-type :dvd} nil]}]
+    :boot-mount-point ["IDE Controller" 0]}
+   :micro-internal
+   {:memory-size 512
+    :cpu-count 1
+    :network [{:attachment-type :host-only
+               :host-interface "vboxnet0"}
+              {:attachment-type :nat}]
+    :storage [{:name "IDE Controller"
+               :bus :ide
+               :devices [nil nil {:device-type :dvd} nil]}]
+    :boot-mount-point ["IDE Controller" 0]}})
 
 (def ^{:dynamic true} *images* nil)
 

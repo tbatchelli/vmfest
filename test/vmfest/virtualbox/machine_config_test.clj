@@ -174,6 +174,13 @@
           (is (= "nothing"
                  (.getHostInterface configured-adapter))))))))
 
+(deftest ^{:integration true}
+  nat-config-tests
+  (testing "You can add a NAT adapter"
+    (with-config-machine
+      (let [config
+            [{:attachment-type :nat}]]))))
+
 (def machine-config
   {:cpu-count 2
    :memory-size 555

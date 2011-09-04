@@ -4,7 +4,8 @@
    [org.virtualbox_4_0 IMachine MachineState ClipboardMode PointingHidType
     FirmwareType KeyboardHidType SessionState SessionType StorageBus
     DeviceType NetworkAttachmentType CleanupMode StorageControllerType
-    MediumType ]))
+    MediumType HostNetworkInterfaceType]))
+
 
 (defmacro find-key-by-value [value table]
   `(let [[v# k# _#] (first (filter (fn [[v# _# _#]] (= ~value v#)) ~table))]
@@ -203,6 +204,15 @@
   (find-key-by-value type medium-type-type-to-key-table))
 (defn key-to-medium-type-type [key]
   (find-value-by-key key medium-type-type-to-key-table))
+
+(def host-network-interface-type-to-key-table
+  [[HostNetworkInterfaceType/Bridged :bridged ""]
+   [HostNetworkInterfaceType/HostOnly :host-only ""]])
+(defn host-network-interface-type-to-key [type]
+  (find-key-by-value type host-network-interface-type-to-key-table))
+(defn key-to-host-network-interface-type [key]
+  (find-value-by-key key host-network-interface-type-to-key-table))
+
 
 ;;; CleanupMode
 (def cleanup-mode-type-to-key-table

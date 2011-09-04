@@ -68,9 +68,10 @@
   (let [[directory image-file-name] (directory-and-file-name-from-url image-url)
         image-name (file-name-without-extensions image-file-name)
         gzipped? (.endsWith image-file-name ".gz")
-        model-name (str "vmfest-" (or model-name image-name))
+        model-name (or model-name image-name)
+        model-unique-name (str "vmfest-" model-name)
         meta-url (or meta-url (str directory (or meta-file-name (str image-name ".meta"))))
-        temp-dir (make-temp-dir model-name)
+        temp-dir (make-temp-dir model-unique-name)
         model-path (or model-path (str (System/getProperty "user.home")
                                      File/separator
                                      ".vmfest/models"))]
@@ -81,8 +82,8 @@
      :image-file (str temp-dir File/separator image-name ".vdi")
      :model-name model-name
      :model-path model-path
-     :model-file (str model-path File/separator model-name ".vdi")
-     :model-meta (str model-path File/separator model-name ".meta")
+     :model-file (str model-path File/separator model-unique-name ".vdi")
+     :model-meta (str model-path File/separator model-unique-name ".meta")
      :temp-dir temp-dir
      :meta meta
      :meta-url (when-not meta meta-url)
@@ -161,6 +162,8 @@
           threaded-register-model
           threaded-create-meta
           threaded-cleanup-temp-files))))
+
+
 
 (comment
  (use 'vmfest.manager)

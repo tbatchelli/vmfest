@@ -1,9 +1,11 @@
 (ns vmfest.virtualbox.image
   (:use [clojure.java.io]
         [vmfest.virtualbox.session :only (with-vbox)]
-        [clojure.pprint :only (pprint)])
+        [clojure.pprint :only (pprint)]
+        [vmfest.virtualbox.virtualbox :only (find-medium)])
   (:require [clojure.tools.logging :as log]
-            [clojure.contrib.str-utils2 :as string])
+            [clojure.contrib.str-utils2 :as string]
+            [vmfest.virtualbox.enums :as enums])
   (:import [org.virtualbox_4_0 DeviceType AccessMode MediumVariant
             MediumType]
            [java.util.zip GZIPInputStream]
@@ -144,6 +146,18 @@
   (delete-file image-file true)
   options)
 
+(defn valid-model? [vbox id-or-location]
+  ;; is the image registered?
+  (let [medium (find-medium vbox id-or-location)]
+    (if-not medium
+      (throw (RuntimeException. (str "This model's image is not registered in VirtualBox: " id-or-location))))
+    ;; is the image immutable?
+    (let [type (enums/medium-type-type-to-key (.getType medium))]
+      (if-not (or (= type :immutable) (= type :multi-attach))
+        (throw (RuntimeException.
+                (str "This model's image is not immutable nor multi-attach: "
+                     id-or-location)))))))
+
 (defn setup-model
   "Download a disk image from `image-url` and register it with `vbox`."
   [image-url vbox & {:as options}]
@@ -155,15 +169,15 @@
         "Model %s already exists. Manually specifiy another file name with :model-name"
         (:model-file job) (:temp-dir job)
         false))
-      (-> job
-          threaded-download
-          threaded-gunzip
-          threaded-get-metadata
-          threaded-register-model
-          threaded-create-meta
-          threaded-cleanup-temp-files))))
-
-
+      (do
+        (-> job
+            threaded-download
+            threaded-gunzip
+            threaded-get-metadata
+            threaded-register-model
+            threaded-create-meta
+            threaded-cleanup-temp-files)
+        (keyword (:model-name job))))))
 
 (comment
  (use 'vmfest.manager)

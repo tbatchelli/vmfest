@@ -16,6 +16,7 @@ machines are stored in ~/.vmfest/nodes ."
             [vmfest.virtualbox.machine-config :as machine-config]
             [vmfest.virtualbox.session :as session]
             [vmfest.virtualbox.model :as model]
+            [vmfest.virtualbox.image :as image]
             [clojure.contrib.condition :as condition]
             [clojure.tools.logging :as log]
             [clojure.java.io :as io]
@@ -206,6 +207,20 @@ Returns a sequence of interfaces as maps containing:
   "Update model metadata in *images*"
   [& {:keys [model-path] :or {model-path (:model-path *location*)}}]
   (alter-var-root #'*images* (fn [_] (load-models :model-path model-path))))
+
+(defn models
+  [& {:keys [model-path] :or {model-path (:model-path *location*)}}]
+  (keys (update-models :model-path model-path)))
+
+(defn model-info
+  [model-key & {:keys [model-path] :or {model-path (:model-path *location*)}}]
+  (model-key (update-models :model-pathmodel-path)))
+
+(defn check-model
+  [server model-key & {:keys [model-path] :or {model-path (:model-path *location*)}}]
+  (let [model-id (:uuid (model-key (update-models :model-path model-path)))]
+    (session/with-vbox server [_ vbox]
+      (image/valid-model? vbox model-id))))
 
 ;; force an model DB update
 ;; (update-models)

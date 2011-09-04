@@ -3,7 +3,8 @@
   (:import
    [org.virtualbox_4_0 IMachine MachineState ClipboardMode PointingHidType
     FirmwareType KeyboardHidType SessionState SessionType StorageBus
-    DeviceType NetworkAttachmentType CleanupMode StorageControllerType]))
+    DeviceType NetworkAttachmentType CleanupMode StorageControllerType
+    MediumType ]))
 
 (defmacro find-key-by-value [value table]
   `(let [[v# k# _#] (first (filter (fn [[v# _# _#]] (= ~value v#)) ~table))]
@@ -183,6 +184,25 @@
   (find-key-by-value type network-attachment-type-to-key-table))
 (defn key-to-network-attachment-type [key]
   (find-value-by-key key network-attachment-type-to-key-table))
+
+;;; MediumType
+(def medium-type-type-to-key-table
+  [[MediumType/Immutable :immutable
+    "Normal medium (attached directly or indirectly, preserved when taking snapshots)."]
+   [MediumType/Normal :normal
+    "Normal medium (attached directly or indirectly, preserved when taking snapshots)."]
+   [MediumType/Writethrough :write-through
+    "Write through medium (attached directly, ignored when taking snapshots)."]
+   [MediumType/Shareable :shareable
+    "Allow using this medium concurrently by several machines."]
+   [MediumType/Readonly :readonly
+    "A readonly medium, which can of course be used by several machines." ]
+   [MediumType/MultiAttach :multi-attach
+    "A medium which is is indirectly attached, so that one base medium can be used for several VMs which have their own differencing medium to store their modifications. In some sense a variant of Immutable with unset AutoReset flag in each differencing medium."]])
+(defn medium-type-type-to-key [type]
+  (find-key-by-value type medium-type-type-to-key-table))
+(defn key-to-medium-type-type [key]
+  (find-value-by-key key medium-type-type-to-key-table))
 
 ;;; CleanupMode
 (def cleanup-mode-type-to-key-table

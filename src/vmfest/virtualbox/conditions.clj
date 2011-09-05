@@ -1,12 +1,12 @@
 (ns vmfest.virtualbox.conditions
   (:use clojure.contrib.condition)
   (:require [clojure.tools.logging :as log])
-  (:import [org.virtualbox_4_0.jaxws
+  (:import [org.virtualbox_4_1.jaxws
             InvalidObjectFault
             InvalidObjectFaultMsg
             RuntimeFault
             RuntimeFaultMsg]
-           [org.virtualbox_4_0 VBoxException]))
+           [org.virtualbox_4_1 VBoxException]))
 
 (defn unsigned-int-to-long [ui]
   (bit-and (long ui) 0xffffffff))

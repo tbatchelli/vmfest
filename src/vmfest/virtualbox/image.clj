@@ -4,7 +4,7 @@
         [clojure.pprint :only (pprint)])
   (:require [clojure.tools.logging :as log]
             [clojure.contrib.str-utils2 :as string])
-  (:import [org.virtualbox_4_0 DeviceType AccessMode MediumVariant
+  (:import [org.virtualbox_4_1 DeviceType AccessMode MediumVariant
             MediumType]
            [java.util.zip GZIPInputStream]
            [java.io File]))

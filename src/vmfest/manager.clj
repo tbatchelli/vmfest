@@ -8,7 +8,7 @@
            [clojure.java.io :as io]
            vmfest.virtualbox.medium)
   (:use clojure.contrib.condition)
-  (:import org.virtualbox_4_0.SessionState java.io.File))
+  (:import org.virtualbox_4_1.SessionState java.io.File))
 
 (defn server [url & [identity credentials]]
   (vmfest.virtualbox.model.Server. url (or identity "") (or credentials "")))
@@ -44,6 +44,11 @@
 (defn set-bridged-network [m interface]
   {:pre [(model/IMachine? m)]}
   (machine/set-network-adapter m 0 :bridged interface)
+  (.saveSettings m))
+
+(defn set-nat-network [m]
+  {:pre [(model/IMachine? m)]}
+  (machine/set-network-adapter m 0 :nat "")
   (.saveSettings m))
 
 (defn configure-machine [vb-m param-map]

@@ -59,12 +59,16 @@ machines are stored in ~/.vmfest/nodes ."
 (defn get-ip
   "Gets the IP Address of a machine, if available. It does so by
   querying the first ethernet interface (interface 0)"
-  [machine] {:pre
-  [(model/Machine? machine)]}
-  (session/with-session machine :shared [session _]
-    (machine/get-guest-property
-     (.getConsole session)
-     "/VirtualBox/GuestInfo/Net/0/V4/IP")))
+  [machine]
+  {:pre
+   [(model/Machine? machine)]}
+  (try 
+    (session/with-session machine :shared [session _]
+      (machine/get-guest-property
+       (.getConsole session)
+       "/VirtualBox/GuestInfo/Net/0/V4/IP"))
+    (catch org.virtualbox_4_0.VBoxException e
+      (throw (RuntimeException e)))))
 
 (defn set-extra-data
   "Adds metadata to a machine, in the form of a key, value pair"
@@ -292,15 +296,19 @@ Returns a sequence of interfaces as maps containing:
           (machine/save-settings vb-m))))
     m))
 
+
+(defn instance* [server name image machine & [base-folder]]
+   (when-not (and image machine)
+      (throw (RuntimeException. "Image or Machine not found")))
+    (let [uuid (:uuid image)
+          os-type-id (:os-type-id image)]
+      (create-machine server name os-type-id machine uuid base-folder)))
+
 (defn instance [server name image-key machine-key & [base-folder]]
   {:pre [(model/Server? server)]}
   (let [image (image-key *images*)
         config (machine-key *machine-models*)]
-    (when-not (and image config)
-      (throw (RuntimeException. "Image or Machine not found")))
-    (let [uuid (:uuid image)
-          os-type-id (:os-type-id image)]
-      (create-machine server name os-type-id config uuid base-folder))))
+    (instance* server name image config base-folder)))
 
 ;;; machine control
 (defn current-time-millis []

@@ -336,15 +336,16 @@ Returns a sequence of interfaces as maps containing:
   [m & [timout-in-ms]]
   (let [end-time (+ (current-time-millis) timout-in-ms)]
     (loop []
-      (let [state (session/with-session m :write [s _] (.getState s))]
-        (if  (not= SessionState/Locked state)
-          (if (< (current-time-millis) end-time)
-            (do
-              (log/tracef "wait-for-lockable-session-state: state %s" state)
-              (Thread/sleep 250)
-              (recur))
-            nil)
-          true)))))
+      (try
+        (let [state (session/with-session m :read [s _] (.getState s))]
+          (if  (not= SessionState/Locked state)
+            (if (< (current-time-millis) end-time)
+              (do
+                (log/tracef "wait-for-lockable-session-state: state %s" state)
+                (Thread/sleep 250)
+                (recur))
+              nil)
+            true))))))
 
 (defn state [^Machine m]
   (session/with-no-session m [vb-m] (machine/state vb-m)))

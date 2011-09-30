@@ -2,13 +2,11 @@
   (:use vmfest.virtualbox.session :reload)
   (:use [vmfest.virtualbox.virtualbox :only (find-vb-m)])
   (:use clojure.test
-        clojure.contrib.condition
         vmfest.fixtures
         vmfest.virtualbox.model)
+  (:require [slingshot.core :as slingshot])
   (:import [org.virtualbox_4_0
             VirtualBoxManager]
-           [clojure.contrib.condition
-            Condition]
            [vmfest.virtualbox.model
             Server
             Machine]))
@@ -25,7 +23,7 @@
           (testing "Get a connection to the remote VBox Server"
             (is (not (nil? (.getVersion vbox)))))
           (testing "Connecting to a malformed address should throwh a condition"
-            (is (thrown-with-msg? Condition #"Cannot connect"
+            (is (thrown-with-msg? slingshot.Stone #"Cannot connect"
                   (create-vbox mgr "bogus address" "" ""))))))
       (finally (when mgr
                  (try (.disconnect mgr))))))
@@ -60,7 +58,7 @@
                   (with-session valid-machine :write [s m])))
           "No locking exceptions are thrown"))
     (testing "write locks are acquired"
-      (is (thrown-with-msg? Condition #"Cannot open session with machine"
+      (is (thrown-with-msg? slingshot.Stone #"Cannot open session with machine"
            (with-session valid-machine :write [s m]
              (with-session valid-machine :write [s2 m2])))))
     (testing "shared locks can be acquired after a write lock"
@@ -69,21 +67,22 @@
                     (with-session valid-machine :shared [s2 m2]
                       (with-session valid-machine :shared [s3 m3])))))))
     (testing "a write lock cannot be acquired after a shared lock"
-      (is (thrown-with-msg? Condition #"Cannot open session with machine"
+      (is (thrown-with-msg? slingshot.Stone #"Cannot open session with machine"
             (with-session valid-machine :shared [s m]
               (with-session valid-machine :write [s2 m2]))))))
   (testing "a session with a bogus machine will throw a condition"
-      (is (thrown-with-msg? Condition #"Cannot open session with machine"
+      (is (thrown-with-msg? slingshot.Stone #"Cannot open session with machine"
             (with-session bogus-machine :write [s m]))))
   (testing "write session method call -- wrong method,"
     (is (thrown?
-         Condition
+         slingshot.Stone
          (with-session valid-machine :write [session machine]
            (.setBogusVariable machine nil))))
-    (is (handler-case :type
+    (is (slingshot/try+
           (with-session valid-machine :write [session machine]
             (.setBogusVariable machine nil))
-          (handle :invalid-method true)))))
+          (catch {nil :invalid-method} e
+            true)))))
 
 (deftest ^{:integration true}
   shared-sessions-can-control-machines

@@ -3,7 +3,7 @@
   (:use clojure.test
         vmfest.virtualbox.session
         vmfest.fixtures
-        [clojure.contrib.io :only (delete-file-recursively)])
+        [vmfest.utils :only (delete-file-recursively)])
   (:require [vmfest.virtualbox.machine :as machine])
   (:import vmfest.virtualbox.model.Server))
 

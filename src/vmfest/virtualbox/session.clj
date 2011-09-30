@@ -1,7 +1,7 @@
 (ns vmfest.virtualbox.session
   "**session** provides the functionality to abstract the creation and
 destruction of sessions with the VBox servers"
-  (:require [clojure.contrib.logging :as log]
+  (:require [clojure.tools.logging :as log]
             [vmfest.virtualbox.conditions :as conditions]
             [vmfest.virtualbox.model :as model]
             [vmfest.virtualbox.enums :as enums])
@@ -68,11 +68,8 @@ VirtualBoxManager object plus the credentials or by a Server object.
              -> IVirtualBox"
   ([^VirtualBoxManager mgr url username password]
      {:pre [(model/VirtualBoxManager? mgr)]}
-     (log/trace
-      (format
-       "creating new vbox with a logon for url=%s and username=%s"
-       url
-       username))
+     (log/tracef
+      "creating new vbox with a logon for url=%s and username=%s" url username)
      (try
        (.connect mgr url username password)
        (.getVBox mgr)

@@ -3,9 +3,8 @@
            [vmfest.virtualbox.machine :as machine]
            [vmfest.virtualbox.session :as session]
            [vmfest.virtualbox.model :as model]
-           [clojure.contrib.logging :as log]
-           vmfest.virtualbox.medium)
-  (use clojure.contrib.condition))
+           [clojure.tools.logging :as log]
+           vmfest.virtualbox.medium))
 
 (defn server [url & [identity credentials]]
   (vmfest.virtualbox.model.Server. url (or identity "") (or credentials "")))
@@ -67,8 +66,7 @@
 
 (defn get-extra-data [machine key]
   {:pre [(model/Machine? machine)]}
-  (log/trace
-   (format "get-extra-data: getting extra data for %s %s" (:id machine) key))
+  (log/tracef "get-extra-data: getting extra data for %s %s" (:id machine) key)
   (session/with-no-session machine [vb-m]
     (machine/get-extra-data vb-m key)))
 

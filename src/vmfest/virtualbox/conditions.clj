@@ -1,6 +1,6 @@
 (ns vmfest.virtualbox.conditions
-  (:use clojure.contrib.condition)
-  (:require [clojure.contrib.logging :as log])
+  (:require [clojure.tools.logging :as log]
+            [slingshot.core :as slingshot])
   (:import [org.virtualbox_4_0.jaxws
             InvalidObjectFault
             InvalidObjectFaultMsg
@@ -13,25 +13,25 @@
 
 ;; from http://forums.virtualbox.org/viewtopic.php?f=7&t=30273
 (defonce *error-code-map*
-  {0 :VBOX_E_UNKNOWN,
-   2159738881 :VBOX_E_OBJECT_NOT_FOUND,
-   2159738882 :VBOX_E_INVALID_VM_STATE,
-   2159738883 :VBOX_E_VM_ERROR,
-   2159738884 :VBOX_E_FILE_ERROR,
-   2159738885 :VBOX_E_IPRT_ERROR,
-   2159738886 :VBOX_E_PDM_ERROR,
-   2159738887 :VBOX_E_INVALID_OBJECT_STATE,
-   2159738888 :VBOX_E_HOST_ERROR,
-   2159738889 :VBOX_E_NOT_SUPPORTED,
-   2159738890 :VBOX_E_XML_ERROR,
-   2159738891 :VBOX_E_INVALID_SESSION_STATE,
-   2159738892 :VBOX_E_OBJECT_IN_USE,
-   2147942405 :E_ACCESSDENIED,
-   2147500035 :E_POINTER,
-   2147500037 :E_FAIL,
-   2147500033 :E_NOTIMPL,
-   2147942414 :E_OUTOFMEMORY,
-   2147942487 :E_INVALIDARG,
+  {0 :VBOX_E_UNKNOWN
+   2159738881 :VBOX_E_OBJECT_NOT_FOUND
+   2159738882 :VBOX_E_INVALID_VM_STATE
+   2159738883 :VBOX_E_VM_ERROR
+   2159738884 :VBOX_E_FILE_ERROR
+   2159738885 :VBOX_E_IPRT_ERROR
+   2159738886 :VBOX_E_PDM_ERROR
+   2159738887 :VBOX_E_INVALID_OBJECT_STATE
+   2159738888 :VBOX_E_HOST_ERROR
+   2159738889 :VBOX_E_NOT_SUPPORTED
+   2159738890 :VBOX_E_XML_ERROR
+   2159738891 :VBOX_E_INVALID_SESSION_STATE
+   2159738892 :VBOX_E_OBJECT_IN_USE
+   2147942405 :E_ACCESSDENIED
+   2147500035 :E_POINTER
+   2147500037 :E_FAIL
+   2147500033 :E_NOTIMPL
+   2147942414 :E_OUTOFMEMORY
+   2147942487 :E_INVALIDARG
    2147549183 :E_UNEXPECTED})
 
 (defprotocol fault
@@ -40,14 +40,14 @@
 (extend-protocol fault
   java.lang.Exception
   (as-map [this]
-          (log/warn
-           (format "Processing exception %s as a java.lang.Exception. Cause %s"
-                   (class this)
-                   (.getCause this)))
+          (log/warnf
+           "Processing exception %s as a java.lang.Exception. Cause %s"
+           (class this)
+           (.getCause this))
           {:original-message (.getMessage this)
            :cause (.getCause this)
            :type :exception})
-  java.net.ConnectException 
+  java.net.ConnectException
   (as-map [this]
           {:type :connection-error})
   com.sun.xml.internal.ws.client.ClientTransportException
@@ -90,9 +90,7 @@
         (as-map cause)
         (as-map e)))
     (catch Exception e
-      (log/warn
-       (format "Cannot parse the error since the object is unavailable %s"
-               e))
+      (log/warn "Cannot parse the error since the object is unavailable %s" e)
       {})))
 
 (defn log-and-raise [exception optional-keys]
@@ -101,13 +99,13 @@
           message (or (:message optional-keys) "An exception occurred.")
           full-message (str message ": " (.getMessage exception))]
       (log/log log-level message)
-      (raise (merge {:message full-message
-                     :cause exception
-                     :stack-trace (stack-trace-info exception)}
-                    (condition-from-webservice-exception exception)
-                    optional-keys)))
+      (slingshot/throw+
+       (merge {:message full-message
+               :cause exception}
+              (condition-from-webservice-exception exception)
+              optional-keys)))
     (catch Exception e
-      (log/error "condition: Can't process this exeption" e)
+      (log/error e "condition: Can't process this exeption")
       (throw e))))
 
 (defn wrap-vbox-runtime [e error-condition-map & default-condition-map]
@@ -122,7 +120,7 @@
   (let [error-type (:original-error-type condition)
         action (error-type type-action-map)]
     (if action action
-        (raise condition))))
+        (slingshot/throw+ condition))))
 
 (defmacro handle-vbox-runtime [type-action-map]
   `(handle-vbox-runtime* *condition* ~type-action-map))
@@ -141,7 +139,6 @@
   (def my-no-machine (vmfest.virtualbox.model.Machine. "bogus" my-server nil)) ;; a bogus machine
 
   (use 'vmfest.virtualbox.machine)
-  (use 'clojure.contrib.condition)
   (require '[vmfest.virtualbox.conditions :as conditions])
   ;; handle error based on original error type
   (handler-case :type

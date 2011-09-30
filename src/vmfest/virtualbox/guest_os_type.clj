@@ -1,5 +1,5 @@
 (ns vmfest.virtualbox.guest-os-type
-  (:require [clojure.contrib.logging :as log]
+  (:require [clojure.tools.logging :as log]
             [vmfest.virtualbox.session :as session]
             [vmfest.virtualbox.model :as model])
   (:import [org.virtualbox_4_0 IGuestOSType]))

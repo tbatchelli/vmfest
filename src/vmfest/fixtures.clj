@@ -2,7 +2,7 @@
   (:require [vmfest.virtualbox.virtualbox :as vbox]
             [vmfest.virtualbox.machine :as machine]
             [vmfest.virtualbox.model :as model])
-  (:use [clojure.contrib.io :only (delete-file-recursively)]
+  (:use [vmfest.utils :only (delete-file-recursively)]
         vmfest.virtualbox.session)
   (:import [vmfest.virtualbox.model Server Machine]))
 

@@ -1,11 +1,11 @@
 (ns vmfest.virtualbox.machine
-  (:use clojure.contrib.condition)
-  (:require [clojure.contrib.logging :as log]
+  (:require [clojure.tools.logging :as log]
             [vmfest.virtualbox.virtualbox :as virtualbox]
             [vmfest.virtualbox.conditions :as conditions]
             [vmfest.virtualbox.model :as model]
             [vmfest.virtualbox.enums :as enums]
-            [vmfest.virtualbox.session :as session])
+            [vmfest.virtualbox.session :as session]
+            [slingshot.core :as slingshot])
   (:import [org.virtualbox_4_0 IMachine IConsole VBoxException
             VirtualBoxManager IVirtualBox IMedium]
            [vmfest.virtualbox.model GuestOsType Machine]))
@@ -123,8 +123,7 @@
   model/vbox-object
   (soak [this vbox]
         (let [vb-m (virtualbox/find-vb-m vbox (:id this))]
-          (log/trace
-           (format "soak: soaking %s into %s" this vb-m))
+          (log/tracef "soak: soaking %s into %s" this vb-m)
           vb-m))
   (as-map [this]
           (session/with-vbox (:server this) [_ vbox]
@@ -133,8 +132,7 @@
                 (merge this
                        (map-from-IMachine machine (:server this))))
               (catch Exception e
-                (log/error (format "as-map: Machine %s not found. Reason"
-                                   (:id this)) e)
+                (log/errorf e "as-map: Machine %s not found. Reason" (:id this))
                 (merge this
                        {:error "Machine not found"
                         :exception e}))))))
@@ -166,9 +164,8 @@ See IVirtualbox::openRemoteSession for more details"
            (log/debug (str "start: Starting session for VM " machine-id "..."))
            (.waitForCompletion progress 30000)
            (let [result-code (.getResultCode progress)]
-             (log/debug (format "start: VM %s started with result code %s"
-                                machine-id
-                                result-code))
+             (log/debugf
+              "start: VM %s started with result code %s" machine-id result-code)
              result-code))
          (catch VBoxException e
            (conditions/wrap-vbox-runtime
@@ -186,7 +183,7 @@ See IVirtualbox::openRemoteSession for more details"
              :VBOX_E_VM_ERROR
              {:message "Failed to assign machine to session."}}))
          (catch Exception e
-           (log/error "Cannot start machine" e)
+           (log/error e "Cannot start machine")
            (conditions/log-and-raise
             e
             {:log-level :error
@@ -271,11 +268,10 @@ See IVirtualbox::openRemoteSession for more details"
   [^IConsole c]
   {:pre [(model/IConsole? c)]}
   (try
-    (log/trace (format "stop: machine-id: %s"
-                       (.getId (.getMachine c))))
+    (log/tracef "stop: machine-id: %s" (.getId (.getMachine c)))
     (.powerButton c)
     (catch VBoxException e
-      (log/debug "stop: Caught exception" e)
+      (log/debug e "stop: Caught exception")
       (conditions/wrap-vbox-runtime
        e
        {:VBOX_E_INVALID_VM_STATE
@@ -408,10 +404,10 @@ See IVirtualbox::openRemoteSession for more details"
     (let [cleanup-mode (if cleanup-key
                          (enums/key-to-cleanup-mode cleanup-key)
                          :unregister-only)]
-      (log/info
-       (format "unregister: unregistering machine with name %s with cleanup %s"
-               (.getName vb-m)
-               cleanup-mode))
+      (log/infof
+       "unregister: unregistering machine with name %s with cleanup %s"
+       (.getName vb-m)
+       cleanup-mode)
       (.unregister vb-m cleanup-mode))
     (catch VBoxException e
       (conditions/wrap-vbox-runtime
@@ -422,9 +418,7 @@ See IVirtualbox::openRemoteSession for more details"
 (defn delete [vb-m media]
   {:pre [(model/IMachine? vb-m)]}
   (try
-    (log/info
-     (format "delete: deleting machine %s and it's media"
-             (.getName vb-m)))
+    (log/infof "delete: deleting machine %s and it's media" (.getName vb-m))
     (.delete vb-m media)
     (catch VBoxException e
       (conditions/wrap-vbox-runtime

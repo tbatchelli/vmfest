@@ -1,5 +1,5 @@
 (ns vmfest.virtualbox.medium
-  (:require [clojure.contrib.logging :as log]
+  (:require [clojure.tools.logging :as log]
             [vmfest.virtualbox.model :as model]
             [vmfest.virtualbox.virtualbox :as virtualbox]
             [vmfest.virtualbox.conditions :as conditions]

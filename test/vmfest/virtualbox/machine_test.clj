@@ -1,12 +1,12 @@
 (ns vmfest.virtualbox.machine-test
   (:require [vmfest.virtualbox.session :as session]
             [vmfest.virtualbox.model :as model]
-            [clojure.contrib.logging :as log])
+            [clojure.tools.logging :as log]
+            [slingshot.core :as slingshot])
   (:use vmfest.virtualbox.machine :reload)
   (:use clojure.test
         vmfest.fixtures
-        [clojure.contrib.io :only (delete-file-recursively)])
-  (:import clojure.contrib.condition.Condition))
+        [vmfest.utils :only (delete-file-recursively)]))
 
 (def test-machine-1
   (vmfest.virtualbox.model.Machine. "Test-1" *server* nil))
@@ -45,11 +45,11 @@
       (is mgr "the manager is created even if the machine is started")
       (is vbox "the virtualbox is created even if the machine is started")
       (is (thrown?
-            clojure.contrib.condition.Condition
-            (start mgr vbox (:id test-machine-1))))))
+           slingshot.Stone
+           (start mgr vbox (:id test-machine-1))))))
   (testing "a running machine cannot be resumed"
     (session/with-session test-machine-1 :shared [s m]
-      (is (thrown? Condition (resume (.getConsole s))))))
+      (is (thrown? slingshot.Stone (resume (.getConsole s))))))
   (testing "a running machine can be paused"
     (session/with-session test-machine-1 :shared [s m]
       (let [console (.getConsole s)]
@@ -65,20 +65,20 @@
         (is console "You can get a console from a shared session")
         (is (nil? (power-down console))))))
   (testing "a stopped machine cannot be powered down"
-    (is (thrown? Condition
+    (is (thrown? slingshot.Stone
                  (session/with-session test-machine-1 :shared [s m]
                    (power-down (.getConsole s))))))
   (testing "a stopped machine cannot be paused"
     (session/with-session test-machine-1 :shared [s m]
-      (is (thrown? Condition (pause (.getConsole s))))))
+      (is (thrown? slingshot.Stone (pause (.getConsole s))))))
   ;; DISABLED: it takes way too long!
   #_(testing "a running machine can be stopped gracefully"
-    (session/with-vbox *server* [mgr vbox]
-      (is (start mgr vbox (:id test-machine-1) :session-type "headless")))
-    (Thread/sleep 200000) ;; give some time to the OS to come up enough
-    ;; so it can catch the shutdown event
-    (session/with-session test-machine-1 :shared [s m]
-      (is (nil? (stop (.getConsole s)))))))
+      (session/with-vbox *server* [mgr vbox]
+        (is (start mgr vbox (:id test-machine-1) :session-type "headless")))
+      (Thread/sleep 200000) ;; give some time to the OS to come up enough
+      ;; so it can catch the shutdown event
+      (session/with-session test-machine-1 :shared [s m]
+        (is (nil? (stop (.getConsole s)))))))
 
 
 (deftest ^{:integration true}
@@ -87,9 +87,8 @@
         sc-name "test-sc"
         device-name "test-device"]
     (try
-      (log/debug (format "machine-test: machine id %s server %s"
-                         (:id machine)
-                         (:server machine)))
+      (log/debugf
+       "machine-test: machine id %s server %s" (:id machine) (:server machine))
       (session/with-session machine :write [_ vb-m]
         (testing "you can add a storage controller"
           (add-storage-controller vb-m sc-name :ide)

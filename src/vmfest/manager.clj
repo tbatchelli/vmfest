@@ -68,7 +68,7 @@ machines are stored in ~/.vmfest/nodes ."
        (.getConsole session)
        "/VirtualBox/GuestInfo/Net/0/V4/IP"))
     (catch org.virtualbox_4_0.VBoxException e
-      (throw (RuntimeException e)))))
+      (throw (RuntimeException. e)))))
 
 (defn set-extra-data
   "Adds metadata to a machine, in the form of a key, value pair"

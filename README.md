@@ -30,7 +30,33 @@ $ VBoxManage setproperty websrvauthlibrary null
 
 ### Installing a Model Image
 
-Before we can instantiate n image, we need to install it as model image. To make things easy I have published a model image (more to come). The following will download an install an ubuntu 10.10 64-bit model image.
+Create a new [Leiningen] [https://github.com/technomancy/leiningen] project.
+
+```
+$ lein new vmfest-quickstart
+$ cd vmfest-quickstart
+```
+
+Edit the ```project.clj``` so it looks like: 
+
+```clojure
+(defproject vmfest-quickstart "1.0.0-SNAPSHOT"
+  :description "FIXME: write description"
+  :dependencies [[org.clojure/clojure "1.2.1"]
+                 [vmfest              "0.2.3"]])
+```
+
+Get the dependencies: 
+```
+$ lein deps
+```
+
+Start your favorite REPL, for example: 
+```
+$ lein repl
+```
+
+Before we can instantiate an image, we need to install it as model image. To make things easy I have published a model image (more to come). The following will download an install an ubuntu 10.10 64-bit model image.
 
 ```clojure
 (use 'vmfest.manager)

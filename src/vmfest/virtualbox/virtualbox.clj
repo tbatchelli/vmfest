@@ -4,7 +4,7 @@
             [vmfest.virtualbox.conditions :as conditions]
             [vmfest.virtualbox.enums :as enums]
             vmfest.virtualbox.guest-os-type)
-  (:import [org.virtualbox_4_0
+  (:import [org.virtualbox_4_1
             VirtualBoxManager
             IVirtualBox
             VBoxException]

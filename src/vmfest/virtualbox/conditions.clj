@@ -1,18 +1,18 @@
 (ns vmfest.virtualbox.conditions
-  (:use clojure.contrib.condition)
+  (:use [slingshot.slingshot :only [try+ throw+]])
   (:require [clojure.tools.logging :as log])
-  (:import [org.virtualbox_4_0.jaxws
+  (:import [org.virtualbox_4_1.jaxws
             InvalidObjectFault
             InvalidObjectFaultMsg
             RuntimeFault
             RuntimeFaultMsg]
-           [org.virtualbox_4_0 VBoxException]))
+           [org.virtualbox_4_1 VBoxException]))
 
 (defn unsigned-int-to-long [ui]
   (bit-and (long ui) 0xffffffff))
 
 ;; from http://forums.virtualbox.org/viewtopic.php?f=7&t=30273
-(defonce *error-code-map*
+(defonce error-code-map
   {0 :VBOX_E_UNKNOWN,
    2159738881 :VBOX_E_OBJECT_NOT_FOUND,
    2159738882 :VBOX_E_INVALID_VM_STATE,
@@ -76,7 +76,7 @@
        :origin-id interface-id
        :origin-component component
        :error-code result-code
-       :original-error-type (*error-code-map* result-code)
+       :original-error-type (error-code-map result-code)
        :text text}))
   InvalidObjectFaultMsg
   (as-map [this]
@@ -85,7 +85,7 @@
 
 (defn condition-from-exception [e]
   (try
-    (if-let [cause (.getWrapped e)]
+    (if-let [cause (try (.getWrapped e) (catch Exception _))]
       (let [condition (as-map cause)]
         (log/debug (format "formatting wrapped exception %s" condition))
         condition)
@@ -97,33 +97,19 @@
        "Cannot parse the error since the object is unavailable %s" e)
       {})))
 
-#_(defn log-and-raise [exception optional-keys]
-  (try
-    (let [log-level (or (:log-level optional-keys) :error)
-          message (or (:message optional-keys) "An exception occurred.")
-          full-message (str message ": " (.getMessage exception))]
-      (log/log log-level message)
-      (raise (merge {:message full-message
-                     :cause exception
-                     :stack-trace (stack-trace-info exception)}
-                    (condition-from-webservice-exception exception)
-                    optional-keys)))
-    (catch Exception e
-      (log/error e "condition: Can't process this exeption")
-      (throw e))))
-
 (defn wrap-exception [exception optional-keys]
-  (try
+  (try+
     (let [message (or (:message optional-keys) "An exception occurred.")
           full-message (format "%s: %s" message (.getMessage exception))]
-      (raise (merge {:full-message full-message
-                     :cause exception
-                     :stack-trace (stack-trace-info exception)}
-                    (condition-from-exception exception)
-                    optional-keys)))
+      (throw+ (merge {:full-message full-message
+                      :cause exception
+;;                      :stack-trace nil  ;; redundant
+                      }
+                     (condition-from-exception exception)
+                     optional-keys)))
     (catch Exception e
       (log/error "condition: Cannot process exception" e)
-      (throw e))))
+      (throw+ e))))
 
 (defn wrap-vbox-exception [e error-condition-map & default-condition-map]
   (if (instance? VBoxException e)
@@ -143,7 +129,7 @@
   (let [error-type (:original-error-type condition)
         action (error-type type-action-map)]
     (if action action
-        (raise condition))))
+        (throw+ condition))))
 
 (defmacro handle-vbox-runtime [type-action-map]
   `(handle-vbox-runtime* *condition* ~type-action-map))
@@ -178,7 +164,7 @@
   (def my-no-machine (vmfest.virtualbox.model.Machine. "bogus" my-server nil)) ;; a bogus machine
 
   (use 'vmfest.virtualbox.machine)
-  (use 'clojure.contrib.condition)
+  (use 'clojure.contrib.condition) 
   (require '[vmfest.virtualbox.conditions :as conditions])
   ;; handle error based on original error type
   (handler-case :type

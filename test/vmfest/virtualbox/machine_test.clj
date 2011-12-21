@@ -4,9 +4,8 @@
             [clojure.tools.logging :as log])
   (:use vmfest.virtualbox.machine :reload)
   (:use clojure.test
-        vmfest.fixtures
-        [clojure.contrib.io :only (delete-file-recursively)])
-  (:import clojure.contrib.condition.Condition))
+        vmfest.fixtures)
+  (:import [slingshot ExceptionInfo]))
 
 (def test-machine-1
   (vmfest.virtualbox.model.Machine. "Test-1" *server* nil))
@@ -45,11 +44,11 @@
       (is mgr "the manager is created even if the machine is started")
       (is vbox "the virtualbox is created even if the machine is started")
       (is (thrown?
-            clojure.contrib.condition.Condition
+            ExceptionInfo
             (start mgr vbox (:id test-machine-1))))))
   (testing "a running machine cannot be resumed"
     (session/with-session test-machine-1 :shared [s m]
-      (is (thrown? Condition (resume (.getConsole s))))))
+      (is (thrown? ExceptionInfo (resume (.getConsole s))))))
   (testing "a running machine can be paused"
     (session/with-session test-machine-1 :shared [s m]
       (let [console (.getConsole s)]
@@ -65,12 +64,12 @@
         (is console "You can get a console from a shared session")
         (is (nil? (power-down console))))))
   (testing "a stopped machine cannot be powered down"
-    (is (thrown? Condition
+    (is (thrown? ExceptionInfo
                  (session/with-session test-machine-1 :shared [s m]
                    (power-down (.getConsole s))))))
   (testing "a stopped machine cannot be paused"
     (session/with-session test-machine-1 :shared [s m]
-      (is (thrown? Condition (pause (.getConsole s))))))
+      (is (thrown? ExceptionInfo (pause (.getConsole s))))))
   ;; DISABLED: it takes way too long!
   #_(testing "a running machine can be stopped gracefully"
     (session/with-vbox *server* [mgr vbox]

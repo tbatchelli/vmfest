@@ -2,8 +2,7 @@
   (:use vmfest.virtualbox.virtualbox :reload)
   (:use clojure.test
         vmfest.virtualbox.session
-        vmfest.fixtures
-        [clojure.contrib.io :only (delete-file-recursively)])
+        vmfest.fixtures)
   (:require [vmfest.virtualbox.machine :as machine])
   (:import vmfest.virtualbox.model.Server))
 
@@ -42,8 +41,6 @@
   (with-vbox *server* [_ vbox]
     (let [dir "/tmp/vbox-tests/"
           name "test-created-machine"]
-     ; (clojure.java.io/make-parents dir)
-     ; (delete-file-recursively dir)
       (let [machine (create-machine
                      vbox
                      name

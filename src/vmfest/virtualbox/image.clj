@@ -4,9 +4,9 @@
         [clojure.pprint :only (pprint)]
         [vmfest.virtualbox.virtualbox :only (find-medium)])
   (:require [clojure.tools.logging :as log]
-            [clojure.contrib.str-utils2 :as string]
+            [clojure.string :as string]
             [vmfest.virtualbox.enums :as enums])
-  (:import [org.virtualbox_4_0 DeviceType AccessMode MediumVariant
+  (:import [org.virtualbox_4_1 DeviceType AccessMode MediumVariant
             MediumType]
            [java.util.zip GZIPInputStream]
            [java.io File]))
@@ -43,7 +43,7 @@
     (let [orig-medium (.openMedium vb orig DeviceType/HardDisk AccessMode/ReadOnly)
           dest-medium (.createHardDisk vb "vdi" dest)
           progress (.cloneTo orig-medium dest-medium (long 0) nil)]
-      (.waitForCompletion progress -1) ;; wait indefinitely for the cloning
+      (.waitForCompletion progress (Integer. -1)) ;; wait indefinitely for the cloning
       (make-immutable dest-medium)
       (.close orig-medium) ;; otherwise the origina medium would remain registered
       )))
@@ -92,7 +92,7 @@
      :image-name image-name
      :vbox vbox}))
 
-(def *dry-run* false)
+(def ^:dynamic *dry-run* false)
 
 (defn threaded-download
   [{:keys [model-name image-url gzipped? gzipped-image-file image-file] :as options}]

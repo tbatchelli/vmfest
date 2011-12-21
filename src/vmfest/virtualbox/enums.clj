@@ -1,7 +1,7 @@
 (ns vmfest.virtualbox.enums
   (:require [clojure.tools.logging :as log])
   (:import
-   [org.virtualbox_4_0 IMachine MachineState ClipboardMode PointingHidType
+   [org.virtualbox_4_1 IMachine MachineState ClipboardMode PointingHidType
     FirmwareType KeyboardHidType SessionState SessionType StorageBus
     DeviceType NetworkAttachmentType CleanupMode StorageControllerType
     MediumType HostNetworkInterfaceType]))
@@ -180,7 +180,7 @@
    [NetworkAttachmentType/Bridged :bridged ""]
    [NetworkAttachmentType/Internal :internal ""]
    [NetworkAttachmentType/HostOnly :host-only ""]
-   [NetworkAttachmentType/VDE :vde ""]])
+   [NetworkAttachmentType/Generic :generic ""]])
 (defn network-attachment-type-to-key [type]
   (find-key-by-value type network-attachment-type-to-key-table))
 (defn key-to-network-attachment-type [key]

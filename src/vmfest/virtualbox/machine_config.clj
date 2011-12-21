@@ -1,12 +1,12 @@
 (ns vmfest.virtualbox.machine-config
+  (:use [slingshot.slingshot :only [throw+]])
   (:require [vmfest.virtualbox.machine :as machine]
             [vmfest.virtualbox.enums :as enums]
             [vmfest.virtualbox.model :as model]
             [clojure.tools.logging :as log]
-            [vmfest.virtualbox.virtualbox :as vbox]
-            [clojure.contrib.condition :as cond])
-  (:import [org.virtualbox_4_0 AccessMode VBoxException
-            HostNetworkInterfaceType]))
+            [vmfest.virtualbox.virtualbox :as vbox])
+  (:import [org.virtualbox_4_1 AccessMode VBoxException NetworkAttachmentType
+            HostNetworkInterfaceType DeviceType]))
 
 (defn get-medium [m device]
   (let [vbox (.getParent m)
@@ -26,7 +26,7 @@
 (defn add-storage-controller [m name storage-bus-key & [controller-type-key]]
   (when (and controller-type-key
              (not (check-controller-type storage-bus-key controller-type-key)))
-    (cond/raise {:type :machine-builder
+    (throw+ {:type :machine-builder
                  :message
                  (format "Bus of type %s is not compatible with controller %s"
                          storage-bus-key
@@ -49,11 +49,16 @@
   (let [device-type (enums/key-to-device-type (:device-type device))
         medium (get-medium m device)]
     (when-not device-type
-      (cond/raise
+      (throw+
        {:type :machine-builder
         :message (str "Failed to attach device; it is missing a"
-                      " valid dvice-type entry")}))
-    (.attachDevice m controller-name port slot device-type medium)))
+                      " valid device-type entry")}))
+    (.attachDevice m
+                   controller-name
+                   (Integer. port)
+                   (Integer. slot)
+                   device-type
+                   medium)))
 
 (defmulti attach-devices
   (fn [m bus-type controller-name devices] bus-type))
@@ -110,12 +115,10 @@
         :adapter-type (.setAdapterType adapter value)
         :network (.setNetwork adapter value)
         ;; equiv. to bridged-interface 4.0.x and below
-        :host-interface (.setHostInterface adapter value)
-        ;; change for 4.1
-        :bridged-interface (.setHostInterface adapter value) 
+        :host-interface (.setBridgedInterface adapter value)
+        :bridged-interface (.setBridgedInterface adapter value)
         :internal-network (.setInternalNetwork adapter value)
-        ;; change for 4.1
-        :host-only-interface (.setHostInterface adapter value) 
+        :host-only-interface (.setHostOnlyInterface adapter value)
         :enabled (.setEnabled adapter value)
         :cable-connected (.setCableConnected adapter value)
         :mac-address (.setMACAddress adapter value)
@@ -133,10 +136,10 @@
       (set-adapter-property adapter k v))))
 
 (defn attach-to-bridged [adapter]
-  (.attachToBridgedInterface adapter))
+  (.setAttachmentType adapter NetworkAttachmentType/Bridged))
 
 (defn attach-to-nat [adapter]
-  (.attachToNAT adapter))
+  (.setAttachmentType adapter NetworkAttachmentType/NAT))
 
 (defn attach-to-host-only [adapter machine]
   (let [host (.getHost (.getParent machine))
@@ -155,10 +158,10 @@
          "Trying to configure a network adapter with inexistent host interface named %s"
          " for machine %s")
         if-name (.getName machine)))))
-  (.attachToHostOnlyInterface adapter))
+  (.setAttachmentType adapter NetworkAttachmentType/HostOnly))
 
 (defn attach-to-internal [adapter]
-  (.attachToInternalNetwork adapter))
+  (.setAttachmentType adapter NetworkAttachmentType/Internal))
 
 (defn attach-adapter [machine adapter attachment-type]
   (condp = attachment-type 
@@ -185,7 +188,7 @@
               (.getName m) config)
   (let [vbox (.getParent m)
         system-properties (.getSystemProperties vbox)
-        adapter-count (.getNetworkAdapterCount system-properties)
+        adapter-count (.getMaxNetworkAdapters system-properties (.getChipsetType m))
         adapter-configs (partition 2 (interleave (range adapter-count) config))]
     (doseq [[slot adapter-config] adapter-configs]
       (log/debugf "Configuring adapter %s with %s" slot adapter-config)

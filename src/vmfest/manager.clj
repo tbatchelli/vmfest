@@ -17,12 +17,10 @@ machines are stored in ~/.vmfest/nodes ."
             [vmfest.virtualbox.session :as session]
             [vmfest.virtualbox.model :as model]
             [vmfest.virtualbox.image :as image]
-            [clojure.contrib.condition :as condition]
             [clojure.tools.logging :as log]
             [clojure.java.io :as io]
             vmfest.virtualbox.medium)
-  (:use clojure.contrib.condition)
-  (:import [org.virtualbox_4_0
+  (:import [org.virtualbox_4_1
             SessionState
             HostNetworkInterfaceType
             HostNetworkInterfaceStatus] java.io.File)

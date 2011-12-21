@@ -5,8 +5,8 @@
   (:require [vmfest.fixtures :as fixtures]
             [vmfest.virtualbox.machine :as machine]
             [vmfest.virtualbox.enums :as enums]
-            [clojure.contrib.logging :as log])
-  (:import [clojure.contrib.condition Condition]))
+            [clojure.tools.logging :as log])
+  (:import [slingshot ExceptionInfo]))
 
 (def boot-hd
   {:device-type :hard-disk
@@ -142,7 +142,7 @@
       (let [config [{:name "SCSI Controller"
                      :bus :scsi
                      :type :piix4}]]
-        (is (thrown? Condition (configure-storage m config)))))))
+        (is (thrown? ExceptionInfo (configure-storage m config)))))))
 
 (deftest check-tests
   (testing "controller-type vs. bus"
@@ -167,12 +167,12 @@
                   (enums/network-attachment-type-to-key
                    (.getAttachmentType configured-adapter)))))
           (is (= "en1: Airport 2"
-                 (.getHostInterface configured-adapter))))
+                 (.getBridgedInterface configured-adapter))))
         (is (not (.getEnabled (.getNetworkAdapter m (long 1))))
             "The nil adapters don't get configured")
         (let [configured-adapter (.getNetworkAdapter m (long 2))]
           (is (= "nothing"
-                 (.getHostInterface configured-adapter))))))))
+                 (.getBridgedInterface configured-adapter))))))))
 
 (deftest ^{:integration true}
   nat-config-tests
@@ -207,7 +207,7 @@
                 (enums/network-attachment-type-to-key
                  (.getAttachmentType configured-adapter)))))
         (is (= "en1: Airport 2"
-               (.getHostInterface configured-adapter)))))
+               (.getBridgedInterface configured-adapter)))))
     (testing "The storage settings are properly set"
       (let [device (find-device m "IDE Controller" 1 0)]
           (is device)))))

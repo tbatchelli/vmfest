@@ -20,6 +20,7 @@ machines are stored in ~/.vmfest/nodes ."
             [clojure.tools.logging :as log]
             [clojure.java.io :as io]
             vmfest.virtualbox.medium)
+  (:use [slingshot.slingshot :only [throw+ try+]])
   (:import [org.virtualbox_4_1
             SessionState
             HostNetworkInterfaceType
@@ -50,7 +51,7 @@ machines are stored in ~/.vmfest/nodes ."
   {:local {:model-path (default-model-path)
            :node-path (default-node-path)}})
 
-;; current location. See *locations* 
+;; current location. See *locations*
 (def ^{:dynamic true} *location* (:local *locations*))
 
 
@@ -60,7 +61,7 @@ machines are stored in ~/.vmfest/nodes ."
   [machine]
   {:pre
    [(model/Machine? machine)]}
-  (try 
+  (try
     (session/with-session machine :shared [session _]
       (machine/get-guest-property
        (.getConsole session)
@@ -124,12 +125,14 @@ Note: :os-name is how vbox identifies the host network interfaces."
       )))
 
 (defn get-usable-network-interfaces-from-java
-  "Finds what host network interfaces are usable for bridging according to the JVM. This excludes interfaces that have no reachable ip addresses, or that are either loopback, virtual or point-to-point.
+  "Finds what host network interfaces are usable for bridging according
+to the JVM. This excludes interfaces that have no reachable ip addresses,
+or that are either loopback, virtual or point-to-point.
 
 Returns a sequence of interfaces as maps containing:
   [:name :ip-addresses :virtual? :loopback? :point-to-point? :up?]
   where :ip-addresses is a sequence of maps with
-  [:ip-address :reachable?]."  []
+  [:ip-address :reachable?]." []
   (let [any-reachable? (fn [ips]
                          (some true? (map :reachable? ips)))
         nis (enumeration-seq (NetworkInterface/getNetworkInterfaces))
@@ -158,7 +161,8 @@ Returns a sequence of interfaces as maps containing:
     (filter usable? ni-infos)))
 
 (defn find-usable-network-interface
-  "Provides a list of interface names that are usable for bridging in VirtualBox"
+  "Provides a list of interface names that are usable for bridging in
+VirtualBox"
   [server]
   (let [vbox-ifs(get-usable-network-interfaces-from-vbox server)
         usable-by-vbox ;; only their names
@@ -179,17 +183,8 @@ Returns a sequence of interfaces as maps containing:
   {:micro
    {:memory-size 512
     :cpu-count 1
-    :network [{:attachment-type :bridged
-               :host-interface "Wi-Fi 2 (AirPort)"}]
-    :storage [{:name "IDE Controller"
-               :bus :ide
-               :devices [nil nil {:device-type :dvd} nil]}]
-    :boot-mount-point ["IDE Controller" 0]}
-   :micro-internal
-   {:memory-size 512
-    :cpu-count 1
     :network [{:attachment-type :host-only
-               :host-interface "vboxnet0"}
+               :host-only-interface "vboxnet0"}
               {:attachment-type :nat}]
     :storage [{:name "IDE Controller"
                :bus :ide
@@ -230,7 +225,8 @@ Returns a sequence of interfaces as maps containing:
   (model-key (update-models :model-pathmodel-path)))
 
 (defn check-model
-  [server model-key & {:keys [model-path] :or {model-path (:model-path *location*)}}]
+  [server model-key & {:keys [model-path]
+                       :or {model-path (:model-path *location*)}}]
   (let [model-id (:uuid (model-key (update-models :model-path model-path)))]
     (session/with-vbox server [_ vbox]
       (image/valid-model? vbox model-id))))
@@ -250,8 +246,9 @@ Returns a sequence of interfaces as maps containing:
                              :location image-uuid
                              :attachment-type :multi-attach}
           image-mounter (fn [{:keys [name] :as storage-bus}]
-                          ;; When the storage bus is named with storage-bus-name,
-                          ;; mount the image in the right device
+                          ;; When the storage bus is named with
+                          ;; storage-bus-name, mount the image in the
+                          ;; right device
                           (if (= name storage-bus-name)
                             ;; this is the controller: add image to devices
                             (update-in storage-bus
@@ -269,7 +266,7 @@ Returns a sequence of interfaces as maps containing:
   {:pre [(model/Server? server)]}
   (when-let [f (or base-folder (:node-path *location*))]
     (when-not (.exists (io/file f))
-      (condition/raise
+      (throw+
        :type :path-not-found
        :message (format "Path for saving nodes doesn't exist: %s" f))))
   (let [m (session/with-vbox server [_ vbox]
@@ -290,7 +287,8 @@ Returns a sequence of interfaces as maps containing:
       (log/debugf "Configuring storage for %s" boot-image-mounted-config)
       (session/with-vbox server [_ vbox]
         (session/with-session m :shared [_ vb-m]
-          (machine-config/configure-machine-storage vb-m boot-image-mounted-config)
+          (machine-config/configure-machine-storage
+           vb-m boot-image-mounted-config)
           (machine/save-settings vb-m))))
     m))
 
@@ -377,10 +375,10 @@ Returns a sequence of interfaces as maps containing:
 (defn power-down
   [^Machine m]
   {:pre [(model/Machine? m)]}
-  (handler-case :type
+  (try+
     (session/with-session m :shared [s _]
       (machine/power-down (.getConsole s)))
-    (handle :vbox-runtime
+    (catch [:type :vbox-runtime] _
       (log/warn "Trying to stop an already stopped machine"))))
 
 (defn destroy [machine]

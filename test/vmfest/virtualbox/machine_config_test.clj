@@ -172,6 +172,26 @@
             "The nil adapters don't get configured")
         (let [configured-adapter (.getNetworkAdapter m (long 2))]
           (is (= "nothing"
+                 (.getBridgedInterface configured-adapter)))))))
+  (testing "Host-only interfaces"
+    (with-config-machine
+      (let [config
+            [{:attachment-type :host-only
+              :host-only-interface "vboxnet0"}
+             nil
+             {:attachment-type :bridged
+              :host-interface "nothing"}]]
+        (configure-network m config)
+        (let [configured-adapter (.getNetworkAdapter m (long 0))]
+          (is (= (:host-only
+                  (enums/network-attachment-type-to-key
+                   (.getAttachmentType configured-adapter)))))
+          (is (= "vboxnet0"
+                 (.getHostOnlyInterface configured-adapter))))
+        (is (not (.getEnabled (.getNetworkAdapter m (long 1))))
+            "The nil adapters don't get configured")
+        (let [configured-adapter (.getNetworkAdapter m (long 2))]
+          (is (= "nothing"
                  (.getBridgedInterface configured-adapter))))))))
 
 (deftest ^{:integration true}

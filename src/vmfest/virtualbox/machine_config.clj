@@ -150,7 +150,7 @@
         host-if-names
         (map #(.getName %) host-only-ifs)
         if-name
-        (.getHostInterface adapter)]
+        (.getHostOnlyInterface adapter)]
     (when-not (some (partial = if-name) host-if-names)
       (log/error
        (format

@@ -65,7 +65,7 @@ machines are stored in ~/.vmfest/nodes ."
       (machine/get-guest-property
        (.getConsole session)
        "/VirtualBox/GuestInfo/Net/0/V4/IP"))
-    (catch org.virtualbox_4_0.VBoxException e
+    (catch org.virtualbox_4_1.VBoxException e
       (throw (RuntimeException. e)))))
 
 (defn set-extra-data

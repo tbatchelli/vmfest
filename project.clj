@@ -1,6 +1,6 @@
 (defproject vmfest "0.2.4-SNAPSHOT"
   :description "Manage local VMs from the REPL"
-  :dependencies [[org.clojure/clojure "1.3.0"]
+  :dependencies [[org.clojure/clojure "1.2.1"]
                  [slingshot "0.10.0"]
                  [org.clojure/tools.logging "0.2.3"]
                  [org.clojars.tbatchelli/vboxjws "4.1.8"]

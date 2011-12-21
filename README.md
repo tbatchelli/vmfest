@@ -30,7 +30,7 @@ $ VBoxManage setproperty websrvauthlibrary null
 
 ### Installing a Model Image
 
-Create a new [Leiningen] [https://github.com/technomancy/leiningen] project.
+Create a new [Leiningen](https://github.com/technomancy/leiningen) project.
 
 ```
 $ lein new vmfest-quickstart

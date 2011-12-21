@@ -5,7 +5,7 @@ destruction of sessions with the VBox servers"
             [vmfest.virtualbox.conditions :as conditions]
             [vmfest.virtualbox.model :as model]
             [vmfest.virtualbox.enums :as enums])
-  (:import [org.virtualbox_4_0
+  (:import [org.virtualbox_4_1
             VirtualBoxManager
             IVirtualBox
             VBoxException
@@ -125,8 +125,8 @@ with a virtualbox.
                           e# {:message "unable to close session"}))))))))
 
 (def lock-type-constant
-  {:write org.virtualbox_4_0.LockType/Write
-   :shared org.virtualbox_4_0.LockType/Shared})
+  {:write org.virtualbox_4_1.LockType/Write
+   :shared org.virtualbox_4_1.LockType/Shared})
 
 (defmacro with-session
   [machine type [session vb-m] & body]

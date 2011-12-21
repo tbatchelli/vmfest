@@ -6,7 +6,7 @@
             [vmfest.virtualbox.model :as model]
             [vmfest.virtualbox.enums :as enums]
             [vmfest.virtualbox.session :as session])
-  (:import [org.virtualbox_4_0 IMachine IConsole VBoxException
+  (:import [org.virtualbox_4_1 IMachine IConsole VBoxException NetworkAttachmentType
             VirtualBoxManager IVirtualBox IMedium]
            [vmfest.virtualbox.model GuestOsType Machine]))
 
@@ -309,15 +309,15 @@ See IVirtualbox::openRemoteSession for more details"
   (try
     (if-let [adapter (.getNetworkAdapter m (long port))]
       (condp = type
-          :bridged (do (.attachToBridgedInterface adapter)
+          :bridged (do (.setAttachmentType adapter NetworkAttachmentType/Bridged)
                        ;; todo: get this from IHost.getNetworkInterfaces
-                       (.setHostInterface adapter interface))
-          :nat (.attachToNAT adapter)
-          :internal (.attachToInternalNetwork adapter)
-          :host-only (.attachToHostOnlyInterface adapter)
-          :vde (.attachToVDE adapter))
+                       (.setBridgedInterface adapter interface))
+          :nat (.setAttachmentType adapter NetworkAttachmentType/NAT)
+          :internal (.setAttachmentType adapter NetworkAttachmentType/Internal)
+          :host-only (.setAttachmentType adapter NetworkAttachmentType/HostOnly)
+          :generic (.setAttachmentType adapter NetworkAttachmentType/Generic)
       ;;todo -- raise a condition
-      )))
+      ))))
 
 (defn stop
   [^IConsole c]

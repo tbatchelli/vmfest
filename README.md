@@ -287,7 +287,7 @@ NOTE: This process has been greatly simplified with VMFest v0.2.3 and Pallet v0.
     (use 'pallet.compute)
     (use 'pallet.crate.automated-admin-user)
     (def service (compute-service-from-config-file :virtualbox))
-    (defnode test-node {:os-family :ubuntu :os-64-bit true} :bootstrap automated-amdin-user)
+    (defnode test-node {:os-family :ubuntu :os-64-bit true} :bootstrap automated-admin-user)
     (converge {test-node 1} :compute service)
        ;; Observe in the VirtualBox GUI that a new VM named test-node-0 has been created and started
        ;; Wait for the REPL to return and get the ip

@@ -73,6 +73,7 @@ Before we can instantiate an image, we need to install it as model image. To mak
 Once the model image is installed, you can create an instance off of it.
 
 ```clojure
+(update-models) ;; this will pick up all defined models.
 (def my-machine (instance my-server "bacug-machine" :vmfest-ubuntu-10-10-64bit-server :micro))
 ```
 

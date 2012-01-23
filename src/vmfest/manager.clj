@@ -330,18 +330,24 @@ VirtualBox"
   "Wait for the machine to be in a state which could be locked.
    Returns true if wait succeeds, nil otherwise."
   [m & [timout-in-ms]]
-  (let [end-time (+ (current-time-millis) timout-in-ms)]
+  (let [end-time (+ (current-time-millis) timout-in-ms)
+        unlocked? (fn []
+                    (let [state (or (try
+                                      (session/with-session
+                                        m :read [s _] (.getState s))
+                                      (catch Exception _))
+                                    SessionState/Locked)]
+                      (log/tracef
+                       "wait-for-lockable-session-state: state %s" state)
+                      (if (= SessionState/Locked state)
+                        (Thread/sleep 250)
+                        true)))]
     (loop []
-      (try
-        (let [state (session/with-session m :read [s _] (.getState s))]
-          (if  (not= SessionState/Locked state)
-            (if (< (current-time-millis) end-time)
-              (do
-                (log/tracef "wait-for-lockable-session-state: state %s" state)
-                (Thread/sleep 250)
-                (recur))
-              nil)
-            true))))))
+      (if (< (current-time-millis) end-time)
+        (if (unlocked?)
+          true
+          (recur))
+        nil))))
 
 (defn state [^Machine m]
   (session/with-no-session m [vb-m] (machine/state vb-m)))

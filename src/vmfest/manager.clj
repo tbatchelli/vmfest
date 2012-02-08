@@ -8,6 +8,7 @@
            [clojure.java.io :as io]
            vmfest.virtualbox.medium)
   (:use clojure.contrib.condition)
+  (:import vmfest.virtualbox.model.Machine)
   (:import org.virtualbox_4_0.SessionState java.io.File))
 
 (defn server [url & [identity credentials]]

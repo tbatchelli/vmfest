@@ -23,7 +23,7 @@
 
 (defn register [vbox image]
   (with-vbox vbox [_ vb]
-    (.openMedium vb image DeviceType/HardDisk AccessMode/ReadOnly)))
+    (.openMedium vb image DeviceType/HardDisk AccessMode/ReadOnly false)))
 
 (defn make-immutable [medium]
   (.setType medium MediumType/Immutable))
@@ -40,7 +40,7 @@
 
 (defn register-model [orig dest vbox]
   (with-vbox vbox [_ vb]
-    (let [orig-medium (.openMedium vb orig DeviceType/HardDisk AccessMode/ReadOnly)
+    (let [orig-medium (.openMedium vb orig DeviceType/HardDisk AccessMode/ReadOnly false)
           dest-medium (.createHardDisk vb "vdi" dest)
           progress (.cloneTo orig-medium dest-medium (long 0) nil)]
       (.waitForCompletion progress (Integer. -1)) ;; wait indefinitely for the cloning

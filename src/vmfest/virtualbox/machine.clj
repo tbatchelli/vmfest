@@ -408,7 +408,7 @@ See IVirtualbox::openRemoteSession for more details"
 (defn set-extra-data [^IMachine m key value]
   {:pre [(model/IMachine? m)]}
   (conditions/with-vbox-exception-translation
-    {:VBOX_E_FILE_ERROR "Sttings file not accessible."
+    {:VBOX_E_FILE_ERROR "Settings file not accessible."
      :VBOX_E_XML_ERROR "Could not parse the settings file."}
     (.setExtraData m key value)
     (.saveSettings m)))
@@ -456,4 +456,3 @@ See IVirtualbox::openRemoteSession for more details"
 (defn get-storage-controller-by-name [m name]
   {:pre [(model/IMachine? m)]}
   (.getStorageControllerByName m name))
-

@@ -13,7 +13,7 @@
 (def getters
   {:name #(.getName %)
    :description #(.getDescription %)
-   :acessible? #(.getAccessible %)
+   :accessible? #(.getAccessible %)
    :access-error #(.getAccessError %) ;; todo. get object
 ;;;   :os-type #(let [type-id (.getOSTypeId %)
 ;;;                  object (GuestOsType. type-id server)]

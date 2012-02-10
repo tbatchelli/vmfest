@@ -159,7 +159,8 @@
                      id-or-location)))))))
 
 (defn setup-model
-  "Download a disk image from `image-url` and register it with `vbox`."
+  "Download a disk image from `image-url` and register it with `vbox`. Returns a
+  map with at leasr `:model-name` and `:meta` keys."
   [image-url vbox & {:as options}]
   (let [job (apply prepare-job image-url vbox (reduce into [] options))]
     (log/info (str "About to execute job \n" (with-out-str (pprint job))))
@@ -176,11 +177,10 @@
             threaded-get-metadata
             threaded-register-model
             threaded-create-meta
-            threaded-cleanup-temp-files)
-        (keyword (:model-name job))))))
+            threaded-cleanup-temp-files)))))
 
 (comment
  (use 'vmfest.manager)
  (use 'vmfest.virtualbox.image)
  (def my-server (server "http://localhost:18083"))
- (setup-model "https://s3.amazonaws.com/vmfest-images/ubuntu-10-10-64bit-server.vdi.gz" my-server)) 
+ (setup-model "https://s3.amazonaws.com/vmfest-images/ubuntu-10-10-64bit-server.vdi.gz" my-server))

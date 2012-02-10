@@ -24,7 +24,9 @@ machines are stored in ~/.vmfest/nodes ."
   (:import [org.virtualbox_4_1
             SessionState
             HostNetworkInterfaceType
-            HostNetworkInterfaceStatus] java.io.File)
+            HostNetworkInterfaceStatus]
+           java.io.File
+           vmfest.virtualbox.model.Machine)
   (:import [java.net NetworkInterface InetAddress]))
 
 (defn server

@@ -163,13 +163,13 @@ e.g:
 
  (conditions/with-vbox-exception-translation
       {:E_INVALIDARG
-       "SATA device, SATA port, IDE port or IDE slot out of range."
+       \"SATA device, SATA port, IDE port or IDE slot out of range.\"
        :VBOX_E_INVALID_OBJECT_STATE
-       "Attempt to attach medium to an unregistered virtual machine."
+       \"Attempt to attach medium to an unregistered virtual machine.\"
        :VBOX_E_INVALID_VM_STATE
-       "Invalid machine state."
+       \"Invalid machine state.\"
        :VBOX_E_OBJECT_IN_USE
-       "Hard disk already attached to this or another virtual machine."}
+       \"Hard disk already attached to this or another virtual machine.\"}
       (.attachDevice m
                      name
                      (Integer. controller-port)

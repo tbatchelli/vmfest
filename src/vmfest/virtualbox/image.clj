@@ -160,7 +160,7 @@
 
 (defn setup-model
   "Download a disk image from `image-url` and register it with `vbox`. Returns a
-  map with at leasr `:model-name` and `:meta` keys."
+  map with at least `:model-name` and `:meta` keys."
   [image-url vbox & {:as options}]
   (let [job (apply prepare-job image-url vbox (reduce into [] options))]
     (log/info (str "About to execute job \n" (with-out-str (pprint job))))

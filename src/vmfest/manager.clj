@@ -19,7 +19,8 @@ machines are stored in ~/.vmfest/nodes ."
             [vmfest.virtualbox.image :as image]
             [clojure.tools.logging :as log]
             [clojure.java.io :as io]
-            vmfest.virtualbox.medium)
+            vmfest.virtualbox.medium
+            clojure.set)
   (:use [slingshot.slingshot :only [throw+ try+]])
   (:import [org.virtualbox_4_1
             SessionState
@@ -296,16 +297,29 @@ VirtualBox"
 
 
 (defn instance* [server name image machine & [base-folder]]
-   (when-not (and image machine)
-      (throw (RuntimeException. "Image or Machine not found")))
     (let [uuid (:uuid image)
           os-type-id (:os-type-id image)]
       (create-machine server name os-type-id machine uuid base-folder)))
 
-(defn instance [server name image-key machine-key & [base-folder]]
+(defn instance [server name image-key-or-map machine-key-or-map & [base-folder]]
   {:pre [(model/Server? server)]}
-  (let [image (image-key *images*)
-        config (machine-key *machine-models*)]
+  (let [image (if (keyword? image-key-or-map)
+                (image-key-or-map *images*)
+                image-key-or-map)
+        config (if (keyword? machine-key-or-map)
+                 (machine-key-or-map *machine-models*)
+                 machine-key-or-map)]
+    (when-not image
+      (throw (RuntimeException.
+              (format
+               "manager/instance: Image model is not valid or not found: %s."
+               image-key-or-map))))
+    (when-not config
+      (throw (RuntimeException.
+              (format
+               "manager/instance: Hardware model is not valid or not found: %s."
+                machine-key-or-map))))
+    (log/infof "Instantiating VM with image: %s hardware: %s" image config)
     (instance* server name image config base-folder)))
 
 ;;; machine control

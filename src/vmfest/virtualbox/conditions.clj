@@ -149,7 +149,34 @@
                  {k {:message v}}))
              message-map)))
 
-(defmacro with-vbox-exception-translation [type-to-condition-map & body]
+(defmacro with-vbox-exception-translation
+  "Runs the code in boxy and captures any exception thrown, providing
+a new exception with a message based on the provider
+`type-to-condition-map`. This allows wrapping virtualbox in clojure
+without leaking the underlying abstraction via exceptions.
+
+The inteneded use of this macro is wrapping a single virtualbox call.
+The possible error codes that a call to virtualbox can issue are
+described in the documentation.
+
+e.g:
+
+ (conditions/with-vbox-exception-translation
+      {:E_INVALIDARG
+       \"SATA device, SATA port, IDE port or IDE slot out of range.\"
+       :VBOX_E_INVALID_OBJECT_STATE
+       \"Attempt to attach medium to an unregistered virtual machine.\"
+       :VBOX_E_INVALID_VM_STATE
+       \"Invalid machine state.\"
+       :VBOX_E_OBJECT_IN_USE
+       \"Hard disk already attached to this or another virtual machine.\"}
+      (.attachDevice m
+                     name
+                     (Integer. controller-port)
+                     (Integer. device)
+                     type
+                     medium))"
+  [type-to-condition-map & body]
   `(try
      ~@body
      (catch VBoxException e#

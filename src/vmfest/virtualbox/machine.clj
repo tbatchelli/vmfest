@@ -1,20 +1,19 @@
 (ns vmfest.virtualbox.machine
-  (:use clojure.contrib.condition)
   (:require [clojure.tools.logging :as log]
             [vmfest.virtualbox.virtualbox :as virtualbox]
             [vmfest.virtualbox.conditions :as conditions]
             [vmfest.virtualbox.model :as model]
             [vmfest.virtualbox.enums :as enums]
             [vmfest.virtualbox.session :as session])
-  (:import [org.virtualbox_4_0 IMachine IConsole VBoxException
-            VirtualBoxManager IVirtualBox IMedium]
+  (:import [org.virtualbox_4_1 IMachine IConsole VBoxException
+            VirtualBoxManager IVirtualBox IMedium NetworkAttachmentType]
            [vmfest.virtualbox.model GuestOsType Machine]))
 
 
 (def getters
   {:name #(.getName %)
    :description #(.getDescription %)
-   :acessible? #(.getAccessible %)
+   :accessible? #(.getAccessible %)
    :access-error #(.getAccessError %) ;; todo. get object
 ;;;   :os-type #(let [type-id (.getOSTypeId %)
 ;;;                  object (GuestOsType. type-id server)]
@@ -185,8 +184,8 @@
                  (let [setter (get-setter k)]
                    (if setter
                      (setter v m)
-                     (log/error
-                      (str "IMachine has no setter defined for " k)))))]
+                     (log/errorf
+                      "IMachine has no setter defined for %s" k))))]
     (doall (map set-fn value-map))))
 
 (extend-type vmfest.virtualbox.model.Machine
@@ -247,7 +246,7 @@ See IVirtualbox::openRemoteSession for more details"
               (.launchVMProcess vb-m session session-type env)
               #_(.openRemoteSession vbox session machine-id session-type env)]
           (log/debug (str "start: Starting session for VM " machine-id "..."))
-          (.waitForCompletion progress 30000)
+          (.waitForCompletion progress (Integer. 30000))
           (let [result-code (.getResultCode progress)]
             (log/debugf "start: VM %s started with result code %s"
                                machine-id
@@ -274,6 +273,8 @@ See IVirtualbox::openRemoteSession for more details"
        e
        {:message "An error occurred while saving a machine"}))))
 
+
+;; TODO: This is redundant with machine-config/add-storage-controller
 (defn add-storage-controller  [m name bus-type]
   {:pre [(model/IMachine? m)
          name
@@ -285,7 +286,7 @@ See IVirtualbox::openRemoteSession for more details"
        :E_INVALIDARG "Invalid controllerType."}
       (.addStorageController m name bus))))
 
-(defn attach-device [m name controller-port device device-type medium]
+#_(defn attach-device [m name controller-port device device-type medium]
   {:pre [(model/IMachine? m)
          name controller-port device
          (instance? IMedium medium)
@@ -300,7 +301,12 @@ See IVirtualbox::openRemoteSession for more details"
        "Invalid machine state."
        :VBOX_E_OBJECT_IN_USE
        "Hard disk already attached to this or another virtual machine."}
-      (.attachDevice m name controller-port device type medium))))
+      (.attachDevice m
+                     name
+                     (Integer. controller-port)
+                     (Integer. device)
+                     type
+                     medium))))
 
 (defn set-network-adapter [m port type interface]
   {:pre [(model/IMachine? m)
@@ -309,15 +315,14 @@ See IVirtualbox::openRemoteSession for more details"
   (try
     (if-let [adapter (.getNetworkAdapter m (long port))]
       (condp = type
-          :bridged (do (.attachToBridgedInterface adapter)
-                       ;; todo: get this from IHost.getNetworkInterfaces
-                       (.setHostInterface adapter interface))
-          :nat (.attachToNAT adapter)
-          :internal (.attachToInternalNetwork adapter)
-          :host-only (.attachToHostOnlyInterface adapter)
-          :vde (.attachToVDE adapter))
-      ;;todo -- raise a condition
-      )))
+        :bridged (do (.setAttachmentType adapter NetworkAttachmentType/Bridged)
+                     (.setBridgedInterface adapter interface))
+        :nat (.setAttachmentType adapter NetworkAttachmentType/NAT)
+        :internal (.setAttachmentType adapter NetworkAttachmentType/Internal)
+        :host-only (.setAttachmentType adapter NetworkAttachmentType/HostOnly)
+        :generic (.setAttachmentType adapter NetworkAttachmentType/Generic)
+        ;;todo -- raise a condition
+      ))))
 
 (defn stop
   [^IConsole c]
@@ -351,7 +356,7 @@ See IVirtualbox::openRemoteSession for more details"
     {:VBOX_E_INVALID_VM_STATE
      "Virtual machine must be Running, Paused or Stuck to be powered down."}
     (let [progress (.powerDown c)]
-      (.waitForCompletion progress 30000))))
+      (.waitForCompletion progress (Integer. 30000)))))
 
 
 ;; ==== DELETE WHEN CONFIRMED IT IS NOT NEEDED ANYMORE =====
@@ -367,7 +372,8 @@ See IVirtualbox::openRemoteSession for more details"
                "device:" device)
       (println "controller:" (.getController medium-attachment))
       (try
-        (.detachDevice vb-m name controller-port device)
+        (.detachDevice vb-m name (Integer. controller-port)
+                       (Ingteger. device))
         (catch Exception e (println e))))))
 
 #_(defn delete-storage [medium-attachment]
@@ -402,7 +408,7 @@ See IVirtualbox::openRemoteSession for more details"
 (defn set-extra-data [^IMachine m key value]
   {:pre [(model/IMachine? m)]}
   (conditions/with-vbox-exception-translation
-    {:VBOX_E_FILE_ERROR "Sttings file not accessible."
+    {:VBOX_E_FILE_ERROR "Settings file not accessible."
      :VBOX_E_XML_ERROR "Could not parse the settings file."}
     (.setExtraData m key value)
     (.saveSettings m)))
@@ -446,3 +452,7 @@ See IVirtualbox::openRemoteSession for more details"
 (defn state [^IMachine vb-m]
   {:pre [(model/IMachine? vb-m)]}
   (enums/machine-state-to-key (.getState vb-m)))
+
+(defn get-storage-controller-by-name [m name]
+  {:pre [(model/IMachine? m)]}
+  (.getStorageControllerByName m name))

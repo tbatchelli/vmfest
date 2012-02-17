@@ -1,10 +1,12 @@
 (ns vmfest.virtualbox.image
   (:use [clojure.java.io]
         [vmfest.virtualbox.session :only (with-vbox)]
-        [clojure.pprint :only (pprint)])
+        [clojure.pprint :only (pprint)]
+        [vmfest.virtualbox.virtualbox :only (find-medium)])
   (:require [clojure.tools.logging :as log]
-            [clojure.contrib.str-utils2 :as string])
-  (:import [org.virtualbox_4_0 DeviceType AccessMode MediumVariant
+            [clojure.string :as string]
+            [vmfest.virtualbox.enums :as enums])
+  (:import [org.virtualbox_4_1 DeviceType AccessMode MediumVariant
             MediumType]
            [java.util.zip GZIPInputStream]
            [java.io File]))
@@ -21,7 +23,7 @@
 
 (defn register [vbox image]
   (with-vbox vbox [_ vb]
-    (.openMedium vb image DeviceType/HardDisk AccessMode/ReadOnly)))
+    (.openMedium vb image DeviceType/HardDisk AccessMode/ReadOnly false)))
 
 (defn make-immutable [medium]
   (.setType medium MediumType/Immutable))
@@ -38,10 +40,10 @@
 
 (defn register-model [orig dest vbox]
   (with-vbox vbox [_ vb]
-    (let [orig-medium (.openMedium vb orig DeviceType/HardDisk AccessMode/ReadOnly)
+    (let [orig-medium (.openMedium vb orig DeviceType/HardDisk AccessMode/ReadOnly false)
           dest-medium (.createHardDisk vb "vdi" dest)
           progress (.cloneTo orig-medium dest-medium (long 0) nil)]
-      (.waitForCompletion progress -1) ;; wait indefinitely for the cloning
+      (.waitForCompletion progress (Integer. -1)) ;; wait indefinitely for the cloning
       (make-immutable dest-medium)
       (.close orig-medium) ;; otherwise the origina medium would remain registered
       )))
@@ -63,15 +65,16 @@
 
 (defn prepare-job
   [image-url vbox
-   & {:keys [model-name temp-dir meta-file-name meta-url meta model-file-name models-dir]
+   & {:keys [model-name temp-dir meta-file-name meta-url meta model-file-name model-path]
       :as options}]
   (let [[directory image-file-name] (directory-and-file-name-from-url image-url)
         image-name (file-name-without-extensions image-file-name)
         gzipped? (.endsWith image-file-name ".gz")
-        model-name (str "vmfest-" (or model-name image-name))
+        model-name (or model-name image-name)
+        model-unique-name (str "vmfest-" model-name)
         meta-url (or meta-url (str directory (or meta-file-name (str image-name ".meta"))))
-        temp-dir (make-temp-dir model-name)
-        models-dir (or models-dir (str (System/getProperty "user.home")
+        temp-dir (make-temp-dir model-unique-name)
+        model-path (or model-path (str (System/getProperty "user.home")
                                      File/separator
                                      ".vmfest/models"))]
     {:image-url image-url
@@ -80,16 +83,16 @@
      :gzipped-image-file (str temp-dir File/separator image-file-name)
      :image-file (str temp-dir File/separator image-name ".vdi")
      :model-name model-name
-     :models-dir models-dir
-     :model-file (str models-dir File/separator model-name ".vdi")
-     :model-meta (str models-dir File/separator model-name ".meta")
+     :model-path model-path
+     :model-file (str model-path File/separator model-unique-name ".vdi")
+     :model-meta (str model-path File/separator model-unique-name ".meta")
      :temp-dir temp-dir
      :meta meta
      :meta-url (when-not meta meta-url)
      :image-name image-name
      :vbox vbox}))
 
-(def *dry-run* false)
+(def ^:dynamic *dry-run* false)
 
 (defn threaded-download
   [{:keys [model-name image-url gzipped? gzipped-image-file image-file] :as options}]
@@ -143,8 +146,21 @@
   (delete-file image-file true)
   options)
 
+(defn valid-model? [vbox id-or-location]
+  ;; is the image registered?
+  (let [medium (find-medium vbox id-or-location)]
+    (if-not medium
+      (throw (RuntimeException. (str "This model's image is not registered in VirtualBox: " id-or-location))))
+    ;; is the image immutable?
+    (let [type (enums/medium-type-type-to-key (.getType medium))]
+      (if-not (or (= type :immutable) (= type :multi-attach))
+        (throw (RuntimeException.
+                (str "This model's image is not immutable nor multi-attach: "
+                     id-or-location)))))))
+
 (defn setup-model
-  "Download a disk image from `image-url` and register it with `vbox`."
+  "Download a disk image from `image-url` and register it with `vbox`. Returns a
+  map with at least `:model-name` and `:meta` keys."
   [image-url vbox & {:as options}]
   (let [job (apply prepare-job image-url vbox (reduce into [] options))]
     (log/info (str "About to execute job \n" (with-out-str (pprint job))))
@@ -154,16 +170,17 @@
         "Model %s already exists. Manually specifiy another file name with :model-name"
         (:model-file job) (:temp-dir job)
         false))
-      (-> job
-          threaded-download
-          threaded-gunzip
-          threaded-get-metadata
-          threaded-register-model
-          threaded-create-meta
-          threaded-cleanup-temp-files))))
+      (do
+        (-> job
+            threaded-download
+            threaded-gunzip
+            threaded-get-metadata
+            threaded-register-model
+            threaded-create-meta
+            threaded-cleanup-temp-files)))))
 
 (comment
  (use 'vmfest.manager)
  (use 'vmfest.virtualbox.image)
  (def my-server (server "http://localhost:18083"))
- (setup-model "https://s3.amazonaws.com/vmfest-images/ubuntu-10-10-64bit-server.vdi.gz" my-server)) 
+ (setup-model "https://s3.amazonaws.com/vmfest-images/ubuntu-10-10-64bit-server.vdi.gz" my-server))

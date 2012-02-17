@@ -3,3 +3,7 @@ lib
 classes
 *.jar
 docs
+.emacs*
+.lein*
+log
+src/log4j.xml

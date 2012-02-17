@@ -1,16 +1,38 @@
 (ns vmfest.manager
-  (:require [vmfest.virtualbox.virtualbox :as vbox]
-           [vmfest.virtualbox.machine :as machine]
-           [vmfest.virtualbox.session :as session]
-           [vmfest.virtualbox.model :as model]
-           [clojure.contrib.condition :as condition]
-           [clojure.tools.logging :as log]
-           [clojure.java.io :as io]
-           vmfest.virtualbox.medium)
-  (:use clojure.contrib.condition)
-  (:import org.virtualbox_4_0.SessionState java.io.File))
+  "High level API for VMFest. If you don't want to do anything too fancy, start here.
 
-(defn server [url & [identity credentials]]
+   Manager provides a cloud-like interface to vmfest. You can set it
+up with a number of model images that later can be used to create
+ephemeral machines that will boot from those model images. Many
+machines, all based on those models. An ephemeral machine will see its
+boot HD reset when it is stopped, so they're always guaranteed to
+reboot to a fresh state. Also, destroying a machine will remove any
+trace of it ever having existed.
+
+By default, image models are stored in ~/.vmfest/models and the instantiated
+machines are stored in ~/.vmfest/nodes ."
+  (:require [vmfest.virtualbox.virtualbox :as vbox]
+            [vmfest.virtualbox.machine :as machine]
+            [vmfest.virtualbox.machine-config :as machine-config]
+            [vmfest.virtualbox.session :as session]
+            [vmfest.virtualbox.model :as model]
+            [vmfest.virtualbox.image :as image]
+            [clojure.tools.logging :as log]
+            [clojure.java.io :as io]
+            vmfest.virtualbox.medium
+            clojure.set)
+  (:use [slingshot.slingshot :only [throw+ try+]])
+  (:import [org.virtualbox_4_1
+            SessionState
+            HostNetworkInterfaceType
+            HostNetworkInterfaceStatus]
+           java.io.File
+           vmfest.virtualbox.model.Machine)
+  (:import [java.net NetworkInterface InetAddress]))
+
+(defn server
+  "Builds a connection definition to the VM Host"
+  [url & [identity credentials]]
   (vmfest.virtualbox.model.Server. url (or identity "") (or credentials "")))
 
 (def user-home (System/getProperty "user.home"))
@@ -25,65 +47,40 @@
   [& {:keys [home] :or {home user-home}}]
   (.getPath (io/file home ".vmfest" "nodes")))
 
+;; In the future, vmfest will be able to handle more than just one VM
+;; host. *locations* will hold the locations. For now, it only holds
+;; one location: local.
 (def ^{:dynamic true} *locations*
   {:local {:model-path (default-model-path)
            :node-path (default-node-path)}})
 
+;; current location. See *locations*
 (def ^{:dynamic true} *location* (:local *locations*))
 
-;; machine configuration stuff
 
-(defn add-ide-controller [m]
-  {:pre [(model/IMachine? m)]}
-  (machine/add-storage-controller m "IDE Controller" :ide))
+(defn get-ip
+  "Gets the IP Address of a machine, if available. It does so by
+  querying the first ethernet interface (interface 0)"
+  [machine]
+  {:pre
+   [(model/Machine? machine)]}
+  (try
+    (session/with-session machine :shared [session _]
+      (machine/get-guest-property
+       (.getConsole session)
+       "/VirtualBox/GuestInfo/Net/0/V4/IP"))
+    (catch org.virtualbox_4_1.VBoxException e
+      (throw (RuntimeException. e)))))
 
-(defn attach-device [m name controller-port device device-type uuid]
-  {:pre [(model/IMachine? m)]}
-  (machine/attach-device m name controller-port device device-type uuid))
-
-(defn set-bridged-network [m interface]
-  {:pre [(model/IMachine? m)]}
-  (machine/set-network-adapter m 0 :bridged interface)
-  (.saveSettings m))
-
-(defn configure-machine [vb-m param-map]
-  {:pre [(model/IMachine? vb-m)]}
-  (machine/set-map vb-m param-map)
-  (.saveSettings vb-m))
-
-(defn basic-config [m]
-  {:pre [(model/IMachine? m)]}
-  (let [parameters
-        {:memory-size 512
-         :cpu-count 1}]
-    (configure-machine m parameters)
-    (set-bridged-network m "en1: AirPort 2")
-    (add-ide-controller m)))
-
-(defn attach-hard-disk [m uuid]
-  {:pre [(model/Machine? m)]}
-  (session/with-vbox (:server m) [_ vbox]
-    (let [medium (vbox/find-medium vbox uuid)]
-      (session/with-session m :shared [_ vb-m]
-        (try
-          (attach-device vb-m "SATA Controller" 0 0 :hard-disk medium)
-          (catch clojure.contrib.condition.Condition _
-            (attach-device vb-m "IDE Controller" 0 0 :hard-disk medium)))
-        (.saveSettings vb-m)))))
-
-(defn get-ip [machine]
-  {:pre [(model/Machine? machine)]}
-  (session/with-session machine :shared [session _]
-    (machine/get-guest-property
-     (.getConsole session)
-     "/VirtualBox/GuestInfo/Net/0/V4/IP")))
-
-(defn set-extra-data [machine key value]
+(defn set-extra-data
+  "Adds metadata to a machine, in the form of a key, value pair"
+  [machine key value]
   {:pre [(model/Machine? machine)]}
   (session/with-session machine :write [_ vb-m]
     (machine/set-extra-data vb-m key value)))
 
 (defn get-extra-data [machine key]
+  "Gets metadata from a machine by its key"
   {:pre [(model/Machine? machine)]}
   (log/tracef "get-extra-data: getting extra data for %s %s" (:id machine) key)
   (session/with-no-session machine [vb-m]
@@ -93,24 +90,111 @@
   (session/with-no-session machine [m]
     (machine/get-attribute m key)))
 
+
+;;; host functions
+
+(defn get-usable-network-interfaces-from-vbox
+  "Finds what host network interfaces are usable for bridging
+  according to VirtualBox. It excludes the ones that are either not of
+  type Bridged or they are not up. Returns a sequence of interfaces as
+  maps with:
+  [:name :os-name :ip-address :status :interface-type :medium-type].
+
+Note: :os-name is how vbox identifies the host network interfaces."
+  [server]
+  (session/with-vbox server [vbox mgr]
+    (let [os-interface-name
+          ;; needed because of how OSX adds a name to the OS i/f name
+          ;; e.g. "en1: Airport" vs. "en1"
+          (fn [name]
+            (let [index  (.indexOf name ":")]
+              (if (> index 0)
+                (.substring name 0 index)
+                name)))
+          all-interfaces
+          (map (fn [ni] {:name (.getName ni) ;; the full OSX name
+                        :os-name (os-interface-name (.getName ni))
+                        :ip-address (.getIPAddress ni)
+                        :status (.getStatus ni)
+                        :interface-type (.getInterfaceType ni)
+                        :medium-type (.getMediumType ni)})
+               (.getNetworkInterfaces (.getHost mgr)))
+          usable? ;; determine if an I/F is usable
+          (fn [if]
+            (and
+             (= (:interface-type if) HostNetworkInterfaceType/Bridged)
+             (= (:status if) HostNetworkInterfaceStatus/Up)))]
+      (doall (filter usable? all-interfaces)) ;; force execution
+      )))
+
+(defn get-usable-network-interfaces-from-java
+  "Finds what host network interfaces are usable for bridging according
+to the JVM. This excludes interfaces that have no reachable ip addresses,
+or that are either loopback, virtual or point-to-point.
+
+Returns a sequence of interfaces as maps containing:
+  [:name :ip-addresses :virtual? :loopback? :point-to-point? :up?]
+  where :ip-addresses is a sequence of maps with
+  [:ip-address :reachable?]." []
+  (let [any-reachable? (fn [ips]
+                         (some true? (map :reachable? ips)))
+        nis (enumeration-seq (NetworkInterface/getNetworkInterfaces))
+        ni-infos
+        (map (fn [ni]
+               (let [ip-addresses (enumeration-seq (.getInetAddresses ni))
+                     ip-info (map
+                              (fn [ip]
+                                {:ip-address ip
+                                 :reachable? (.isReachable ip 1000)})
+                              ip-addresses)]
+                 {:name (.getName ni)
+                  :ip-addresses ip-info
+                  :virtual? (.isVirtual ni)
+                  :loopback? (.isLoopback ni)
+                  :point-to-point? (.isPointToPoint ni)
+                  :up? (.isUp ni)}))
+             nis)
+        usable?
+        (fn [if]
+          (and (not (or (:virtual? if)
+                        (:loopback? if)
+                        (:point-to-point? if)
+                        (not (:up? if))))
+               (any-reachable? (:ip-addresses if))))]
+    (filter usable? ni-infos)))
+
+(defn find-usable-network-interface
+  "Provides a list of interface names that are usable for bridging in
+VirtualBox"
+  [server]
+  (let [vbox-ifs(get-usable-network-interfaces-from-vbox server)
+        usable-by-vbox ;; only their names
+        (into #{} (map :os-name vbox-ifs))
+        usable-by-java ;; only their names
+        (into #{}
+              (map :name (get-usable-network-interfaces-from-java)))
+        usable-by-both ;; only their names
+        (clojure.set/intersection usable-by-vbox usable-by-java)
+        find-interface-by-os-name (fn [ifs os-name]
+                  (first (filter #(= (:os-name %) os-name) ifs)))]
+    (map #(:name (find-interface-by-os-name vbox-ifs %)) usable-by-both)))
+
 ;;; jclouds/pallet-style infrastructure
 
+;; These are the hardware models to be instantiated. 
 (def ^{:dynamic true} *machine-models*
-  {:micro basic-config})
+  {:micro
+   {:memory-size 512
+    :cpu-count 1
+    :network [{:attachment-type :host-only
+               :host-only-interface "vboxnet0"}
+              {:attachment-type :nat}]
+    :storage [{:name "IDE Controller"
+               :bus :ide
+               :devices [nil nil {:device-type :dvd} nil]}]
+    :boot-mount-point ["IDE Controller" 0]}})
 
-(def ^{:dynamic true} *images* nil
-  #_{:cent-os-5-5
-   {:description "CentOS 5.5 32bit"
-    :uuid "/Users/tbatchelli/Library/VirtualBox/HardDisks/Test1.vdi"
-    :os-type-id "RedHat"}
-   :ubuntu-10-10-64bit
-   {:description "Ubuntu 10.10 64bit"
-    :uuid "/Users/tbatchelli/VBOX-HDS/Ubuntu-10-10-64bit.vdi"
-    :os-type-id "Ubuntu_64"}
-   :cloned
-   {:description "Ubuntu 10.10 64bit"
-    :uuid "/tmp/clone3.vdi"
-    :os-type-id "Ubuntu_64"}})
+(def ^{:dynamic true} *images* nil)
 
 (defn fs-dir [path]
   (seq (.listFiles (java.io.File. path))))
@@ -135,15 +219,57 @@
   [& {:keys [model-path] :or {model-path (:model-path *location*)}}]
   (alter-var-root #'*images* (fn [_] (load-models :model-path model-path))))
 
+(defn models
+  [& {:keys [model-path] :or {model-path (:model-path *location*)}}]
+  (keys (update-models :model-path model-path)))
+
+(defn model-info
+  [model-key & {:keys [model-path] :or {model-path (:model-path *location*)}}]
+  (model-key (update-models :model-pathmodel-path)))
+
+(defn check-model
+  [server model-key & {:keys [model-path]
+                       :or {model-path (:model-path *location*)}}]
+  (let [model-id (:uuid (model-key (update-models :model-path model-path)))]
+    (session/with-vbox server [_ vbox]
+      (image/valid-model? vbox model-id))))
+
 ;; force an model DB update
 ;; (update-models)
 
+(defn mount-boot-image
+  "For a machine configuration with an entry :boot-mount-point
+  containing a vector [<storage bus name> <device id>], it will
+  configure the machine so that the supplied HardDisk image is mounted
+  in said bus and device id. Returns an updated machine configuration map"
+  [config image-uuid]
+  ;; TODO: This needs unit testing!
+  (if-let [[storage-bus-name device-id] (:boot-mount-point config)]
+    (let [boot-disk-config  {:device-type :hard-disk
+                             :location image-uuid
+                             :attachment-type :multi-attach}
+          image-mounter (fn [{:keys [name] :as storage-bus}]
+                          ;; When the storage bus is named with
+                          ;; storage-bus-name, mount the image in the
+                          ;; right device
+                          (if (= name storage-bus-name)
+                            ;; this is the controller: add image to devices
+                            (update-in storage-bus
+                                       [:devices]
+                                       #(assoc %1 device-id boot-disk-config))
+                            ;; not the right controller. Leave it as is.
+                            storage-bus))]
+      (update-in config [:storage] #(map image-mounter %1)))
+    (do
+      (log/warnf "Image not mounted. No mount point found for %s." config)
+      config)))
+
 (defn create-machine
-  [server name os-type-id config-fn image-uuid & [base-folder]]
+  [server name os-type-id config image-uuid & [base-folder]]
   {:pre [(model/Server? server)]}
   (when-let [f (or base-folder (:node-path *location*))]
     (when-not (.exists (io/file f))
-      (condition/raise
+      (throw+
        :type :path-not-found
        :message (format "Path for saving nodes doesn't exist: %s" f))))
   (let [m (session/with-vbox server [_ vbox]
@@ -154,23 +280,47 @@
                            true ;; overwrite whatever previous
                            ;; definition was there
                            (or base-folder (:node-path *location*)))]
-              (config-fn machine)
+              (machine-config/configure-machine machine config)
               (machine/save-settings machine)
               (vbox/register-machine vbox machine)
               (vmfest.virtualbox.model.Machine. (.getId machine) server nil)))]
-    ;; can't set the drive
-    (attach-hard-disk m image-uuid)
+    ;; Configure the storage buses in the machine
+    (let [boot-image-mounted-config ;; first mount the image if needed
+          (mount-boot-image config image-uuid)]
+      (log/debugf "Configuring storage for %s" boot-image-mounted-config)
+      (session/with-vbox server [_ vbox]
+        (session/with-session m :shared [_ vb-m]
+          (machine-config/configure-machine-storage
+           vb-m boot-image-mounted-config)
+          (machine/save-settings vb-m))))
     m))
 
-(defn instance [server name image-key machine-key & [base-folder]]
-  {:pre [(model/Server? server)]}
-  (let [image (image-key *images*)
-        config-fn (machine-key *machine-models*)]
-    (when-not (and image config-fn)
-      (throw (RuntimeException. "Image or Machine not found")))
+
+(defn instance* [server name image machine & [base-folder]]
     (let [uuid (:uuid image)
           os-type-id (:os-type-id image)]
-      (create-machine server name os-type-id config-fn uuid base-folder))))
+      (create-machine server name os-type-id machine uuid base-folder)))
+
+(defn instance [server name image-key-or-map machine-key-or-map & [base-folder]]
+  {:pre [(model/Server? server)]}
+  (let [image (if (keyword? image-key-or-map)
+                (image-key-or-map *images*)
+                image-key-or-map)
+        config (if (keyword? machine-key-or-map)
+                 (machine-key-or-map *machine-models*)
+                 machine-key-or-map)]
+    (when-not image
+      (throw (RuntimeException.
+              (format
+               "manager/instance: Image model is not valid or not found: %s."
+               image-key-or-map))))
+    (when-not config
+      (throw (RuntimeException.
+              (format
+               "manager/instance: Hardware model is not valid or not found: %s."
+                machine-key-or-map))))
+    (log/infof "Instantiating VM with image: %s hardware: %s" image config)
+    (instance* server name image config base-folder)))
 
 ;;; machine control
 (defn current-time-millis []
@@ -196,17 +346,24 @@
   "Wait for the machine to be in a state which could be locked.
    Returns true if wait succeeds, nil otherwise."
   [m & [timout-in-ms]]
-  (let [end-time (+ (current-time-millis) timout-in-ms)]
+  (let [end-time (+ (current-time-millis) timout-in-ms)
+        unlocked? (fn []
+                    (let [state (or (try
+                                      (session/with-session
+                                        m :read [s _] (.getState s))
+                                      (catch Exception _))
+                                    SessionState/Locked)]
+                      (log/tracef
+                       "wait-for-lockable-session-state: state %s" state)
+                      (if (= SessionState/Locked state)
+                        (Thread/sleep 250)
+                        true)))]
     (loop []
-      (let [state (session/with-session m :write [s _] (.getState s))]
-        (if  (not= SessionState/Locked state)
-          (if (< (current-time-millis) end-time)
-            (do
-              (log/tracef "wait-for-lockable-session-state: state %s" state)
-              (Thread/sleep 250)
-              (recur))
-            nil)
-          true)))))
+      (if (< (current-time-millis) end-time)
+        (if (unlocked?)
+          true
+          (recur))
+        nil))))
 
 (defn state [^Machine m]
   (session/with-no-session m [vb-m] (machine/state vb-m)))
@@ -240,27 +397,11 @@
 (defn power-down
   [^Machine m]
   {:pre [(model/Machine? m)]}
-  (handler-case :type
+  (try+
     (session/with-session m :shared [s _]
       (machine/power-down (.getConsole s)))
-    (handle :vbox-runtime
+    (catch [:type :vbox-runtime] _
       (log/warn "Trying to stop an already stopped machine"))))
-
-;; just keeping the code around in case the new implementation using
-;; the new vbox 4.0 clean-up features don't work as expected.
-;; toni 20110213
-#_(defn destroy [machine]
-  (let [vbox (:server machine)]
-    (try
-      (let [settings-file (get-machine-attribute machine :settings-file-path)]
-        (let [progress (power-down machine)]
-          (when progress
-            (.waitForCompletion progress -1)))
-        (session/with-session machine :write [_ vb-m]
-          (machine/remove-all-media vb-m))
-        (session/with-vbox vbox [_ vbox]
-          (vbox/unregister-machine vbox machine))
-        (.delete (java.io.File. settings-file))))))
 
 (defn destroy [machine]
   {:pre [(model/Machine? machine)]}

@@ -1,9 +1,11 @@
 (ns vmfest.virtualbox.enums
   (:require [clojure.tools.logging :as log])
   (:import
-   [org.virtualbox_4_0 IMachine MachineState ClipboardMode PointingHidType
+   [org.virtualbox_4_1 IMachine MachineState ClipboardMode PointingHidType
     FirmwareType KeyboardHidType SessionState SessionType StorageBus
-    DeviceType NetworkAttachmentType CleanupMode]))
+    DeviceType NetworkAttachmentType CleanupMode StorageControllerType
+    MediumType HostNetworkInterfaceType]))
+
 
 (defmacro find-key-by-value [value table]
   `(let [[v# k# _#] (first (filter (fn [[v# _# _#]] (= ~value v#)) ~table))]
@@ -141,6 +143,21 @@
 (defn key-to-storage-bus [key]
   (find-value-by-key key storage-bus-to-key-table))
 
+(def storage-controller-type-to-key-table
+  [[StorageControllerType/LsiLogic :lsi-logic ""]
+   [StorageControllerType/BusLogic :bus-logic ""]
+   [StorageControllerType/IntelAhci :intel-ahci ""]
+   [StorageControllerType/Null :null ""]
+   [StorageControllerType/PIIX3 :piix3 ""]
+   [StorageControllerType/PIIX4 :piix4 ""]
+   [StorageControllerType/ICH6 :ich6 ""]
+   [StorageControllerType/I82078 :i82087 ""]
+   [StorageControllerType/LsiLogicSas :lsi-logic-sas ""]])
+(defn storage-controller-type-to-key [type]
+  (find-key-by-value type storage-controller-type-to-key-table))
+(defn key-to-storage-controller-type [key]
+  (find-value-by-key key storage-controller-type-to-key-table))
+
 ;;; DeviceType
 (def device-type-to-key-table
   [[DeviceType/Null
@@ -163,11 +180,39 @@
    [NetworkAttachmentType/Bridged :bridged ""]
    [NetworkAttachmentType/Internal :internal ""]
    [NetworkAttachmentType/HostOnly :host-only ""]
-   [NetworkAttachmentType/VDE :vde ""]])
+   [NetworkAttachmentType/Generic :generic ""]])
 (defn network-attachment-type-to-key [type]
   (find-key-by-value type network-attachment-type-to-key-table))
 (defn key-to-network-attachment-type [key]
   (find-value-by-key key network-attachment-type-to-key-table))
+
+;;; MediumType
+(def medium-type-type-to-key-table
+  [[MediumType/Immutable :immutable
+    "Normal medium (attached directly or indirectly, preserved when taking snapshots)."]
+   [MediumType/Normal :normal
+    "Normal medium (attached directly or indirectly, preserved when taking snapshots)."]
+   [MediumType/Writethrough :write-through
+    "Write through medium (attached directly, ignored when taking snapshots)."]
+   [MediumType/Shareable :shareable
+    "Allow using this medium concurrently by several machines."]
+   [MediumType/Readonly :readonly
+    "A readonly medium, which can of course be used by several machines." ]
+   [MediumType/MultiAttach :multi-attach
+    "A medium which is is indirectly attached, so that one base medium can be used for several VMs which have their own differencing medium to store their modifications. In some sense a variant of Immutable with unset AutoReset flag in each differencing medium."]])
+(defn medium-type-type-to-key [type]
+  (find-key-by-value type medium-type-type-to-key-table))
+(defn key-to-medium-type-type [key]
+  (find-value-by-key key medium-type-type-to-key-table))
+
+(def host-network-interface-type-to-key-table
+  [[HostNetworkInterfaceType/Bridged :bridged ""]
+   [HostNetworkInterfaceType/HostOnly :host-only ""]])
+(defn host-network-interface-type-to-key [type]
+  (find-key-by-value type host-network-interface-type-to-key-table))
+(defn key-to-host-network-interface-type [key]
+  (find-value-by-key key host-network-interface-type-to-key-table))
+
 
 ;;; CleanupMode
 (def cleanup-mode-type-to-key-table

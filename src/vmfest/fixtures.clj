@@ -2,20 +2,22 @@
   (:require [vmfest.virtualbox.virtualbox :as vbox]
             [vmfest.virtualbox.machine :as machine]
             [vmfest.virtualbox.model :as model])
-  (:use [clojure.contrib.io :only (delete-file-recursively)]
+  (:use [fs.core :only (delete-dir)]
         vmfest.virtualbox.session)
   (:import [vmfest.virtualbox.model Server Machine]))
 
-(def *dir* "/tmp/vbox-tests")
-(def *url* "http://localhost:18083")
-(def *username* "")
-(def *password* "")
-(def *server* (Server. *url* *username* *password*))
-(def *test-machine-name* "test-created-machine")
+(def ^:dynamic *dir* "/tmp/vbox-tests")
+(def ^:dynamic *url* "http://localhost:18083")
+(def ^:dynamic *username* "")
+(def ^:dynamic *password* "")
+(def ^:dynamic *server* (Server. *url* *username* *password*))
+(def ^:dynamic *test-machine-name* "test-created-machine")
 
 (defn initialize-test-dir []
   (clojure.java.io/make-parents *dir*)
-  (delete-file-recursively *dir*))
+  (try
+    (delete-dir *dir*)
+    (catch Exception e)))
 
 (defn get-new-test-machine
   ([]

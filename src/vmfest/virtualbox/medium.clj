@@ -3,7 +3,7 @@
             [vmfest.virtualbox.virtualbox :as virtualbox]
             [vmfest.virtualbox.conditions :as conditions]
             [vmfest.virtualbox.session :as session])
-  (:import [org.virtualbox_4_0 IMedium]))
+  (:import [org.virtualbox_4_1 IMedium]))
 
 (defn map-from-IMedium
   [^IMedium m server]

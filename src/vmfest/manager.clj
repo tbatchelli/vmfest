@@ -58,17 +58,26 @@ machines are stored in ~/.vmfest/nodes ."
 (def ^{:dynamic true} *location* (:local *locations*))
 
 
+(defn get-machine-attribute [machine key]
+  (session/with-no-session machine [m]
+    (machine/get-attribute m key)))
+
 (defn get-ip
-  "Gets the IP Address of a machine, if available. It does so by
-  querying the first ethernet interface (interface 0)"
-  [machine]
-  {:pre
-   [(model/Machine? machine)]}
+  "Gets the IP Address of network card in the slot in the position
+  specified by 'slot' (0 indexed). If no slot is specified, it will
+  use 0.
+"
+  [machine & {:keys [slot] :or {slot 0}}]
+  {:pre [(model/Machine? machine)]}
+  (log/tracef "Getting IP address slot %s in machine \"%s\""
+          slot (get-machine-attribute machine :name))
   (try
     (session/with-session machine :shared [session _]
       (machine/get-guest-property
        (.getConsole session)
-       "/VirtualBox/GuestInfo/Net/0/V4/IP"))
+       (format
+        "/VirtualBox/GuestInfo/Net/%s/V4/IP"
+        slot)))
     (catch org.virtualbox_4_1.VBoxException e
       (throw (RuntimeException. e)))))
 
@@ -86,9 +95,6 @@ machines are stored in ~/.vmfest/nodes ."
   (session/with-no-session machine [vb-m]
     (machine/get-extra-data vb-m key)))
 
-(defn get-machine-attribute [machine key]
-  (session/with-no-session machine [m]
-    (machine/get-attribute m key)))
 
 
 ;;; host functions

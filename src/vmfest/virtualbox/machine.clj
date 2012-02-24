@@ -74,9 +74,9 @@
    ;;   :io-bandwidth-max #(.getIoBandwidthMax %)
    })
 
-(defn get-attribute [vb-m key]
+(defn get-attribute [vb-m getter-key]
   {:pre (model/IMachine? vb-m)}
-  (when-let [getter (key getters)]
+  (when-let [getter (getter-key getters)]
     (getter vb-m)))
 
 (defn map-from-IMachine

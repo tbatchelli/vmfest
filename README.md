@@ -31,7 +31,33 @@ $ VBoxManage setproperty websrvauthlibrary null
 
 ### Installing a Model Image
 
-Before we can instantiate n image, we need to install it as model image. To make things easy I have published a model image (more to come). The following will download an install an ubuntu 10.10 64-bit model image.
+Create a new [Leiningen](https://github.com/technomancy/leiningen) project.
+
+```
+$ lein new vmfest-quickstart
+$ cd vmfest-quickstart
+```
+
+Edit the ```project.clj``` so it looks like: 
+
+```clojure
+(defproject vmfest-quickstart "1.0.0-SNAPSHOT"
+  :description "FIXME: write description"
+  :dependencies [[org.clojure/clojure "1.2.1"]
+                 [vmfest              "0.2.3"]])
+```
+
+Get the dependencies: 
+```
+$ lein deps
+```
+
+Start your favorite REPL, for example: 
+```
+$ lein repl
+```
+
+Before we can instantiate an image, we need to install it as model image. To make things easy I have published a model image (more to come). The following will download an install an ubuntu 10.10 64-bit model image.
 
 ```clojure
 (use 'vmfest.manager)
@@ -41,14 +67,15 @@ Before we can instantiate n image, we need to install it as model image. To make
 (def my-server (server "http://localhost:18083"))
 
 ;; download and install a model
-(setup-model "https://s3.amazonaws.com/vmfest-images/ubuntu-10-10-64bit-server.vdi.gz" server)
+(setup-model "https://s3.amazonaws.com/vmfest-images/ubuntu-10-10-64bit-server.vdi.gz" my-server)
 ```
 
 ### Creating and Running Images from a Model Image
 Once the model image is installed, you can create an instance off of it.
 
 ```clojure
-(def my-machine (instance my-server "bacug-machine" :ubuntu-10-10-64bit :micro))
+(update-models) ;; this will pick up all defined models.
+(def my-machine (instance my-server "bacug-machine" :vmfest-ubuntu-10-10-64bit-server :micro))
 ```
 
 At this point, you can operate your instance.
@@ -262,7 +289,7 @@ NOTE: This process has been greatly simplified with VMFest v0.2.3 and Pallet v0.
     (use 'pallet.compute)
     (use 'pallet.crate.automated-admin-user)
     (def service (compute-service-from-config-file :virtualbox))
-    (defnode test-node {:os-family :ubuntu :os-64-bit true} :bootstrap automated-amdin-user)
+    (defnode test-node {:os-family :ubuntu :os-64-bit true} :bootstrap automated-admin-user)
     (converge {test-node 1} :compute service)
        ;; Observe in the VirtualBox GUI that a new VM named test-node-0 has been created and started
        ;; Wait for the REPL to return and get the ip

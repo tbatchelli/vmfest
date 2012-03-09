@@ -26,7 +26,7 @@
     (.openMedium vb image DeviceType/HardDisk AccessMode/ReadOnly false)))
 
 (defn make-immutable [medium]
-  (.setType medium MediumType/Immutable))
+  (.setType medium MediumType/MultiAttach))
 
 (defn directory-and-file-name-from-url [url]
   (let [last-forward-slash-index (+ 1 (.lastIndexOf url "/"))]

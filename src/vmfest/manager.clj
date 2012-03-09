@@ -270,6 +270,22 @@ VirtualBox"
       (log/warnf "Image not mounted. No mount point found for %s." config)
       config)))
 
+(defn- ensure-image-is-registered [vbox location]
+  "If the medium in the location is not open, it will open it as multi-attach"
+  (try+
+   (vbox/find-medium vbox location :hard-disk)
+   (catch [:original-error-type :VBOX_E_OBJECT_NOT_FOUND] _
+     (log/debugf
+      (str "ensure-image-is-registered: %s not registered. Will "
+           "attempt at registering if it is a hard drive")
+      location)
+     (let [medium (vbox/open-medium vbox location :hard-disk :read-only false)]
+       (image/make-immutable medium)
+       (log/debugf
+        "ensure-image-is-registered: hard disk %s successfully registered."
+        location)
+       medium))))
+
 (defn create-machine
   [server name os-type-id config image-uuid & [base-folder]]
   {:pre [(model/Server? server)]}
@@ -296,6 +312,10 @@ VirtualBox"
       (log/debugf "Configuring storage for %s" boot-image-mounted-config)
       (session/with-vbox server [_ vbox]
         (session/with-session m :shared [_ vb-m]
+          ;; sometimes VBox seems to unregister images. We will make
+          ;; sure the boot image is always registered before we try to
+          ;; build the machine.
+          (ensure-image-is-registered vbox image-uuid)
           (machine-config/configure-machine-storage
            vb-m boot-image-mounted-config)
           (machine/save-settings vb-m))))

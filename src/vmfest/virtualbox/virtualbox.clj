@@ -34,11 +34,28 @@
      "find-medium: medium type %s not in #{:hard-disk :floppy :dvd}" type)
     (let [type-key (or type :hard-disk)
           type (enums/key-to-device-type type-key)]
-      (try (.findMedium vbox id-or-location type)
-           (catch Exception e
-             (log/warnf
-              "Can't find a medium of type %s located in/with id '%s'. Reason: %s"
-              type id-or-location e))))))
+      (conditions/with-vbox-exception-translation
+        {:VBOX_E_OBJECT_NOT_FOUND "No medium object matching location found."}
+        (.findMedium vbox id-or-location type)))))
+
+(defn open-medium
+  [vbox location & [type access-mode force-new-uuid?]]
+  {:pre [(model/IVirtualBox? vbox)
+         (if type (#{:hard-disk :floppy :dvd} type) true)]}
+  (let [type (enums/key-to-device-type (or type :hard-disk))
+        access-mode (enums/key-to-access-mode (or access-mode :read-write))
+        force-new-uuid? (or force-new-uuid? false)]
+    (conditions/with-vbox-exception-translation
+      {:VBOX_E_FILE_ERROR
+       "Invalid medium storage file location or could not find the medium
+at the specified location."
+       :VBOX_E_IPRT_ERROR
+       "Could not get medium storage format."
+       :E_INVALIDARG
+       "Invalid medium storage format."
+       :VBOX_E_INVALID_OBJECT_STATE
+       "Medium has already been added to a media registry."}
+      (.openMedium vbox location type access-mode force-new-uuid?))))
 
 (defn register-machine [vbox machine]
   {:pre [(model/IVirtualBox? vbox)

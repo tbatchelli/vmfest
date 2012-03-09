@@ -13,7 +13,7 @@
 
 (defn download [from to]
   (with-open [input (input-stream from)
-              output (output-stream to)] 
+              output (output-stream to)]
     (copy input output :buffer-size (* 1024 1024))))
 
 (defn gunzip [from to]
@@ -40,13 +40,16 @@
 
 (defn register-model [orig dest vbox]
   (with-vbox vbox [_ vb]
-    (let [orig-medium (.openMedium vb orig DeviceType/HardDisk AccessMode/ReadOnly false)
+    (let [orig-medium
+          (.openMedium vb orig DeviceType/HardDisk AccessMode/ReadOnly false)
           dest-medium (.createHardDisk vb "vdi" dest)
           progress (.cloneTo orig-medium dest-medium (long 0) nil)]
-      (.waitForCompletion progress (Integer. -1)) ;; wait indefinitely for the cloning
+      ;; wait indefinitely for the cloning
+      (.waitForCompletion progress (Integer. -1))
       (make-immutable dest-medium)
-      (.close orig-medium) ;; otherwise the origina medium would remain registered
-      )))
+      ;; We need to close the origial medium, otherwise it would
+      ;; remain registered
+      (.close orig-medium))))
 
 (defn make-temp-dir [image-name]
   (let [tmp (System/getProperty "java.io.tmpdir")
@@ -65,14 +68,17 @@
 
 (defn prepare-job
   [image-url vbox
-   & {:keys [model-name temp-dir meta-file-name meta-url meta model-file-name model-path]
+   & {:keys [model-name temp-dir meta-file-name
+             meta-url meta model-file-name model-path]
       :as options}]
   (let [[directory image-file-name] (directory-and-file-name-from-url image-url)
         image-name (file-name-without-extensions image-file-name)
         gzipped? (.endsWith image-file-name ".gz")
         model-name (or model-name image-name)
         model-unique-name (str "vmfest-" model-name)
-        meta-url (or meta-url (str directory (or meta-file-name (str image-name ".meta"))))
+        meta-url (or meta-url
+                     (str directory (or meta-file-name
+                                        (str image-name ".meta"))))
         temp-dir (make-temp-dir model-unique-name)
         model-path (or model-path (str (System/getProperty "user.home")
                                      File/separator
@@ -95,9 +101,10 @@
 (def ^:dynamic *dry-run* false)
 
 (defn threaded-download
-  [{:keys [model-name image-url gzipped? gzipped-image-file image-file] :as options}]
+  [{:keys [model-name image-url gzipped? gzipped-image-file image-file]
+    :as options}]
   (let [dest (if gzipped? gzipped-image-file image-file)]
-    (log/info (format "%s: Downloading %s into %s" model-name image-url dest ))
+    (log/infof "%s: Downloading %s into %s" model-name image-url dest )
     (when-not *dry-run*
       (download image-url dest)))
   options)
@@ -106,26 +113,27 @@
   [{:keys [model-name gzipped? gzipped-image-file image-file] :as options}]
   (if gzipped?
     (do
-      (log/info (format "%s: Gunzipping %s into %s" model-name gzipped-image-file image-file))
+      (log/infof "%s: Gunzipping %s into %s"
+                 model-name gzipped-image-file image-file)
       (when-not *dry-run*
         (gunzip gzipped-image-file image-file)))
-    (log/info (format "%s: File %s is already uncompressed" model-name image-file)))
+    (log/infof "%s: File %s is already uncompressed" model-name image-file))
   options)
 
 (defn threaded-get-metadata
   [{:keys [model-name image-file meta meta-url] :as options}]
   (if meta
     (do
-      (log/info (format "%s: Metadata provided explicitly" model-name))
+      (log/infof "%s: Metadata provided explicitly" model-name)
       options)
     (do
-      (log/info (format "%s: Loading metadata from %s" model-name meta-url))
+      (log/infof "%s: Loading metadata from %s" model-name meta-url)
       (assoc options :meta (load-string (slurp meta-url))))))
 
 (defn threaded-register-model
   [{:keys [image-file model-file vbox model-name] :as options}]
-  (log/info (format "%s: Registering image %s as %s in %s"
-                    model-name image-file model-file vbox))
+  (log/infof "%s: Registering image %s as %s in %s"
+             model-name image-file model-file vbox)
   (when-not *dry-run*
     (register-model image-file model-file vbox))
   options)
@@ -134,8 +142,7 @@
   [{:keys [model-name meta model-meta model-file] :as options}]
   (let [meta (assoc meta :uuid model-file)
         meta {(keyword model-name) meta}]
-    (log/info
-     (format "%s: Creating meta file %s with %s" model-name model-meta meta))
+    (log/infof "%s: Creating meta file %s with %s" model-name model-meta meta)
     (when-not *dry-run*
       (spit model-meta meta))
     (assoc options :meta meta)))
@@ -150,7 +157,9 @@
   ;; is the image registered?
   (let [medium (find-medium vbox id-or-location)]
     (if-not medium
-      (throw (RuntimeException. (str "This model's image is not registered in VirtualBox: " id-or-location))))
+      (throw (RuntimeException.
+              (str "This model's image is not registered in VirtualBox: "
+                   id-or-location))))
     ;; is the image immutable?
     (let [type (enums/medium-type-type-to-key (.getType medium))]
       (if-not (or (= type :immutable) (= type :multi-attach))
@@ -165,11 +174,9 @@
   (let [job (apply prepare-job image-url vbox (reduce into [] options))]
     (log/info (str "About to execute job \n" (with-out-str (pprint job))))
     (if (.exists (File. (:model-file job)))
-      (log/error
-       (format
-        "Model %s already exists. Manually specifiy another file name with :model-name"
-        (:model-file job) (:temp-dir job)
-        false))
+      (log/errorf
+       "TheModel %s already exists. Manually specifiy another file name with :model-name"
+       (:model-file job)
       (do
         (-> job
             threaded-download

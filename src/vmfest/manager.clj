@@ -272,9 +272,9 @@ VirtualBox"
 
 (defn- ensure-image-is-registered [vbox location]
   "If the medium in the location is not open, it will open it as multi-attach"
-  (try+
-   (vbox/find-medium vbox location :hard-disk)
-   (catch [:original-error-type :VBOX_E_OBJECT_NOT_FOUND] _
+  (let [medium
+        (vbox/find-medium vbox location :hard-disk)]
+   (when-not medium
      (log/debugf
       (str "ensure-image-is-registered: %s not registered. Will "
            "attempt at registering if it is a hard drive")

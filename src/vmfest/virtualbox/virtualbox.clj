@@ -34,9 +34,9 @@
      "find-medium: medium type %s not in #{:hard-disk :floppy :dvd}" type)
     (let [type-key (or type :hard-disk)
           type (enums/key-to-device-type type-key)]
-      (conditions/with-vbox-exception-translation
-        {:VBOX_E_OBJECT_NOT_FOUND "No medium object matching location found."}
-        (.findMedium vbox id-or-location type)))))
+      (try (.findMedium vbox id-or-location type)
+           (catch Exception e
+             (log/warnf "find-medium: location %s not found" id-or-location))))))
 
 (defn open-medium
   [vbox location & [type access-mode force-new-uuid?]]

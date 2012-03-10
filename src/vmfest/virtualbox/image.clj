@@ -176,7 +176,7 @@
     (if (.exists (File. (:model-file job)))
       (log/errorf
        "TheModel %s already exists. Manually specifiy another file name with :model-name"
-       (:model-file job)
+       (:model-file job))
       (do
         (-> job
             threaded-download

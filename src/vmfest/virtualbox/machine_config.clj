@@ -11,7 +11,6 @@
             HostNetworkInterfaceType DeviceType]))
 
 (defn get-medium [m device]
-  (println device)
   (let [vbox (.getParent m)
         location (:location device)
         device-type (:device-type device)]

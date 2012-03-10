@@ -329,6 +329,7 @@ VirtualBox"
 
 (defn instance [server name image-key-or-map machine-key-or-map & [base-folder]]
   {:pre [(model/Server? server)]}
+  (update-models)
   (let [image (if (keyword? image-key-or-map)
                 (image-key-or-map *images*)
                 image-key-or-map)

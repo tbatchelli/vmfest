@@ -1,6 +1,7 @@
 (ns vmfest.virtualbox.machine-config
   (:use [slingshot.slingshot :only [throw+ try+]]
-        [vmfest.virtualbox.image :only [ make-immutable]])
+        [vmfest.virtualbox.image :only [ make-immutable]]
+        [vmfest.virtualbox.host :only [add-host-only-interface]])
   (:require [vmfest.virtualbox.machine :as machine]
             [vmfest.virtualbox.enums :as enums]
             [vmfest.virtualbox.model :as model]
@@ -154,29 +155,31 @@
   (.setAttachmentType adapter NetworkAttachmentType/NAT))
 
 (defn attach-to-host-only [adapter machine]
-  (let [host (.getHost (.getParent machine))
-        host-only-ifs
-        (.findHostNetworkInterfacesOfType
-         host
-         HostNetworkInterfaceType/HostOnly)
-        host-if-names
-        (map #(.getName %) host-only-ifs)
-        if-name
-        (.getHostOnlyInterface adapter)]
+  (let [vbox (.getParent machine)
+        host (.getHost vbox)
+        host-only-ifs (.findHostNetworkInterfacesOfType
+                       host
+                       HostNetworkInterfaceType/HostOnly)
+        host-if-names (map #(.getName %) host-only-ifs)
+        if-name (.getHostOnlyInterface adapter)]
     (when-not (some (partial = if-name) host-if-names)
-      (log/error
-       (format
-        (str
-         "Trying to configure a network adapter with inexistent host interface named %s"
-         " for machine %s")
-        if-name (.getName machine)))))
+      (log/warnf
+       (str
+        "Trying to configure a network adapter with inexistent host "
+        "interface named %s for machine %s")
+       if-name (.getName machine))
+      (if (re-matches #"vboxnet[0-9]+" if-name)
+        (add-host-only-interface vbox if-name)
+        (throw+ {:message
+                 (format "Cannot create a host only interface named %s"
+                         if-name)}))))
   (.setAttachmentType adapter NetworkAttachmentType/HostOnly))
 
 (defn attach-to-internal [adapter]
   (.setAttachmentType adapter NetworkAttachmentType/Internal))
 
 (defn attach-adapter [machine adapter attachment-type]
-  (condp = attachment-type 
+  (condp = attachment-type
         :bridged (attach-to-bridged adapter)
         :nat (attach-to-nat adapter)
         :internal (attach-to-internal adapter)

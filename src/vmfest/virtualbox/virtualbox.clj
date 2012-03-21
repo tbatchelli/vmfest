@@ -87,8 +87,34 @@ at the specified location."
            name
            path
            (if overwrite "" "not"))
-          (.createMachine vbox path name os-type-id nil overwrite)))))
+         (.createMachine vbox path name os-type-id nil overwrite)))))
 
+;;; DHCP
+
+(defn find-dhcp-by-interface-name
+  "Find a dhcp server by the interface name to which it is attached.
+
+  NOTE: This is not very reliable, as the original function does not
+  do what it says it does. This function finds the dhcp by the *dhcp*
+  name instead of the interface name. The DHCP server is usually named
+  with the pattern `HostInterfaceNetworking-vboxnetN`.
+
+  This function, then, looks a DHCP named
+  `HostNetworkInterfaceType-NAME` where NAME is the name of the host
+  interface"
+
+  [vbox interface-name]
+  (try (.findDHCPServerByNetworkName
+        vbox
+        (str "HostInterfaceNetworking-" interface-name))
+       (catch Exception e nil)))
+
+(defn create-dhcp-server [vbox interface-name]
+  (conditions/with-vbox-exception-translation
+    {:E_INVALIDARG "Host network interface name already exists."}
+    (.createDHCPServer
+     vbox
+     (str "HostInterfaceNetworking-" interface-name))))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (comment

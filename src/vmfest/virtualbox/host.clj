@@ -19,7 +19,8 @@
   ;; What we're interested is in the contents (`value`) of this
   ;; `holder`
   (let [interface-holder (Holder. (IHostNetworkInterface/queryInterface host))]
-    (.waitForCompletion (.createHostOnlyNetworkInterface host interface-holder) -1)
+    (.waitForCompletion
+     (.createHostOnlyNetworkInterface host interface-holder) (Integer. -1))
     (let [interface (.value interface-holder)]
       (log/infof "Created Host Only network interface %s" (.getName interface))
       interface)))

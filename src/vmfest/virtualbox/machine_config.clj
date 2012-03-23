@@ -1,10 +1,13 @@
 (ns vmfest.virtualbox.machine-config
-  (:use [slingshot.slingshot :only [throw+]])
+  (:use [slingshot.slingshot :only [throw+ try+]]
+        [vmfest.virtualbox.image :only [ make-immutable]]
+        [vmfest.virtualbox.host :only [add-host-only-interface]])
   (:require [vmfest.virtualbox.machine :as machine]
             [vmfest.virtualbox.enums :as enums]
             [vmfest.virtualbox.model :as model]
             [clojure.tools.logging :as log]
-            [vmfest.virtualbox.virtualbox :as vbox])
+            [vmfest.virtualbox.virtualbox :as vbox]
+            [vmfest.virtualbox.conditions :as conditions])
   (:import [org.virtualbox_4_1 AccessMode VBoxException NetworkAttachmentType
             HostNetworkInterfaceType DeviceType]))
 
@@ -12,7 +15,8 @@
   (let [vbox (.getParent m)
         location (:location device)
         device-type (:device-type device)]
-    (vbox/find-medium vbox location device-type)))
+    (when location
+      (vbox/find-medium vbox location device-type))))
 
 (def controller-type-checkers
   {:scsi #{:lsi-logic :bus-logic}
@@ -53,12 +57,21 @@
        {:type :machine-builder
         :message (str "Failed to attach device; it is missing a"
                       " valid device-type entry")}))
-    (.attachDevice m
-                   controller-name
-                   (Integer. port)
-                   (Integer. slot)
-                   device-type
-                   medium)))
+    (conditions/with-vbox-exception-translation
+      {:E_INVALIDARG
+       "SATA device, SATA port, IDE port or IDE slot out of range, or file or UUID not found."
+       :VBOX_E_INVALID_OBJECT_STATE
+       "Machine must be registered before media can be attached."
+       :VBOX_E_INVALID_VM_STATE
+       "Invalid machine state."
+       :VBOX_E_OBJECT_IN_USE
+       "A medium is already attached to this or another virtual machine."}
+      (.attachDevice m
+                     controller-name
+                     (Integer. port)
+                     (Integer. slot)
+                     device-type
+                     medium))))
 
 (defmulti attach-devices
   (fn [m bus-type controller-name devices] bus-type))
@@ -142,29 +155,31 @@
   (.setAttachmentType adapter NetworkAttachmentType/NAT))
 
 (defn attach-to-host-only [adapter machine]
-  (let [host (.getHost (.getParent machine))
-        host-only-ifs
-        (.findHostNetworkInterfacesOfType
-         host
-         HostNetworkInterfaceType/HostOnly)
-        host-if-names
-        (map #(.getName %) host-only-ifs)
-        if-name
-        (.getHostOnlyInterface adapter)]
+  (let [vbox (.getParent machine)
+        host (.getHost vbox)
+        host-only-ifs (.findHostNetworkInterfacesOfType
+                       host
+                       HostNetworkInterfaceType/HostOnly)
+        host-if-names (map #(.getName %) host-only-ifs)
+        if-name (.getHostOnlyInterface adapter)]
     (when-not (some (partial = if-name) host-if-names)
-      (log/error
-       (format
-        (str
-         "Trying to configure a network adapter with inexistent host interface named %s"
-         " for machine %s")
-        if-name (.getName machine)))))
+      (log/warnf
+       (str
+        "Trying to configure a network adapter with inexistent host "
+        "interface named %s for machine %s")
+       if-name (.getName machine))
+      (if (re-matches #"vboxnet[0-9]+" if-name)
+        (add-host-only-interface vbox if-name)
+        (throw+ {:message
+                 (format "Cannot create a host only interface named %s"
+                         if-name)}))))
   (.setAttachmentType adapter NetworkAttachmentType/HostOnly))
 
 (defn attach-to-internal [adapter]
   (.setAttachmentType adapter NetworkAttachmentType/Internal))
 
 (defn attach-adapter [machine adapter attachment-type]
-  (condp = attachment-type 
+  (condp = attachment-type
         :bridged (attach-to-bridged adapter)
         :nat (attach-to-nat adapter)
         :internal (attach-to-internal adapter)

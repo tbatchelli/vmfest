@@ -4,7 +4,7 @@
    [org.virtualbox_4_1 IMachine MachineState ClipboardMode PointingHidType
     FirmwareType KeyboardHidType SessionState SessionType StorageBus
     DeviceType NetworkAttachmentType CleanupMode StorageControllerType
-    MediumType HostNetworkInterfaceType]))
+    MediumType HostNetworkInterfaceType AccessMode]))
 
 
 (defmacro find-key-by-value [value table]
@@ -232,3 +232,11 @@
   (find-key-by-value type cleanup-mode-type-to-key-table))
 (defn key-to-cleanup-mode [key]
   (find-value-by-key key cleanup-mode-type-to-key-table))
+
+(def access-mode-type-to-key-table
+  [[AccessMode/ReadOnly :read-only "Read Only"]
+   [AccessMode/ReadWrite :read-write "Read & Write"]])
+(defn access-mode-type-to-key [type]
+  (find-key-by-value type access-mode-type-to-key-table))
+(defn key-to-access-mode [key]
+  (find-value-by-key key access-mode-type-to-key-table))

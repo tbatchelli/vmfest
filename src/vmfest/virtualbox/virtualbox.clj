@@ -36,9 +36,26 @@
           type (enums/key-to-device-type type-key)]
       (try (.findMedium vbox id-or-location type)
            (catch Exception e
-             (log/warnf
-              "Can't find a medium of type %s located in/with id '%s'. Reason: %s"
-              type id-or-location e))))))
+             (log/warnf "find-medium: location %s not found" id-or-location))))))
+
+(defn open-medium
+  [vbox location & [type access-mode force-new-uuid?]]
+  {:pre [(model/IVirtualBox? vbox)
+         (if type (#{:hard-disk :floppy :dvd} type) true)]}
+  (let [type (enums/key-to-device-type (or type :hard-disk))
+        access-mode (enums/key-to-access-mode (or access-mode :read-write))
+        force-new-uuid? (or force-new-uuid? false)]
+    (conditions/with-vbox-exception-translation
+      {:VBOX_E_FILE_ERROR
+       "Invalid medium storage file location or could not find the medium
+at the specified location."
+       :VBOX_E_IPRT_ERROR
+       "Could not get medium storage format."
+       :E_INVALIDARG
+       "Invalid medium storage format."
+       :VBOX_E_INVALID_OBJECT_STATE
+       "Medium has already been added to a media registry."}
+      (.openMedium vbox location type access-mode force-new-uuid?))))
 
 (defn register-machine [vbox machine]
   {:pre [(model/IVirtualBox? vbox)
@@ -70,8 +87,34 @@
            name
            path
            (if overwrite "" "not"))
-          (.createMachine vbox path name os-type-id nil overwrite)))))
+         (.createMachine vbox path name os-type-id nil overwrite)))))
 
+;;; DHCP
+
+(defn find-dhcp-by-interface-name
+  "Find a dhcp server by the interface name to which it is attached.
+
+  NOTE: This is not very reliable, as the original function does not
+  do what it says it does. This function finds the dhcp by the *dhcp*
+  name instead of the interface name. The DHCP server is usually named
+  with the pattern `HostInterfaceNetworking-vboxnetN`.
+
+  This function, then, looks a DHCP named
+  `HostNetworkInterfaceType-NAME` where NAME is the name of the host
+  interface"
+
+  [vbox interface-name]
+  (try (.findDHCPServerByNetworkName
+        vbox
+        (str "HostInterfaceNetworking-" interface-name))
+       (catch Exception e nil)))
+
+(defn create-dhcp-server [vbox interface-name]
+  (conditions/with-vbox-exception-translation
+    {:E_INVALIDARG "Host network interface name already exists."}
+    (.createDHCPServer
+     vbox
+     (str "HostInterfaceNetworking-" interface-name))))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (comment

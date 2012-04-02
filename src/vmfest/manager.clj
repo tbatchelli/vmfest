@@ -292,8 +292,8 @@ VirtualBox"
   (when-let [f (or base-folder (:node-path *location*))]
     (when-not (.exists (io/file f))
       (throw+
-       :type :path-not-found
-       :message (format "Path for saving nodes doesn't exist: %s" f))))
+       {:type :path-not-found
+        :message (format "Path for saving nodes doesn't exist: %s" f)})))
   (let [m (session/with-vbox server [_ vbox]
             (let [machine (vbox/create-machine
                            vbox

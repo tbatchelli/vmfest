@@ -329,6 +329,35 @@ VirtualBox"
           (machine/save-settings vb-m))))
     m))
 
+(defn new-image
+  "Creates a new hard disk image as described by the `image-spec` map
+  that contains the keys :size :format :variants :location. Only :size
+  and :location are mandatory.
+
+  vbox: an IVirtualBox
+
+  image spec:
+    :location File path where the image will be created
+    :format the format of the image. One in
+       (system-properties/supported-medium-formats)
+    :size Logical size, in MB
+    :variants a sequence with zero or more of the variants in
+      (enums/medium-variant-type-to-key-table)
+
+  e.g.:
+
+   (new-image (server \"http://localhost:18083\"
+               {:size 1024
+                :location \"/tmp/my-image.vdi\"
+                :format :vdi
+                :variants [:fixed]}))
+
+  NOTE: not all formats and variants are supported for all hosts, nor
+  all combinations of variatns are valid. Error reporting on this
+  front is spotty at best"
+  [server {:keys [size format variants location] :as image-spec}]
+  (session/with-vbox server [_ vbox]
+    (image/create-medium vbox location format size variants)))
 
 (defn instance* [server name image machine & [base-folder]]
     (let [uuid (:uuid image)

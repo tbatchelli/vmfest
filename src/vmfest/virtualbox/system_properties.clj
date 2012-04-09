@@ -73,7 +73,10 @@
 
 (setters)
 
-(defn supported-medium-formats [o]
+(defn supported-medium-formats
+  "Returns the supported formats for this vbox (or machine) in the
+  form of keywords"
+  [o]
   (let [supported-formats (medium-formats o)
         format-ids
         (map #(.getId %) supported-formats)]

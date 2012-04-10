@@ -248,7 +248,7 @@
       ;; only get here when the required format is supported in this host
       (let [medium (.createHardDisk vbox (name format-key) location)
             progress (create-base-storage medium size variants)]
-        (.waitForCompletion progress -1) ;; wait until it is done
+        (.waitForCompletion progress (Integer. -1)) ;; wait until it is done
         (when (= (.getState medium) MediumState/NotCreated)
           ;; oops. Image not created
           (throw+ {:type :image-not-created

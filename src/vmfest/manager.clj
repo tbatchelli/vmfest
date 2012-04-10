@@ -323,7 +323,8 @@ VirtualBox"
           ;; sometimes VBox seems to unregister images. We will make
           ;; sure the boot image is always registered before we try to
           ;; build the machine.
-          (ensure-image-is-registered vbox image-uuid)
+          (when image-uuid
+            (ensure-image-is-registered vbox image-uuid))
           (machine-config/configure-machine-storage
            vb-m boot-image-mounted-config)
           (machine/save-settings vb-m))))

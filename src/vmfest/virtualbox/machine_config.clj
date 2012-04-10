@@ -9,7 +9,7 @@
             [vmfest.virtualbox.virtualbox :as vbox]
             [vmfest.virtualbox.conditions :as conditions])
   (:import [org.virtualbox_4_1 AccessMode VBoxException NetworkAttachmentType
-            HostNetworkInterfaceType DeviceType]))
+            HostNetworkInterfaceType]))
 
 (defn get-medium [m {:keys [location device-type create] :as device}]
   (let [vbox (.getParent m)]

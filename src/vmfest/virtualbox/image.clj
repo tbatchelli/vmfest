@@ -178,7 +178,7 @@
     (log/info (str "About to execute job \n" (with-out-str (pprint job))))
     (if (.exists (File. (:model-file job)))
       (log/errorf
-       "TheModel %s already exists. Manually specifiy another file name with :model-name"
+       "The model %s already exists. Manually specifiy another file name with :model-name"
        (:model-file job))
       (do
         (-> job

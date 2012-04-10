@@ -11,10 +11,8 @@
   (:import [org.virtualbox_4_1 AccessMode VBoxException NetworkAttachmentType
             HostNetworkInterfaceType DeviceType]))
 
-(defn get-medium [m device]
-  (let [vbox (.getParent m)
-        location (:location device)
-        device-type (:device-type device)]
+(defn get-medium [m {:keys [location device-type create] :as device}]
+  (let [vbox (.getParent m)]
     (when location
       (vbox/find-medium vbox location device-type))))
 

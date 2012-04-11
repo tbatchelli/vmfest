@@ -5,6 +5,7 @@
             [vmfest.virtualbox.model :as model]
             [vmfest.virtualbox.enums :as enums]
             [vmfest.virtualbox.session :as session])
+  (:use [vmfest.virtualbox.scan-codes :only (scan-codes)])
   (:import [org.virtualbox_4_1 IMachine IConsole VBoxException
             VirtualBoxManager IVirtualBox IMedium NetworkAttachmentType]
            [vmfest.virtualbox.model GuestOsType Machine]))
@@ -456,3 +457,20 @@ See IVirtualbox::openRemoteSession for more details"
 (defn get-storage-controller-by-name [m name]
   {:pre [(model/IMachine? m)]}
   (.getStorageControllerByName m name))
+
+;;; scan codes
+(defn send-keyboard-entries [vb-m entries]
+  "Given a sequence with a mix of character strings and keywords it
+ sends to the machine the scan codes via the virtual keyboard that
+ correspond to the values in 'entries'.
+
+ (chars) will provide a list of permitted characters in the strings
+ (non-chars) will provide a list of the permitted commands as keywords
+
+ Example:
+  (scan-codes {:keypad-5 \"Abc\"})
+  => (76 204 42 30 158 170 48 176 46 174)"
+  (let [keyboard  (.getKeyboard (.getConsole vb-m))
+        scan-code-seq (scan-codes entries)]
+    (doseq [sc scan-code-seq]
+      (.putScancode keyboard  sc))))

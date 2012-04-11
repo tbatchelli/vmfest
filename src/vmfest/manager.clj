@@ -475,6 +475,20 @@ VirtualBox"
       (let [media (machine/unregister vb-m :detach-all-return-hard-disks-only)]
         (machine/delete vb-m media)))))
 
+(defn send-keyboard [machine entries]
+  "Given a sequence with a mix of character strings and keywords it
+ sends to the machine the scan codes via the virtual keyboard that
+ correspond to the values in 'entries'.
+
+ (chars) will provide a list of permitted characters in the strings
+ (non-chars) will provide a list of the permitted commands as keywords
+
+ Example:
+  (scan-codes {:keypad-5 \"Abc\"})
+  => (76 204 42 30 158 170 48 176 46 174)"
+  (session/with-session machine :shared [s _]
+    (machine/send-keyboard-entries s entries)))
+
 
 ;;; virtualbox-wide functions
 

@@ -149,15 +149,21 @@
   (filter (complement keyword?) (keys sc-map)))
 
 (defn scan-codes
-  "Given a sequence with a mix of character strings and keywords
- it returns a sequence with the corresponding scan codes.
+  "Given a sequence with a mix of:
+     - strings corresponding to text
+     - keywords corresponding to non-char key presses
+     - numbers corresponding to wait times in ms.
+  returns a sequence with the corresponding scan codes to be sent from the VM's
+  keyboard(in hexa) and pauses to be observed between key presses (e.g. [10]
+  for 10ms).
 
- (chars) will provide a list of permitted characters in the strings
- (non-chars) will provide a list of the permitted commands as keywords
+  Note that:
+   - (chars) will provide a list of permitted characters in the strings
+   - (non-chars) will provide a list of the permitted commands as keywords
 
  Example:
-  (scan-codes {:keypad-5 \"Abc\"})
-  => (76 204 42 30 158 170 48 176 46 174)"
+  (scan-codes {:keypad-5 35 \"Abc\"})
+  => (76 204 [35] 42 30 158 170 48 176 46 174)"
   [s]
   (let [translate-keyword
         (fn [e]
@@ -182,10 +188,13 @@
                (str "scan-codes: The character '%s' does not correspond to any"
                     " scan code. Please check"
                     " vmfest.virtualbox.scan-codes/chars"
-                    " for a list of available codes." ) c)})))]
+                    " for a list of available codes." ) c)})))
+        translate-num (fn [n] [[n]])]
     (mapcat
      (fn [e]
        (if (keyword? e)
          (translate-keyword e)
-         (mapcat translate-char e)))
+         (if (number? e)
+           (translate-num e)
+           (mapcat translate-char e))))
      s)))

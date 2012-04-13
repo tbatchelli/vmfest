@@ -460,17 +460,28 @@ See IVirtualbox::openRemoteSession for more details"
 
 ;;; scan codes
 (defn send-keyboard-entries [vb-m entries]
-  "Given a sequence with a mix of character strings and keywords it
- sends to the machine the scan codes via the virtual keyboard that
- correspond to the values in 'entries'.
+  "Given a sequence with a mix of:
+     - strings corresponding to text
+     - keywords corresponding to non-char key presses
+     - numbers corresponding to wait times in ms.
+  it sends the scan codes corresponding to either the strings or the keywords
+  to the VM's keyboard interface, simulating a keyboard attached to the VM.
 
- (chars) will provide a list of permitted characters in the strings
- (non-chars) will provide a list of the permitted commands as keywords
+  The scan codes will be sent as fast as possible, observing the
+  pauses in ms. especified in the form of numbers in the entries
+  sequence.
+
+  Note that:
+   - (chars) will provide a list of permitted characters in the strings
+   - (non-chars) will provide a list of the permitted commands as keywords
 
  Example:
-  (scan-codes {:keypad-5 \"Abc\"})
-  => (76 204 42 30 158 170 48 176 46 174)"
+  (scan-codes {:esc 100 \"Abc\"})
+  will send an ESCAPE, wait for 100ms and then send the text \"Abc\" "
   (let [keyboard  (.getKeyboard (.getConsole vb-m))
         scan-code-seq (scan-codes entries)]
+    (println scan-code-seq)
     (doseq [sc scan-code-seq]
-      (.putScancode keyboard  sc))))
+      (if (number? sc)
+        (.putScancode keyboard (Integer. sc))
+        (Thread/sleep (first sc))))))

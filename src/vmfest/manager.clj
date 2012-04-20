@@ -535,6 +535,16 @@ VirtualBox"
 (defn as-map [& params]
   (apply model/as-map params))
 
+(defn make-disk-immutable [server path]
+  (session/with-vbox server [_ vbox]
+    (let [medium (vbox/find-medium vbox path :hard-disk)]
+      (log/infof "Compacting image %s" path)
+      (.waitForCompletion
+       (.compact medium)
+       (Integer. -1))
+      (log/infof "Making hard-disk %s multi-attach (immutable)" path)
+      (image/make-immutable medium))))
+
 (comment "without pallet-style infrastructure"
   (use 'vmfest.manager)
   (def my-server (server "http://localhost:18083"))

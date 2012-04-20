@@ -468,12 +468,16 @@ VirtualBox"
     (catch [:type :vbox-runtime] _
       (log/warn "Trying to stop an already stopped machine"))))
 
-(defn destroy [machine & {:keys [delete-disks] :or {delete-disks true}}]
+(defn destroy [machine & {:keys [delete-disks timeout]
+                          :or {delete-disks true
+                               timeout -1}}]
   {:pre [(model/Machine? machine)]}
   (let [id (:id machine)]
     (session/with-no-session machine [vb-m]
       (let [media (machine/unregister vb-m :detach-all-return-hard-disks-only)]
-        (machine/delete vb-m (if delete-disks media nil))))))
+        (.waitForCompletion
+         (machine/delete vb-m (if delete-disks media nil))
+         (Integer. timeout))))))
 
 (defn send-keyboard [machine entries]
   "Given a sequence with a mix of character strings and keywords it

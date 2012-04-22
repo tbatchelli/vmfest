@@ -480,7 +480,7 @@ See IVirtualbox::openRemoteSession for more details"
   will send an ESCAPE, wait for 100ms and then send the text \"Abc\" "
   (let [keyboard  (.getKeyboard (.getConsole vb-m))
         scan-code-seq (scan-codes entries)]
-    (log/debugf "Sending to %s the scan-codes %s" (.getName vb-m) scan-code-seq)
+    (log/debugf "Sending to %s the scan-codes %s" (.getName (.getMachine vb-m)) scan-code-seq)
     (doseq [sc scan-code-seq]
       (if (number? sc)
         (.putScancode keyboard (Integer. sc))

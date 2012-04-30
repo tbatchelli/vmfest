@@ -296,12 +296,13 @@ VirtualBox"
       (try+
        (.mkdirs (io/file f))
        (log/infof "Created path for saving nodes: %s" f)
-       (throw+
-        {:type :path-not-found
-         :message
-         (format
-          "Path for saving nodes does not exist and could not be created: %s"
-          f)}))))
+       (catch Exception e
+         (throw+
+          {:type :path-not-found
+           :message
+           (format
+            "Path for saving nodes does not exist and could not be created: %s"
+            f)})))))
   (let [m (session/with-vbox server [_ vbox]
             (let [machine (vbox/create-machine
                            vbox

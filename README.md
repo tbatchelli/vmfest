@@ -1,315 +1,335 @@
-# vmfest
+VMFest is a [PalletOps][palletops] project to turn [VirtualBox][vbox]
+into a light-weight cloud provider. This is very useful for when
+developing cloud automation. VirtualBox's Virtual Machines (VMs) boot
+very quickly (seconds), so why not take advantage of it?
 
-VMFest is a clojure wrapper to (currently) [VirtualBox] [vbox], a virtualization platform that is pretty good with virtualizing servers. 
+VMFest takes the form of a library, and you can use it as a toolkit to
+create your own virtualization environments.
 
-Although VMFest provides tool-like functionality, VMFest is also a library that you can use to create your own virtualization environment.
+This project is work in progress, so feedback and suggestions are
+welcome. Please use the
+[issues](http://github.com/tbatchelli/vmfest/issues) for this purpose.
 
 [vbox]: http://www.virtualbox.org 
+[palletops]: http://palletops.com
 
-With VMFest you can easily create and operate virtual machines, with emphasis on creating many clones of the same model VMs. 
+# Usage
 
-## Models and Instances
+## Install Virtualbox 4.1.x
 
-In VMFest, a *model* is a VM image. Although it is possible to run an actual VM off of this image in VMFest, this is not the common usage scenario. The common usage scenario is to run an *instance* of the model. 
+Download and install [VirtualBox 4.1.x][vbox41]. It won't work with
+any older version.
 
-An instance is a transient VM that will be created dynamically from the model and destroyed after being used. You can start as many instances as you need from the same model. Each instance created is virtually a clone of the model, but the way VirtualBox works makes this cloning a space efficient operation, namely, each clone takes significant less disk space than the model image.
+Start the VirtualBox server (`vboxwebsrvr`) by issuing the following on the shell:
 
-It is possible to use VMFest in a more standard way, in which each VM uses a permanent image. A permanent image is an image that keeps its changes beyond the lifetime of the VM that runs on it. 
-
-## Prerequisites to use VMFest
-
-To use VMFest you first need to install [VirtualBox 4.0x][vbox] in
-your machine.  (NOTE: Virtualbox 4.1.x and above will not work for now)
-
-VMFest uses a web service that VirtualBox installs. This service is authenticated and there are many ways to authenticate, but for simplicity you can disable authentication by running the following in your shell:
-
-```
-$ VBoxManage setproperty websrvauthlibrary null
+```bash
+$ vboxwebsrvr -t0
 ```
 
-## Usage ( vmfest v 0.2.3)
-
-### Installing a Model Image
-
-Create a new [Leiningen](https://github.com/technomancy/leiningen) project.
-
-```
-$ lein new vmfest-quickstart
-$ cd vmfest-quickstart
-```
-
-Edit the ```project.clj``` so it looks like: 
-
-```clojure
-(defproject vmfest-quickstart "1.0.0-SNAPSHOT"
-  :description "FIXME: write description"
-  :dependencies [[org.clojure/clojure "1.2.1"]
-                 [vmfest              "0.2.3"]])
-```
-
-Get the dependencies: 
-```
-$ lein deps
-```
-
-Start your favorite REPL, for example: 
-```
-$ lein repl
-```
-
-Before we can instantiate an image, we need to install it as model image. To make things easy I have published a model image (more to come). The following will download an install an ubuntu 10.10 64-bit model image.
-
-```clojure
-(use 'vmfest.manager)
-(use 'vmfest.virtualbox.image)
-
-;; crate a connection to the local VirtualBox server
-(def my-server (server "http://localhost:18083"))
-
-;; download and install a model
-(setup-model "https://s3.amazonaws.com/vmfest-images/ubuntu-10-10-64bit-server.vdi.gz" my-server)
-```
-
-### Creating and Running Images from a Model Image
-Once the model image is installed, you can create an instance off of it.
-
-```clojure
-(update-models) ;; this will pick up all defined models.
-(def my-machine (instance my-server "bacug-machine" :vmfest-ubuntu-10-10-64bit-server :micro))
-```
-
-At this point, you can operate your instance.
-
-```clojure
-(start my-machine) ;; starts your vm instance
-(pause my-machine) ;; pauses your running instance
-(resume my-machine) ;; resumes your paused instance
-(power-down my-machine) ;; turns off your machine. The changes in the filesystem will be lost
-(destroy-my machine) ;; removes any trace of this instance having ever existed
-```
-
-Now let's say you want to start 10 instances of the same model.
-
-```clojure
-;; find some names for those instances
-(def clone-names #{"c1" "c2" "c3" "c4" "c5" "c6"})
-
-;; create the instances
-(def my-machines (map #(instance my-server % :ubuntu-10-10-64bit :micro)))
-
-;; start them all!
-(map start my-machines)
-
-;; stop them all
-(map power-down my-machines)
-
-;; remove them all
-(map destroy my-machines)
-```
-
-### More stuff you can do ... (old documentation, still works for v0.2.3)
-
-``` clojure
-;; load vmfest 
-(use 'vmfest.manager)
-
-;; define a connection to the vbox server. It doesn't create any socket
-(def my-server (server "http://localhost:18083"))
-
-;; see what images are available
-(hard-disks my-server)
-
-;; get all the data about the registered images
-(pprint (map as-map (hard-disks my-server)))
-
-;; see what guest OSs are supported by vbox
-(guest-os-types my-server)
-
-;; create a new VM ...
-(def my-machine (create-machine my-server "bacug-machine" "Ubuntu_64" basic-config
-                                "/Users/tbatchelli/VBOX-HDS/Ubuntu-10-10-64bit.vdi"))
-
-;; ... start it ...
-(start my-machine)
-
-;; ... pause it ...
-(pause my-machine)
-
-;; ... resume it ...
-(resume my-machine)
-
-;; ... send a shut down key ... (won't work on this ubuntu)
-(stop my-machine)
-
-;; ... turn the machine off ...
-(power-down my-machine)
-
-;; ... aaaand, get rid of it.
-(destroy my-machine)
-
-;; Let's use this in a functional way:
-;; 1) define the machine again
-(def my-machine (create-machine my-server "bacug-machine" "Ubuntu_64" basic-config
-                                "/Users/tbatchelli/VBOX-HDS/Ubuntu-10-10-64bit.vdi"))
-
-;; 2) Define the names of the machines
-(def clone-names #{"c1" "c2" "c3" "c4" "c5" "c6"})
-
-;; 3) Create a bunch a seq of machines same image based on the names defined
-(def my-machines
-  (map #(create-machine my-server % "Ubuntu_64" basic-config
-                        "/Users/tbatchelli/VBOX-HDS/Ubuntu-10-10-64bit.vdi")
-       clone-names))
-
-;; 4) Start them all
-(map start my-machines)
-
-;; 5) Power them all down
-(map power-down my-machines)
-
-;; 6) clean up
-(map destroy my-machines)
-
-
-;; Now, this was pretty low level. Let's build some infrastructure on
-;; top of it. This infrastructure defines *machines* and *images* that
-;; can be used to instantiate machines
-(def my-machine (instance my-server "bacug-machine" :ubuntu-10-10-64bit :micro))
-(def my-machine-2 (instance my-server "bacug-machine-2" :cent-os-5-5 :micro))
-
-;; now we can use the same operations as before
-(start my-machine)
-(start my-machine-2)
-(power-down my-machine)
-(power-down my-machine-2)
-(destroy my-machine)
-(destroy my-machine-2)
-
-;; View currently defined machines
-(pprint (map as-map (machines my-server)))
-
-;; you can search machines too
-(def my-test-machine (find-machine my-server "Ubuntu-10-10-64bit-Immutable")))
-
-(start my-test-machine)
-
-;; now, what ip did this machine get?
-(get-ip my-test-machine)
-
-;; ssh into it
-;; $ ssh user@<ip>
-
-;; kill it again
-(power-down my-test-machine)
-(destroy my-test-machine)
-```
-
-# Instructions to setup vmfest v0.2.2 with [pallet 0.4.x](https://github.com/pallet/pallet "pallet")
-
-NOTE: This process has been greatly simplified with VMFest v0.2.3 and Pallet v0.6.2+. The setup instructions will come soon (I promise).
-
-1. Install VirtualBox on your machine
-2. Disable login credential: 
+Finally, disable login authorization in virtualbox server: 
 
     ``` 
     $ VBoxManage setproperty websrvauthlibrary null
     ```
 
-3. Download and uncompress the following [image](https://s3.amazonaws.com/vmfest-images/ubuntu-10-10-64bit-server.vdi.gz "image")
-4. Clone the image to its final destination (```~/vmfest/models```):
 
-    ``` 
-    $ mkdir -p ~/vmfest/models
-    $ VBoxManage clonehd /path/to/downloaded/ubuntu-10-10-64bit-server.vdi ~/vmfest/models/ubuntu-10-10-64bit-server.vdi
-    ```
+[vbox41]: (https://www.virtualbox.org/wiki/Downloads)
 
-    * This should produce a uuid for your new image. Keep it around
-5. Start VirtualBox (the GUI) and:
-    1. Create an new image Linux - ```Ubuntu (64bit)```
-    2. Select ```"Use existing hard disk"``` and if your newly cloned image doesn't appear in the drop-down list, click on the folder icon and find the image in your hard disk (the one you just cloned)
-    3. Finish and test the image by starting the VM. You should get a prompt
-    4. The credentials are ```user```/```superduper```
-5. Now stop the machine and detach the hard drive from it (in settings)
-6. Make the disk image immutable
+## Setup VMFest in your project
 
-    ``` 
-    $ VBoxManage modifyhd ~/vmfest/models/ubuntu-10-10-64bit-server.vdi --type immutable
-    ```
+The following instructions are for setting up [Leiningen][lein]
+project, just because pretty much everyone using Clojure uses `lein`,
+but sticking vmfest in your classpath will suffice.
 
-6. Get the name of your bridged network interface by running: 
+Add the following dependencies to your ```project.clj```:
 
-    ```
-    $ VBoxManage list bridgedifs | grep ^Name 
-    ```
-    e.g.```"Name: en1: AirPort 2"```  --> the interface name is ```"en1: Airport 2"```
-    
-7. Start VBbox Web Services: 
+```clojure
+   [vmfest "0.2.4-beta.5"]
+```
 
-     ```
-    $ vboxwebsrv -t0
-    ```
-    
-8. In ```~/.pallet/config.clj``` add the following new provider:
+NOTE: add more detailed instructions for non-clojurians
 
-    ``` clojure
-    :virtualbox 
-     {:provider "virtualbox"
-      :images
-       {:ubuntu-10-10-64bit
-        {:description "Ubuntu 10.10 (64bit)"
-         :uuid "4f072132-7fbc-431b-b5bf-4aa6a807398a" ;; the uuid if your cloned image
-         :os-type-id "Ubuntu_64"
-         :os-version "10.10"
-         :username "user"
-         :password "superduper"
-         :os-family :ubuntu
-         :os-64-bit true
-         :no-sudo false
-         :sudo-password "superduper"}}
-     :model-path "~/vmfest/models"
-     :node-path "~/vmfest/nodes"
-     :url "http://localhost:18083"
-     :identity ""
-     :credential ""
-     :environment
-      {:algorithms
-       {:lift-fn pallet.core/parallel-lift
-        :vmfest {:create-nodes-fn pallet.compute.vmfest/parallel-create-nodes}
-        :converge-fn pallet.core/parallel-adjust-node-counts}}
-       :image
-        {:bridged-network "Airport 2" ;; The name of the network interface to use for bridging 
-       }}
-    ```
+[lein]: (https://github.com/technomancy/leiningen)
 
-9. Add the following dependency to your (lein/cake) project  ```[vmfest "0.2.2"]``` (under ```:dev-dependencies```)
-10. Test pallet/vmfest. Download the dependencies and fire up the REPL. Then enter the following
+# Basic Features
 
-    ``` clojure
-    (use 'pallet.core)
-    (use 'pallet.compute)
-    (use 'pallet.crate.automated-admin-user)
-    (def service (compute-service-from-config-file :virtualbox))
-    (defnode test-node {:os-family :ubuntu :os-64-bit true} :bootstrap automated-admin-user)
-    (converge {test-node 1} :compute service)
-       ;; Observe in the VirtualBox GUI that a new VM named test-node-0 has been created and started
-       ;; Wait for the REPL to return and get the ip
-    ```
-    
-    * from a terminal, ssh into your newly created machine
-    * pat yourself in the back
-    * now kill your machine
-    
-        ``` clojure
-        (converge {test-node 0} :compute service)
-        ```
-        
-    * test the limits of your computer 
-    
-        ``` clojure
-        (converge {test-node 10} :compute service) 
-        ```
-        
-    * ... enjoy the music your computer fan makes!
+## Create VMs programmatically
+
+VMFest has a data oriented API to create VMs. There are to data
+structures needed to create a VM: one describing the hardware 
+and the other one describing the image that the VM will boot off.
+
+### Hardware specs
+
+You can define every hardware aspect of a VM as a hash map. Consider
+this map: 
+
+```clojure
+   {:memory-size 512
+    :cpu-count 1
+    :network [{:attachment-type :host-only
+               :host-only-interface "vboxnet0"}
+              {:attachment-type :nat}]
+    :storage [{:name "IDE Controller"
+               :bus :ide
+               :devices [nil nil {:device-type :dvd} nil]}]
+    :boot-mount-point ["IDE Controller" 0]}}
+```
+
+This map describes a VM with 1 CPU, 512MB RAM, two network interfaces
+plugged in: one attached to VirtualBox's host-only network named
+"vboxnet0", and another one attached to NAT. For storage it has an IDE
+controller in the first slot. The first channel in this IDE controller
+and the second channel has a DVD attached to the master. Finally, a
+the booting image (will cover this later) will be attached in the
+master slot master in the channel 1 of the IDE.
 
 
-## License
+### Image specs
+
+You can use any VirtualBox image with VMFest, but we encourage using
+immutable ones, a must if you want to use VMFest as a cloud provider.
+
+VMFest lets you provide image medatata that will be passed on to the
+libraries using VMFest. This image metadata can contain information
+like the user/password for the image, the OS family, 32 or 64 bits,
+etc., but for now we only care about one piece of data: the image
+location in the file system --which for historical reasons it is
+called uuid:
+
+```clojure
+{:uuid
+"/Users/tbatchelli/images/vmfest-Debian-6.0.2.1-64bit-v0.3.vdi"}
+```
+
+### Create VMs from specs
+
+A new VM is created from a hardware spec and an image spec. The
+following will create a VM on the Virtualbox host defined by
+`my-server`.  
+
+```clojure
+(def my-machine 
+     (instance my-server "my-vmfest-vm" 
+        {:uuid "/Users/tbatchelli/imgs/vmfest-Debian-6.0.2.1-64bit-v0.3.vdi"}  
+        {:memory-size 512
+         :cpu-count 1
+         :network [{:attachment-type :host-only
+                    :host-only-interface "vboxnet0"}
+                   {:attachment-type :nat}]
+         :storage [{:name "IDE Controller"
+                    :bus :ide
+                    :devices [nil nil {:device-type :dvd} nil]}]
+         :boot-mount-point ["IDE Controller" 0]}))
+```
+
+## Manage VMs
+
+You can `start`, `pause`, `resume`, `stop`, `power-down` and `destroy` (careful
+with `destroy` if you are not using immutable images!). It shouldn't
+be too hard to figure out what they do. The only operation that needs
+some explanation is `destroy`, as it will remove the VM and __also the
+attached image__ if it is not immutable.
+
+Each of these functions take a machine as argument, e.g.:
+
+```clojure
+(start my-machine)
+(pause my-machine)
+(resume my-machine)
+(stop my-machine)
+(destroy my-machine)
+```
+
+Operating on existing machines is also possible:
+
+```clojure
+(def my-machine (find-machine my-server "a-machine"))
+(start my-machine)
+```
+
+Finally, you can get the IP address of your VMs, provided that the
+images the VMs are running have VirtualBox Guest Additions installed:
+
+```clojure
+(get-ip my-machine)
+```
+
+# Cloudy features
+
+## Models
+
+The main use case that we had when we built VMFest was to use
+VirtualBox like a lightweight cloud provider.
+
+Most clloud providers will tipically provide a set of images and a set
+hardware profiles, and when you want to create a new instance (VM) you
+select a profile for each, e.g., ubuntu 10.04 + Large Machine.
+
+To emulate this convention, vmfest has these two concepts: _Image
+Models_ and _Hardware Models_. These are lists of named specs, both
+for image and hardware. These specs are built with the clojure maps
+described above, and you can add your own too.
+
+When creating a new VM, you can reference these specs by key instead
+of passing the specs. For example, in my laptop, I can instantiate the
+exact same VM as above with: 
+
+```clojure
+(instance my-server "my-vmfest-vm" :debian-6.0.2.1-64bit-v0.3 :micro)
+```
+
+### Setting up Image Models
+
+We have created a few images to be used with VMFest. Although VMFest
+can operate on any image, we want to build high quality images that
+every one can confidently use. We also provide a way to setup those
+images on your local VMFest setup.
+
+```clojure
+(setup-model "https://s3.amazonaws.com/vmfest-images/debian-6.0.2.1-64bit-v0.3.vdi.gz" my-server)
+```
+
+This will download and install this image as immutable. From there on
+you can start using it as :debian-6.0.2.1-64bit-v0.3.
+
+## Fast VM Instantiation
+
+VirtualBox provides a way to run many VMs out of the same disk image.
+This is done using immutable disk images. When a image is set as
+immutable, every time you attach new VM to this disk, VirtualBox
+creates a `differencing disk`. This differencing disk contains the
+disk sectors from the original disk that have changed, or the
+difference. Each VM attached to an immutable image can diverge
+independently once it is booted.
+
+The benefit of using immutable images this way is that in order to
+start two or more VMs out of the same exact disk image, you don't have
+to create one copy the original disk image for each VM. This results in big
+savings in terms of time and most importantly, space.
+
+When you use VMFest then, you can create as many VMs as you please and
+attach them to the same image. This is usually a very fast operation,
+typically sub-second. Here is one example of how to do this:
+
+```clojure
+;; create some names for the VMs
+(def names ["slave-1" "slave-2" ... "slave-N" "master"])
+
+;; instantiate the VMs
+(def machines 
+     (map (fn [name] 
+              (instance my-server % :debian-6.0.2.1-64bit-v0.3 :micro))
+          names))
+          
+;; start all the VMs
+(map start machines)
+```
+
+# Low Level API 
+
+There is a low-level API to program VirtualBox from Cloure. This API
+eliminates some of the complexity of connecting to VirtualBox, but
+we'll leave this explanation for another day. Just know that it's
+there, and you can look at the `manager.clj` sources and the tests to
+see what this API is about.
+
+# Tutorial
+
+We've created a [playground project][playground]for you to test
+VMFest. You can find the tutorial [here][tutorial].
+
+[playground]: (https://github.com/pallet/vmfest-playground)
+[tutorial]:
+(https://github.com/pallet/vmfest-playground/blob/master/src/play.clj)
+
+```clojure
+(use 'vmfest.manager)
+(use '[vmfest.virtualbox.image :only [setup-model]])
+
+;; First we need to define a connection to our VirtualBox host
+;; service.
+(def my-server (server "http://localhost:18083"))
+
+;; We need an image model to play with. This will set up a fairly up-to-date
+;; Debian image.
+(setup-model "https://s3.amazonaws.com/vmfest-images/debian-6.0.2.1-64bit-v0.3.vdi.gz" my-server)
+;; {:image-file "/var/folders...}
+
+;; let's check that the image model has been installed
+(models)
+;; (:debian-6.0.2.1-64bit-v0.3) <-- you should see this
+
+;; Time do create a VM instance. We'll call it my-vmfest-vm. This is
+;; the name that will appear in VirtualBox's GUI.
+(def my-machine (instance my-server "my-vmfest-vm" :debian-6.0.2.1-64bit-v0.3 :micro))
+
+;; Notice that once we have created a VM we don't need to reference
+;; the server anymore
+(start my-machine)
+
+;; Get the IP address of the machine. At this point, you can SSH into
+;; this machine with user/password: vmfest/vmfest
+(get-ip my-machine)
+
+;; You can pause and resume the VM.
+(pause my-machine)
+(resume my-machine)
+
+;; Stopping the VM will send a signal to the OS to shutdown. This will
+;; not the VM itself, just the OS run by the VM
+(stop my-machine)
+
+;; This will turn off the VM completely and immediately.
+(power-down my-machine)
+
+;; Once we are done with this VM, we can destroy it, which will remove
+;; any trace of it's existence. Your data will be lost, but not the
+;; original image this VM was booted off.
+(destroy my-machine)
+
+
+;;; MULTIPLE INSTANCES
+
+;; Now we are going to create multiple instances of the same image.
+;; First we need some names for each instance. names will do just
+;; that, e.g.: (names 3) -> ("vmfest-0" "vmfest-1" "vmfest-2").
+(defn
+  names [n]
+  (map #(format "vmfest-%s" %) (range n)))
+
+;; This function will create a debian instance based on the image
+;; downloaded above
+(defn deb-instance [server name]
+  (instance server name :debian-6.0.2.1-64bit-v0.3 :micro))
+
+;; Let's create a few images. Notice that in this case we're creating
+;; 5. Each machine takes roughly 0.5GB of RAM, so change the number to
+;; match your available RAM.
+(def my-machines (pmap #(deb-instance my-server %)
+                       (names 5)))
+
+;; From here we can start, power-down, and destroy all the VMs in parallel.
+(pmap start my-machines)
+(pmap power-down my-machines)
+(pmap destroy my-machines)
+```
+# Contact
+
+If you need help setting up or programming VMFest, or have
+suggestions, or just want to chat, here are your options:
+
+ - Join the [Pallet mailing list][pallet-ml] and send a message
+ - Join the #pallet channel on [FreeNode's IRC][freenode]
+ - Create a new issue (feat request, bug, etc.) on
+   [vmfest's github repo][vmfest-issues]
+ - Tweet [@palletops][palletops-tweet]
+ 
+ 
+[pallet-ml]:(https://groups.google.com/forum/?fromgroups#!forum/pallet-clj)
+
+[freenode]: (http://freenode.net/irc_servers.shtml)
+
+[vmfest-issues]: (https://github.com/tbatchelli/vmfest/issues) 
+
+[palletops-tweet]: (https://twitter.com/palletops)

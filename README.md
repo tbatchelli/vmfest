@@ -33,13 +33,16 @@ Finally, disable login authorization in virtualbox server:
     ```
 
 
-[vbox41]: (https://www.virtualbox.org/wiki/Downloads)
+[vbox41]: https://www.virtualbox.org/wiki/Downloads
 
 ## Setup VMFest in your project
 
 The following instructions are for setting up [Leiningen][lein]
 project, just because pretty much everyone using Clojure uses `lein`,
 but sticking vmfest in your classpath will suffice.
+
+[lein]: https://github.com/technomancy/leiningen
+
 
 Add the following dependencies to your ```project.clj```:
 
@@ -49,7 +52,6 @@ Add the following dependencies to your ```project.clj```:
 
 NOTE: add more detailed instructions for non-clojurians
 
-[lein]: (https://github.com/technomancy/leiningen)
 
 # Basic Features
 
@@ -236,12 +238,11 @@ see what this API is about.
 
 # Tutorial
 
-We've created a [playground project][playground]for you to test
+We've created a [playground project][playground] for you to test
 VMFest. You can find the tutorial [here][tutorial].
 
-[playground]: (https://github.com/pallet/vmfest-playground)
-[tutorial]:
-(https://github.com/pallet/vmfest-playground/blob/master/src/play.clj)
+[playground]: https://github.com/pallet/vmfest-playground
+[tutorial]: https://github.com/pallet/vmfest-playground/blob/master/src/play.clj
 
 ```clojure
 (use 'vmfest.manager)
@@ -326,10 +327,10 @@ suggestions, or just want to chat, here are your options:
  - Tweet [@palletops][palletops-tweet]
  
  
-[pallet-ml]:(https://groups.google.com/forum/?fromgroups#!forum/pallet-clj)
+[pallet-ml]: https://groups.google.com/forum/?fromgroups#!forum/pallet-clj
 
-[freenode]: (http://freenode.net/irc_servers.shtml)
+[freenode]: http://freenode.net/irc_servers.shtml
 
-[vmfest-issues]: (https://github.com/tbatchelli/vmfest/issues) 
+[vmfest-issues]: https://github.com/tbatchelli/vmfest/issues
 
-[palletops-tweet]: (https://twitter.com/palletops)
+[palletops-tweet]: https://twitter.com/palletops

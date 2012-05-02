@@ -57,7 +57,7 @@ NOTE: add more detailed instructions for non-clojurians
 
 ## Create VMs programmatically
 
-VMFest has a data oriented API to create VMs. There are to data
+VMFest has a data oriented API to create VMs. There are two data
 structures needed to create a VM: one describing the hardware 
 and the other one describing the image that the VM will boot off.
 

@@ -1,4 +1,5 @@
 (ns vmfest.virtualbox.scan-codes
+  (:refer-clojure :exclude [chars])
   (:use [slingshot.slingshot :only (throw+)]))
 
 (defn keyp

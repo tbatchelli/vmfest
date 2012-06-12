@@ -326,6 +326,11 @@ suggestions, or just want to chat, here are your options:
    [vmfest's github repo][vmfest-issues]
  - Tweet [@palletops][palletops-tweet]
  
+# License
+
+Copyright © 2012 Antoni Batchelli
+
+Distributed under the Eclipse Public License, the same as Clojure.
  
 [pallet-ml]: https://groups.google.com/forum/?fromgroups#!forum/pallet-clj
 

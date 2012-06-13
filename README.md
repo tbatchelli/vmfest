@@ -13,6 +13,10 @@ welcome. Please use the
 [vbox]: http://www.virtualbox.org 
 [palletops]: http://palletops.com
 
+# Release Notes
+
+Can be found [here](relnotes.md).
+
 # Usage
 
 ## Install Virtualbox 4.1.x
@@ -28,10 +32,9 @@ $ vboxwebsrvr -t0
 
 Finally, disable login authorization in virtualbox server: 
 
-    ``` 
-    $ VBoxManage setproperty websrvauthlibrary null
-    ```
-
+``` 
+$ VBoxManage setproperty websrvauthlibrary null
+```
 
 [vbox41]: https://www.virtualbox.org/wiki/Downloads
 

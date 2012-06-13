@@ -15,7 +15,7 @@ welcome. Please use the
 
 # Release Notes
 
-Can be found [here](relnotes.md).
+Can be found [here](vmfest/blob/master/relnotes.md).
 
 # Usage
 

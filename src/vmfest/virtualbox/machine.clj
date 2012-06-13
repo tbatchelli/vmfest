@@ -71,6 +71,7 @@
    :rtc-use-utc? #(.getRTCUseUTC %)
    :io-cache-enabled? #(.getIoCacheEnabled %)
    :io-cache-size #(.getIoCacheSize %)
+   :io-apic-enabled? #(-> % (.getBIOSSettings) (.getIOAPICEnabled))
    ;;   :io-bandwidth-max #(.getIoBandwidthMax %)
    })
 
@@ -141,6 +142,7 @@
    :rtc-use-utc? (.getRTCUseUTC vb-m)
    :io-cache-enabled? (.getIoCacheEnabled vb-m)
    :io-cache-size (.getIoCacheSize vb-m)
+   :io-apic-enabled? (-> vb-m (.getBIOSSettings) (.getIOAPICEnabled))
    ;;   :io-bandwidth-max (.getIoBandwidthMax vb-m)
    })
 
@@ -174,6 +176,7 @@
    :rtc-use-utc? #(.setRTCUseUTC %2 %1)
    :io-cache-enabled? #(.setIoCacheEnabled %2 %1)
    :io-cache-size #(.setIoCacheSize %2 (long %1))
+   :io-apic-enabled? #(doto (.getBIOSSettings %2) (.setIOAPICEnabled %1))
    ;;   :io-bandwidth-max #(.setIoBandwidthMax %2 (long %1))
    })
 

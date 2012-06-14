@@ -50,7 +50,7 @@ but sticking vmfest in your classpath will suffice.
 Add the following dependencies to your ```project.clj```:
 
 ```clojure
-   [vmfest "0.2.4-beta.5"]
+   [vmfest "0.2.4"]
 ```
 
 NOTE: add more detailed instructions for non-clojurians

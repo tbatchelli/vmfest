@@ -85,7 +85,7 @@ machines are stored in ~/.vmfest/nodes ."
   "Adds metadata to a machine, in the form of a key, value pair"
   [machine key value]
   {:pre [(model/Machine? machine)]}
-  (session/with-session machine :write [_ vb-m]
+  (session/with-session machine :shared [_ vb-m]
     (machine/set-extra-data vb-m key value)))
 
 (defn get-extra-data [machine key]

@@ -95,6 +95,13 @@ machines are stored in ~/.vmfest/nodes ."
   (session/with-no-session machine [vb-m]
     (machine/get-extra-data vb-m key)))
 
+(defn get-extra-data-keys [machine]
+  "Gets metadata keys from a machine"
+  {:pre [(model/Machine? machine)]}
+  (log/tracef "get-extra-data-keys : getting extra data for %s" (:id machine))
+  (session/with-no-session machine [vb-m]
+    (machine/get-extra-data-keys vb-m)))
+
 
 
 ;;; host functions

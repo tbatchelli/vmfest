@@ -421,6 +421,13 @@ See IVirtualbox::openRemoteSession for more details"
      :VBOX_E_XML_ERROR "Could not parse the settings file."}
     (.getExtraData m key)))
 
+(defn get-extra-data-keys [^IMachine m]
+  {:pre [(model/IMachine? m)]}
+  (conditions/with-vbox-exception-translation
+    {:VBOX_E_FILE_ERROR "Settings file not accessible."
+     :VBOX_E_XML_ERROR "Could not parse the settings file."}
+    (.getExtraDataKeys m)))
+
 ;;;;;;;
 
 (defn unregister [vb-m & [cleanup-key]]

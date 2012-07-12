@@ -24,7 +24,7 @@ Can be found [here](vmfest/blob/master/relnotes.md).
 Download and install [VirtualBox 4.1.x][vbox41]. It won't work with
 any older version.
 
-Start the VirtualBox server (`vboxwebsrvr`) by issuing the following on the shell:
+Start the VirtualBox server (`vboxwebsrv`) by issuing the following on the shell:
 
 ```bash
 $ vboxwebsrv -t0

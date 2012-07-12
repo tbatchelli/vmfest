@@ -27,7 +27,7 @@ any older version.
 Start the VirtualBox server (`vboxwebsrvr`) by issuing the following on the shell:
 
 ```bash
-$ vboxwebsrvr -t0
+$ vboxwebsrv -t0
 ```
 
 Finally, disable login authorization in virtualbox server: 

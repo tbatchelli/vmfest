@@ -4,7 +4,7 @@
    [org.virtualbox_4_1 IMachine MachineState ClipboardMode PointingHidType
     FirmwareType KeyboardHidType SessionState SessionType StorageBus
     DeviceType NetworkAttachmentType CleanupMode StorageControllerType
-    MediumType HostNetworkInterfaceType AccessMode]))
+    MediumType HostNetworkInterfaceType AccessMode MediumVariant]))
 
 
 (defmacro find-key-by-value [value table]
@@ -240,3 +240,25 @@
   (find-key-by-value type access-mode-type-to-key-table))
 (defn key-to-access-mode [key]
   (find-value-by-key key access-mode-type-to-key-table))
+
+;;; MediumVariant
+(def medium-variant-type-to-key-table
+  [[MediumVariant/Standard :standard
+    "No particular variant requested, results in using the backend default."]
+   [MediumVariant/VmdkSplit2G :vmdk-split-2g
+    "VMDK image split in chunks of less than 2GByte."]
+   [MediumVariant/VmdkStreamOptimized :vmdk-stream-optimized
+    (str "VMDK streamOptimized image. Special import/export format"
+         " which is read-only/append-only.")]
+   [MediumVariant/VmdkESX :vmdk-esx
+    "VMDK format variant used on ESX products."]
+   [MediumVariant/Fixed :fixed "Fixed image. Only allowed for base images."]
+   [MediumVariant/Diff :diff
+    "Differencing image. Only allowed for child images."]
+   [MediumVariant/NoCreateDir :no-create-dir
+    (str "Special flag which suppresses automatic creation of the subdirectory."
+         " Only used when passing the medium variant as an input parameter.")]])
+(defn medium-variant-type-to-key [type]
+  (find-key-by-value type medium-variant-type-to-key-table))
+(defn key-to-medium-variant [key]
+  (find-value-by-key key medium-variant-type-to-key-table))

@@ -2,12 +2,15 @@
   (:use [clojure.java.io]
         [vmfest.virtualbox.session :only (with-vbox)]
         [clojure.pprint :only (pprint)]
-        [vmfest.virtualbox.virtualbox :only (find-medium)])
+        [vmfest.virtualbox.virtualbox :only (find-medium)]
+        [vmfest.virtualbox.system-properties :only [supported-medium-formats
+                                                    default-hard-disk-format]]
+        [slingshot.slingshot :only [throw+]])
   (:require [clojure.tools.logging :as log]
             [clojure.string :as string]
             [vmfest.virtualbox.enums :as enums])
   (:import [org.virtualbox_4_1 DeviceType AccessMode MediumVariant
-            MediumType]
+            MediumType IMedium MediumState]
            [java.util.zip GZIPInputStream]
            [java.io File]))
 
@@ -175,7 +178,7 @@
     (log/info (str "About to execute job \n" (with-out-str (pprint job))))
     (if (.exists (File. (:model-file job)))
       (log/errorf
-       "TheModel %s already exists. Manually specifiy another file name with :model-name"
+       "The model %s already exists. Manually specifiy another file name with :model-name"
        (:model-file job))
       (do
         (-> job
@@ -191,3 +194,79 @@
  (use 'vmfest.virtualbox.image)
  (def my-server (server "http://localhost:18083"))
  (setup-model "https://s3.amazonaws.com/vmfest-images/ubuntu-10-10-64bit-server.vdi.gz" my-server))
+
+
+;;; new image creation
+
+(defn- create-base-storage
+  "Creates the actual base storage for this medium. If no variant
+  flags are passed it will default to [].
+
+  Returns an IProgress for this operation
+
+  logical-size in MB
+  variants is a sequence of MediumVariant keys
+          (see enums/medium-variant-type-to-key-table) "
+  [medium logical-size variant-seq]
+  (let [ ;; variants are flags. Get all the flags into a single long value
+        variants (long (reduce bit-or 0
+                               (map (comp #(.value %) enums/key-to-medium-variant)
+                                    (or variant-seq []))))
+        logical-size (long (* 1024 1024 logical-size))]
+    (log/infof
+     "create-base-storage: Creating medium with size %sMB and variants %s"
+     logical-size variants)
+    (.createBaseStorage medium logical-size variants)))
+
+(defn create-medium
+  "Creates a hard disk in the path described by `location`.
+
+  vbox: an IVirtualBox
+  location: File path where the image will be created
+  format: the format of the image. One in
+       (system-properties/supported-medium-formats)
+  size: Logical size, in MB
+  variants: one or more of the variants in
+      (enums/medium-variant-type-to-key-table)
+
+  NOTE: not all formats and variants are supported for all hosts, nor
+  all combinations of variatns are valid. Error reporting on this
+  front is spotty at best."
+  [vbox location format-key size variants]
+  (let [format-key
+        ;; ensure that a format is specified. Not sure this is needed,
+        ;; but at least it makes it explicit what format will be used
+        ;; when none is specified
+        (or format-key
+            (let [format-key (keyword
+                              (.toLowerCase (default-hard-disk-format vbox)))]
+              (log/warnf
+               "create-medium: No format specified for %s. Defaulting to %s"
+               location format-key)
+              format-key))]
+    (if (some #(= format-key %) (supported-medium-formats vbox))
+      ;; only get here when the required format is supported in this host
+      (let [medium (.createHardDisk vbox (name format-key) location)
+            progress (create-base-storage medium size variants)]
+        (.waitForCompletion progress (Integer. -1)) ;; wait until it is done
+        (when (= (.getState medium) MediumState/NotCreated)
+          ;; oops. Image not created
+          (throw+ {:type :image-not-created
+                   :last-access-error (.getLastAccessError medium)
+                   :message
+                   (format
+                    (str "Cannot create image. Check that the variants %s are"
+                         " allowed in this host, or that the image doesn't"
+                         " already exist in %s")
+                    variants location)
+                   :result-code (.getResultCode progress)}))
+        medium)
+      ;; the format is unsupported in this host
+      (throw+ {:type :invalid-image-format
+               :message
+               (format (str "The format %s for image %s is not supported in this"
+                            " host.")
+                       format-key location)}))))
+
+
+

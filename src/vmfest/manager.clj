@@ -85,7 +85,7 @@ machines are stored in ~/.vmfest/nodes ."
   "Adds metadata to a machine, in the form of a key, value pair"
   [machine key value]
   {:pre [(model/Machine? machine)]}
-  (session/with-session machine :write [_ vb-m]
+  (session/with-session machine :shared [_ vb-m]
     (machine/set-extra-data vb-m key value)))
 
 (defn get-extra-data [machine key]
@@ -94,6 +94,13 @@ machines are stored in ~/.vmfest/nodes ."
   (log/tracef "get-extra-data: getting extra data for %s %s" (:id machine) key)
   (session/with-no-session machine [vb-m]
     (machine/get-extra-data vb-m key)))
+
+(defn get-extra-data-keys [machine]
+  "Gets metadata keys from a machine"
+  {:pre [(model/Machine? machine)]}
+  (log/tracef "get-extra-data-keys : getting extra data for %s" (:id machine))
+  (session/with-no-session machine [vb-m]
+    (machine/get-extra-data-keys vb-m)))
 
 
 
@@ -324,12 +331,42 @@ VirtualBox"
           ;; sometimes VBox seems to unregister images. We will make
           ;; sure the boot image is always registered before we try to
           ;; build the machine.
-          (ensure-image-is-registered vbox image-uuid)
+          (when image-uuid
+            (ensure-image-is-registered vbox image-uuid))
           (machine-config/configure-machine-storage
            vb-m boot-image-mounted-config)
           (machine/save-settings vb-m))))
     m))
 
+(defn new-image
+  "Creates a new hard disk image as described by the `image-spec` map
+  that contains the keys :size :format :variants :location. Only :size
+  and :location are mandatory.
+
+  vbox: an IVirtualBox
+
+  image spec:
+    :location File path where the image will be created
+    :format the format of the image. One in
+       (system-properties/supported-medium-formats)
+    :size Logical size, in MB
+    :variants a sequence with zero or more of the variants in
+      (enums/medium-variant-type-to-key-table)
+
+  e.g.:
+
+   (new-image (server \"http://localhost:18083\"
+               {:size 1024
+                :location \"/tmp/my-image.vdi\"
+                :format :vdi
+                :variants [:fixed]}))
+
+  NOTE: not all formats and variants are supported for all hosts, nor
+  all combinations of variatns are valid. Error reporting on this
+  front is spotty at best"
+  [server {:keys [size format variants location] :as image-spec}]
+  (session/with-vbox server [_ vbox]
+    (image/create-medium vbox location format size variants)))
 
 (defn instance* [server name image machine & [base-folder]]
     (let [uuid (:uuid image)
@@ -439,12 +476,30 @@ VirtualBox"
     (catch [:type :vbox-runtime] _
       (log/warn "Trying to stop an already stopped machine"))))
 
-(defn destroy [machine]
+(defn destroy [machine & {:keys [delete-disks timeout]
+                          :or {delete-disks true
+                               timeout -1}}]
   {:pre [(model/Machine? machine)]}
   (let [id (:id machine)]
     (session/with-no-session machine [vb-m]
       (let [media (machine/unregister vb-m :detach-all-return-hard-disks-only)]
-        (machine/delete vb-m media)))))
+        (.waitForCompletion
+         (machine/delete vb-m (if delete-disks media nil))
+         (Integer. timeout))))))
+
+(defn send-keyboard [machine entries]
+  "Given a sequence with a mix of character strings and keywords it
+ sends to the machine the scan codes via the virtual keyboard that
+ correspond to the values in 'entries'.
+
+ (chars) will provide a list of permitted characters in the strings
+ (non-chars) will provide a list of the permitted commands as keywords
+
+ Example:
+  (scan-codes {:keypad-5 \"Abc\"})
+  => (76 204 42 30 158 170 48 176 46 174)"
+  (session/with-session machine :shared [s _]
+    (machine/send-keyboard-entries s entries)))
 
 
 ;;; virtualbox-wide functions
@@ -487,6 +542,16 @@ VirtualBox"
 
 (defn as-map [& params]
   (apply model/as-map params))
+
+(defn make-disk-immutable [server path]
+  (session/with-vbox server [_ vbox]
+    (let [medium (vbox/find-medium vbox path :hard-disk)]
+      (log/infof "Compacting image %s" path)
+      (.waitForCompletion
+       (.compact medium)
+       (Integer. -1))
+      (log/infof "Making hard-disk %s multi-attach (immutable)" path)
+      (image/make-immutable medium))))
 
 (comment "without pallet-style infrastructure"
   (use 'vmfest.manager)

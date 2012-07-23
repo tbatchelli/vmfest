@@ -5,6 +5,7 @@
             [vmfest.virtualbox.model :as model]
             [vmfest.virtualbox.enums :as enums]
             [vmfest.virtualbox.session :as session])
+  (:use [vmfest.virtualbox.scan-codes :only (scan-codes)])
   (:import [org.virtualbox_4_1 IMachine IConsole VBoxException
             VirtualBoxManager IVirtualBox IMedium NetworkAttachmentType]
            [vmfest.virtualbox.model GuestOsType Machine]))
@@ -420,6 +421,13 @@ See IVirtualbox::openRemoteSession for more details"
      :VBOX_E_XML_ERROR "Could not parse the settings file."}
     (.getExtraData m key)))
 
+(defn get-extra-data-keys [^IMachine m]
+  {:pre [(model/IMachine? m)]}
+  (conditions/with-vbox-exception-translation
+    {:VBOX_E_FILE_ERROR "Settings file not accessible."
+     :VBOX_E_XML_ERROR "Could not parse the settings file."}
+    (.getExtraDataKeys m)))
+
 ;;;;;;;
 
 (defn unregister [vb-m & [cleanup-key]]
@@ -456,3 +464,31 @@ See IVirtualbox::openRemoteSession for more details"
 (defn get-storage-controller-by-name [m name]
   {:pre [(model/IMachine? m)]}
   (.getStorageControllerByName m name))
+
+;;; scan codes
+(defn send-keyboard-entries [vb-m entries]
+  "Given a sequence with a mix of:
+     - strings corresponding to text
+     - keywords corresponding to non-char key presses
+     - numbers corresponding to wait times in ms.
+  it sends the scan codes corresponding to either the strings or the keywords
+  to the VM's keyboard interface, simulating a keyboard attached to the VM.
+
+  The scan codes will be sent as fast as possible, observing the
+  pauses in ms. especified in the form of numbers in the entries
+  sequence.
+
+  Note that:
+   - (chars) will provide a list of permitted characters in the strings
+   - (non-chars) will provide a list of the permitted commands as keywords
+
+ Example:
+  (scan-codes {:esc 100 \"Abc\"})
+  will send an ESCAPE, wait for 100ms and then send the text \"Abc\" "
+  (let [keyboard  (.getKeyboard (.getConsole vb-m))
+        scan-code-seq (scan-codes entries)]
+    (log/debugf "Sending to %s the scan-codes %s" (.getName (.getMachine vb-m)) scan-code-seq)
+    (doseq [sc scan-code-seq]
+      (if (number? sc)
+        (.putScancode keyboard (Integer. sc))
+        (Thread/sleep (first sc))))))

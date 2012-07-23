@@ -1,5 +1,14 @@
 # Release Notes
 
+## 0.2.5
+
+- Add support for get-extra-data-keys
+  This allows the extra data to be enumerated.
+
+## 0.2.4
+
+Same as 0.2.4-beta.5
+
 ## 0.2.4-beta.5
 
 - Attempt to create the nodes directory if it doesn't exist.

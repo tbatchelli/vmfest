@@ -26,6 +26,26 @@
               (sleep 10)
               (recur task description)))))
 
+(defmacro with-mor-workarounds
+  "this macro exists because vCenter sometimes fails to get the
+managed object reference for objects that actually do exist. Wrap
+any call to vi java in this to have it retry with an incramental delay"
+  [& body]
+  `((fn mor-workaround# [attempt# timeout#]
+      (if (> attempt# 10)
+        (do (println "giving up after too many mor-not-found failures")
+            (println "please complain to VMware about this bug...")
+            (throw (Exception. "MOR not found for existing object")))
+        (try
+          ~@body
+          (catch RuntimeException e#
+            (if  (instance? com.vmware.vim25.ManagedObjectNotFound (unwrap-exception e#))
+              (do (println "Caught VMware ManagedObjectNotFound bug " e#)
+                  (sleep timeout#)
+                  (mor-workaround# (inc attempt#) (+ 5 timeout#)))
+              (throw (RuntimeException. e#)))))))
+    0 5))
+
 (defn get-si [host-ip-or-dns user password]
   (ServiceInstance.
    (java.net.URL. (str "https://" host-ip-or-dns "/sdk"))

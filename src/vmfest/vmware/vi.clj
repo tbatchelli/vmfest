@@ -352,3 +352,17 @@ to print a report on these three testbeds, or just (status) for all testbeds"
     (if (zero? result)
       (println (-> status :totals :vms) " active VMS"))
     result))
+
+
+(comment
+
+  (with-vc-login
+        {:vc    "my.vc.company.com"
+         :username "administrator"
+         :password "sUpers3kret"}
+        (with-vc-login
+          (clone-vm "template-vm-name"
+                    "new-vm-name"
+                    "name-of-host-on-vcenter"
+                    "my-datastore-name"
+                    [["eth0" "Network1"] ["eth1" "Network2"]]))))

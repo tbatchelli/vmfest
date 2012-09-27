@@ -12,6 +12,7 @@
                :all [[slingshot "0.10.0"]
                      [org.clojure/tools.logging "0.2.3"]
                      [org.clojars.tbatchelli/vboxjws "4.1.8"]
+                     [org.jvnet.hudson/vijava "2120100824"]
                      [fs "1.0.0"]]}
   :dev-dependencies [[robert/hooke "1.1.2"]
                      [log4j/log4j "1.2.14"]

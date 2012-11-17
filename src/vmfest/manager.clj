@@ -538,6 +538,26 @@ VirtualBox"
       (map (comp get-keys vmfest.virtualbox.guest-os-type/map-from-IGuestOSType)
            (.getGuestOSTypes vbox)))))
 
+;;; list images from server
+
+(defn available-models
+  "Lists the available models in a model repository"
+  [& url]
+  (let [url (or url "http://s3.amazonaws.com/vmfest-images")
+        listing (clojure.xml/parse url)
+        files (for [x (xml-seq listing)
+                      :when (= :Key (:tag x))]
+                (first (:content x)))
+        metas (filter #(re-find #"\.meta$" %) files)
+        fixed-metas (map #(clojure.string/replace % #" " "+") metas)
+        meta-files (map #(str url "/" %) fixed-metas)
+        read-url (fn [url]
+                   (read (java.io.PushbackReader.
+                          (clojure.java.io/reader url))))
+        read-metas (map read-url meta-files)]
+    (map (fn [a b] (assoc b :url a)) meta-files read-metas)))
+
+
 ;;; model forwards
 
 (defn as-map [& params]
@@ -552,6 +572,8 @@ VirtualBox"
        (Integer. -1))
       (log/infof "Making hard-disk %s multi-attach (immutable)" path)
       (image/make-immutable medium))))
+
+
 
 (comment "without pallet-style infrastructure"
   (use 'vmfest.manager)

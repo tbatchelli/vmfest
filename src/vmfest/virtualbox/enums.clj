@@ -1,8 +1,8 @@
 (ns vmfest.virtualbox.enums
   (:require [clojure.tools.logging :as log])
   (:import
-   [org.virtualbox_4_1 IMachine MachineState ClipboardMode PointingHidType
-    FirmwareType KeyboardHidType SessionState SessionType StorageBus
+   [org.virtualbox_4_1 IMachine MachineState ClipboardMode PointingHIDType
+    FirmwareType KeyboardHIDType SessionState SessionType StorageBus
     DeviceType NetworkAttachmentType CleanupMode StorageControllerType
     MediumType HostNetworkInterfaceType AccessMode MediumVariant]))
 
@@ -69,13 +69,13 @@
 (defn key-to-clipboard-mode [key]
   (find-value-by-key key clipboard-mode-to-key-table))
 
-;;; PointingHidType
+;;; PointingHIDType
 (def pointing-hid-type-to-key-table
-  [[PointingHidType/None :none ""]
-   [PointingHidType/PS2Mouse :ps2-mouse ""]
-   [PointingHidType/USBMouse :usb-mouse ""]
-   [PointingHidType/USBTablet :usb-tablet ""]
-   [PointingHidType/ComboMouse :combo-mouse ""]])
+  [[PointingHIDType/None :none ""]
+   [PointingHIDType/PS2Mouse :ps2-mouse ""]
+   [PointingHIDType/USBMouse :usb-mouse ""]
+   [PointingHIDType/USBTablet :usb-tablet ""]
+   [PointingHIDType/ComboMouse :combo-mouse ""]])
 
 (defn pointing-hid-type-to-key [type]
   (find-key-by-value type pointing-hid-type-to-key-table))
@@ -96,12 +96,12 @@
 
 (defn key-to-firmware-type [key]
   (find-value-by-key key firmware-type-to-key-table))
-;;; KeyboardHidType
+;;; KeyboardHIDType
 (def keyboard-hid-type-to-key-table
-  [[KeyboardHidType/None :none ""]
-   [KeyboardHidType/PS2Keyboard :ps2-keyboard ""]
-   [KeyboardHidType/USBKeyboard :usb-keyboard ""]
-   [KeyboardHidType/ComboKeyboard :combo-keyboard ""]])
+  [[KeyboardHIDType/None :none ""]
+   [KeyboardHIDType/PS2Keyboard :ps2-keyboard ""]
+   [KeyboardHIDType/USBKeyboard :usb-keyboard ""]
+   [KeyboardHIDType/ComboKeyboard :combo-keyboard ""]])
 (defn keyboard-hid-type-to-key [type]
   (find-key-by-value type keyboard-hid-type-to-key-table))
 (defn key-to-keyboard-hid-type [key]

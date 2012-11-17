@@ -34,9 +34,9 @@
    :firmware-type #(enums/firmware-type-to-key
                    (.getFirmwareType %)) ;todo: get object
    :pointing-hid-type #(enums/pointing-hid-type-to-key
-                       (.getPointingHidType %)) ;todo: get object
+                       (.getPointingHIDType %)) ;todo: get object
    :keyboard-hid-type #(enums/keyboard-hid-type-to-key
-                       (.getKeyboardHidType %)) ;todo: get object
+                       (.getKeyboardHIDType %)) ;todo: get object
    :hpet-enabled #(.getHpetEnabled %)
    :snapshot-folder #(.getSnapshotFolder %)
    :vrde-server #(.getVRDEServer %) ;todo: get object
@@ -104,9 +104,9 @@
    :firmware-type (enums/firmware-type-to-key
                    (.getFirmwareType vb-m)) ;todo: get object
    :pointing-hid-type (enums/pointing-hid-type-to-key
-                       (.getPointingHidType vb-m)) ;todo: get object
+                       (.getPointingHIDType vb-m)) ;todo: get object
    :keyboard-hid-type (enums/keyboard-hid-type-to-key
-                       (.getKeyboardHidType vb-m)) ;todo: get object
+                       (.getKeyboardHIDType vb-m)) ;todo: get object
    :hpet-enabled (.getHpetEnabled vb-m)
    :snapshot-folder (.getSnapshotFolder vb-m)
    :vrde-server (.getVRDEServer vb-m) ;todo: get object
@@ -161,8 +161,8 @@
    :accelerate-2d-enabled? #(.setAccelerate2DEnabled %2 %1)
    :monitor-count #(.setMonitorCount %2 (long %1))
    :firmware-type #(.setFirmwareType %2 %1)
-   :pointing-hid-type #(.setPointingHidType %2 %1)
-   :keyboard-hid-type #(.setKeyboardHidType %2 %1)
+   :pointing-hid-type #(.setPointingHIDType %2 %1)
+   :keyboard-hid-type #(.setKeyboardHIDType %2 %1)
    :hpet-enabled #(.setHpetEnabled %2 %1)
    :snapshot-folder #(.setSnapshotFolder %2 %1)
    :clipboard-mode #(.setClipboardMode %2 %1)

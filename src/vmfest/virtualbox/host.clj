@@ -1,5 +1,5 @@
 (ns vmfest.virtualbox.host
-  (:import [org.virtualbox_4_1 HostNetworkInterfaceType Holder IHostNetworkInterface])
+  (:import [org.virtualbox_4_2 HostNetworkInterfaceType Holder IHostNetworkInterface])
   (:require [vmfest.virtualbox.conditions :as conditions]
             [clojure.tools.logging :as log])
   (:use [vmfest.virtualbox.virtualbox :only [find-dhcp-by-interface-name

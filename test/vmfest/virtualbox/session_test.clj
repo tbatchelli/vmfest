@@ -4,7 +4,7 @@
   (:use clojure.test
         vmfest.fixtures
         vmfest.virtualbox.model)
-  (:import [org.virtualbox_4_1
+  (:import [org.virtualbox_4_2
             VirtualBoxManager]
            [slingshot ExceptionInfo]
            [vmfest.virtualbox.model

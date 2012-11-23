@@ -1,9 +1,10 @@
-(defproject vmfest "0.2.5"
+(defproject vmfest "0.2.6-beta.1"
   :description "Manage local VMs from the REPL"
   :dependencies [[org.clojure/clojure "1.2.1"]
                  [slingshot "0.10.0"]
                  [org.clojure/tools.logging "0.2.3"]
-                 [org.clojars.tbatchelli/vboxjws "4.1.8"]
+                 [org.clojars.tbatchelli/vboxjws "4.2.4"]
+                 [clj-http "0.5.8"]
                  [fs "1.0.0"]]
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}

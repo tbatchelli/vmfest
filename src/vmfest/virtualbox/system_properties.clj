@@ -1,5 +1,5 @@
 (ns vmfest.virtualbox.system-properties
-  (:import [org.virtualbox_4_1 ISystemProperties IMachine IVirtualBox]))
+  (:import [org.virtualbox_4_2 ISystemProperties IMachine IVirtualBox]))
 
 (defmulti system-properties class)
 

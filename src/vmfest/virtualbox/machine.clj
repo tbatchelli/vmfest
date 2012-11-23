@@ -6,7 +6,7 @@
             [vmfest.virtualbox.enums :as enums]
             [vmfest.virtualbox.session :as session])
   (:use [vmfest.virtualbox.scan-codes :only (scan-codes)])
-  (:import [org.virtualbox_4_1 IMachine IConsole VBoxException
+  (:import [org.virtualbox_4_2 IMachine IConsole VBoxException
             VirtualBoxManager IVirtualBox IMedium NetworkAttachmentType]
            [vmfest.virtualbox.model GuestOsType Machine]))
 
@@ -37,7 +37,7 @@
                        (.getPointingHIDType %)) ;todo: get object
    :keyboard-hid-type #(enums/keyboard-hid-type-to-key
                        (.getKeyboardHIDType %)) ;todo: get object
-   :hpet-enabled #(.getHpetEnabled %)
+   :hpet-enabled #(.getHPETEnabled %)
    :snapshot-folder #(.getSnapshotFolder %)
    :vrde-server #(.getVRDEServer %) ;todo: get object
    :medium-attachments #(.getMediumAttachments %) ;todo: get
@@ -52,7 +52,7 @@
    :session-state #(enums/session-state-to-key
                    (.getSessionState %)) ;todo: get object
    :session-type #(enums/session-type-to-key (.getSessionType %))
-   :session-pid #(.getSessionPid %)
+   :session-pid #(.getSessionPID %)
    :state #(enums/machine-state-to-key (.getState %)) ;todo: get object
    :last-state-change #(.getLastStateChange %) ;todo: make-date?
    :state-file-path #(.getStateFilePath %)
@@ -70,7 +70,7 @@
    :teleporter-address #(.getTeleporterAddress %)
    :teleporter-password #(.getTeleporterPassword %)
    :rtc-use-utc? #(.getRTCUseUTC %)
-   :io-cache-enabled? #(.getIoCacheEnabled %)
+   :io-cache-enabled? #(.getIOCacheEnabled %)
    :io-cache-size #(.getIoCacheSize %)
    ;;   :io-bandwidth-max #(.getIoBandwidthMax %)
    })
@@ -107,7 +107,7 @@
                        (.getPointingHIDType vb-m)) ;todo: get object
    :keyboard-hid-type (enums/keyboard-hid-type-to-key
                        (.getKeyboardHIDType vb-m)) ;todo: get object
-   :hpet-enabled (.getHpetEnabled vb-m)
+   :hpet-enabled (.getHPETEnabled vb-m)
    :snapshot-folder (.getSnapshotFolder vb-m)
    :vrde-server (.getVRDEServer vb-m) ;todo: get object
    :medium-attachments (.getMediumAttachments vb-m) ;todo: get
@@ -122,7 +122,7 @@
    :session-state (enums/session-state-to-key
                    (.getSessionState vb-m)) ;todo: get object
    :session-type (enums/session-type-to-key (.getSessionType vb-m))
-   :session-pid (.getSessionPid vb-m)
+   :session-pid (.getSessionPID vb-m)
    :state (enums/machine-state-to-key (.getState vb-m)) ;todo: get object
    :last-state-change (.getLastStateChange vb-m) ;todo: make-date?
    :state-file-path (.getStateFilePath vb-m)
@@ -140,8 +140,8 @@
    :teleporter-address (.getTeleporterAddress vb-m)
    :teleporter-password (.getTeleporterPassword vb-m)
    :rtc-use-utc? (.getRTCUseUTC vb-m)
-   :io-cache-enabled? (.getIoCacheEnabled vb-m)
-   :io-cache-size (.getIoCacheSize vb-m)
+   :io-cache-enabled? (.getIOCacheEnabled vb-m)
+   :io-cache-size (.getIOCacheSize vb-m)
    ;;   :io-bandwidth-max (.getIoBandwidthMax vb-m)
    })
 
@@ -173,8 +173,8 @@
    :teleporter-address #(.setTeleporterAddress %2 %1)
    :teleporter-password #(.setTeleporterAddress %2 %1)
    :rtc-use-utc? #(.setRTCUseUTC %2 %1)
-   :io-cache-enabled? #(.setIoCacheEnabled %2 %1)
-   :io-cache-size #(.setIoCacheSize %2 (long %1))
+   :io-cache-enabled? #(.setIOCacheEnabled %2 %1)
+   :io-cache-size #(.setIOCacheSize %2 (long %1))
    ;;   :io-bandwidth-max #(.setIoBandwidthMax %2 (long %1))
    })
 

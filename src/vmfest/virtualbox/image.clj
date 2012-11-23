@@ -9,7 +9,7 @@
   (:require [clojure.tools.logging :as log]
             [clojure.string :as string]
             [vmfest.virtualbox.enums :as enums])
-  (:import [org.virtualbox_4_1 DeviceType AccessMode MediumVariant
+  (:import [org.virtualbox_4_2 DeviceType AccessMode MediumVariant
             MediumType IMedium MediumState]
            [java.util.zip GZIPInputStream]
            [java.io File]))

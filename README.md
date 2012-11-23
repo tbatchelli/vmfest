@@ -19,9 +19,9 @@ Can be found [here](vmfest/blob/master/relnotes.md).
 
 # Usage
 
-## Install Virtualbox 4.1.x
+## Install Virtualbox 4.2.x
 
-Download and install [VirtualBox 4.1.x][vbox41]. It won't work with
+Download and install [VirtualBox 4.2.x][vbox42]. It won't work with
 any older version.
 
 Start the VirtualBox server (`vboxwebsrv`) by issuing the following on the shell:
@@ -50,7 +50,7 @@ but sticking vmfest in your classpath will suffice.
 Add the following dependencies to your ```project.clj```:
 
 ```clojure
-   [vmfest "0.2.5"]
+   [vmfest "0.2.6-beta.1"]
 ```
 
 NOTE: add more detailed instructions for non-clojurians

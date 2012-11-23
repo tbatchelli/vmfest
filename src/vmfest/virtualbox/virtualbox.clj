@@ -4,7 +4,7 @@
             [vmfest.virtualbox.conditions :as conditions]
             [vmfest.virtualbox.enums :as enums]
             vmfest.virtualbox.guest-os-type)
-  (:import [org.virtualbox_4_1
+  (:import [org.virtualbox_4_2
             VirtualBoxManager
             IVirtualBox
             VBoxException]
@@ -23,20 +23,6 @@
     (catch Exception e
       (log/warnf
        "find-vb-m: Machine identified by '%s' not found." id-or-name))))
-
-(defn find-medium
-  [vbox id-or-location & [type]]
-  {:pre [(model/IVirtualBox? vbox)
-         (if type (#{:hard-disk :floppy :dvd} type) true)]}
-  (if (and type (not (#{:hard-disk :floppy :dvd} type)))
-    ;; todo: throw condition
-    (log/warnf
-     "find-medium: medium type %s not in #{:hard-disk :floppy :dvd}" type)
-    (let [type-key (or type :hard-disk)
-          type (enums/key-to-device-type type-key)]
-      (try (.findMedium vbox id-or-location type)
-           (catch Exception e
-             (log/warnf "find-medium: location %s not found" id-or-location))))))
 
 (defn open-medium
   [vbox location & [type access-mode force-new-uuid?]]
@@ -57,6 +43,23 @@ at the specified location."
        "Medium has already been added to a media registry."}
       (.openMedium vbox location type access-mode force-new-uuid?))))
 
+(defn find-medium
+  [vbox id-or-location & [type]]
+  #_{:pre [(model/IVirtualBox? vbox)
+         (if type (#{:hard-disk :floppy :dvd} type) true)]}
+  #_(if (and type (not (#{:hard-disk :floppy :dvd} type)))
+    ;; todo: throw condition
+    (log/warnf
+     "find-medium: medium type %s not in #{:hard-disk :floppy :dvd}" type)
+    (let [type-key (or type :hard-disk)
+          type (enums/key-to-device-type type-key)]
+      (try (.findMedium vbox id-or-location type)
+           (catch Exception e
+             (log/warnf "find-medium: location %s not found" id-or-location)))))
+  (try (open-medium vbox id-or-location type)
+       (catch Exception e
+         (log/warnf "find-medium: location %s not found" id-or-location))))
+
 (defn register-machine [vbox machine]
   {:pre [(model/IVirtualBox? vbox)
          (model/IMachine? machine)]}
@@ -69,12 +72,14 @@ at the specified location."
 (defn create-machine
   ([vbox name os-type-id]
      (create-machine vbox name os-type-id false))
-  ([vbox name os-type-id overwrite]
-     (create-machine vbox name os-type-id overwrite nil))
-  ([vbox name os-type-id overwrite base-folder]
+  ([vbox name os-type-id overwrite?]
+     (create-machine vbox name os-type-id overwrite? nil))
+  ([vbox name os-type-id overwrite? base-folder]
      {:pre [(model/IVirtualBox? vbox)]}
-     (let [path (when base-folder
-                  (.composeMachineFilename vbox name base-folder))]
+     (let [flags (if overwrite? "forceOverwrite=1" nil)
+           path (when base-folder
+                  ;; using no groups for now (group=nil)
+                  (.composeMachineFilename vbox name "/vmfest" flags base-folder))]
        (conditions/with-vbox-exception-translation
          {:VBOX_E_OBJECT_NOT_FOUND "invalid os type ID."
           :VBOX_E_FILE_ERROR
@@ -86,8 +91,9 @@ at the specified location."
            "create-machine: Creating machine %s in %s, %s overwriting previous contents"
            name
            path
-           (if overwrite "" "not"))
-         (.createMachine vbox path name os-type-id nil overwrite)))))
+           (if overwrite? "" "not"))
+         ;; using no groups for now (groups=nil)
+         (.createMachine vbox path name ["/vmfest"] os-type-id flags)))))
 
 ;;; DHCP
 

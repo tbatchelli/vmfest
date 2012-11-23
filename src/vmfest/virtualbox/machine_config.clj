@@ -8,7 +8,7 @@
             [clojure.tools.logging :as log]
             [vmfest.virtualbox.virtualbox :as vbox]
             [vmfest.virtualbox.conditions :as conditions])
-  (:import [org.virtualbox_4_1 AccessMode VBoxException NetworkAttachmentType
+  (:import [org.virtualbox_4_2 AccessMode VBoxException NetworkAttachmentType
             HostNetworkInterfaceType]))
 
 (defn get-medium [m {:keys [location device-type create] :as device}]

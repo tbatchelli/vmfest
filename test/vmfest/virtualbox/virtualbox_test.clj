@@ -29,7 +29,9 @@
   (with-vbox *server* [_ vbox]
     (testing "finding a medium on a vbox (by name)"
       (is (not (nil? (find-medium vbox valid-medium-path :hard-disk)))))
-    (testing "find a medium on a vbox by id"
+    ;; from the SDK 4.2 documentation, it seems like using IDs has
+    ;; been deprecated.
+    #_(testing "find a medium on a vbox by id"
       (let [medium (find-medium vbox valid-medium-path)
             id (.getId medium)]
         (is (not (nil? (find-medium vbox id))))))
@@ -39,7 +41,9 @@
 (deftest ^{:integration true}
   create-a-machine
   (with-vbox *server* [_ vbox]
-    (let [dir "/tmp/vbox-tests/"
+    (let [dir "/tmp/vbox-tests"
+          ;; for now, the group is hardcoded
+          dest-dir (str dir "/vmfest")
           name "test-created-machine"]
       (let [machine (create-machine
                      vbox
@@ -51,7 +55,7 @@
           (is (not (nil? machine))))
         (testing "a machine can be saved"
           (machine/save-settings machine)
-          (is (.exists (clojure.java.io/file dir name (str name ".vbox")))))
+          (is (.exists (clojure.java.io/file dest-dir name (str name ".vbox")))))
         (testing "a machine can be registered"
           (register-machine vbox machine)
           (is (not (nil? (find-vb-m vbox name)))))

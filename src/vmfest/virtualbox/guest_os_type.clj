@@ -1,7 +1,7 @@
 (ns vmfest.virtualbox.guest-os-type
   (:require [vmfest.virtualbox.session :as session]
             [vmfest.virtualbox.model :as model])
-  (:import [org.virtualbox_4_1 IGuestOSType]))
+  (:import [org.virtualbox_4_2 IGuestOSType]))
 
 (defn map-from-IGuestOSType
   [o]
@@ -16,20 +16,20 @@
    :recommended-vram (.getRecommendedVRAM o)
    :recommended-hdd (.getRecommendedHDD o)
    :adapter-type (.getAdapterType o) ;todo: pull the object
-   :recommended-pae? (.getRecommendedPae o)
+   :recommended-pae? (.getRecommendedPAE o)
    :recommended-dvd-storage-controller
-   (.getRecommendedDvdStorageController o) ;todo: pull object
+   (.getRecommendedDVDStorageController o) ;todo: pull object
    :recommended-dvd-storage-bus
-   (.getRecommendedDvdStorageBus o) ;todo: pull object
+   (.getRecommendedDVDStorageBus o) ;todo: pull object
    :recommended-hd-storage-controller
-   (.getRecommendedHdStorageController o) ;todo: pull object
+   (.getRecommendedHDStorageController o) ;todo: pull object
    :recommended-hd-storage-bus
-   (.getRecommendedHdStorageBus o) ;todo: pull object
+   (.getRecommendedHDStorageBus o) ;todo: pull object
    :recommended-firmware (.getRecommendedFirmware o) ;todo: pull object
-   :recommended-usb-hid? (.getRecommendedUsbHid o)
-   :recommended-hpet? (.getRecommendedHpet o)
-   :recommended-usb-tablet? (.getRecommendedUsbTablet o)
-   :recommended-rtc-use-utc? (.getRecommendedRtcUseUtc o)
+   :recommended-usb-hid? (.getRecommendedUSBHID o)
+   :recommended-hpet? (.getRecommendedHPET o)
+   :recommended-usb-tablet? (.getRecommendedUSBTablet o)
+   :recommended-rtc-use-utc? (.getRecommendedRTCUseUTC o)
    })
 
 

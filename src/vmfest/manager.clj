@@ -22,7 +22,7 @@ machines are stored in ~/.vmfest/nodes ."
             vmfest.virtualbox.medium
             clojure.set)
   (:use [slingshot.slingshot :only [throw+ try+]])
-  (:import [org.virtualbox_4_1
+  (:import [org.virtualbox_4_2
             SessionState
             HostNetworkInterfaceType
             HostNetworkInterfaceStatus]
@@ -78,7 +78,7 @@ machines are stored in ~/.vmfest/nodes ."
        (format
         "/VirtualBox/GuestInfo/Net/%s/V4/IP"
         slot)))
-    (catch org.virtualbox_4_1.VBoxException e
+    (catch org.virtualbox_4_2.VBoxException e
       (throw (RuntimeException. e)))))
 
 (defn set-extra-data

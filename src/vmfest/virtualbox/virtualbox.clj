@@ -95,6 +95,9 @@ at the specified location."
          ;; using no groups for now (groups=nil)
          (.createMachine vbox path name ["/vmfest"] os-type-id flags)))))
 
+(defn api-version [vbox]
+  (.getAPIVersion vbox))
+
 ;;; DHCP
 
 (defn find-dhcp-by-interface-name

@@ -30,11 +30,32 @@ machines are stored in ~/.vmfest/nodes ."
            vmfest.virtualbox.model.Machine)
   (:import [java.net NetworkInterface InetAddress]))
 
+(def supported-api-version "4_2")
+
+(defn check-vbox-api-version
+  "Checks whether the underlying VirtualBox system provides an API
+  version supported by this version of VMFEST. True if it does, false
+  otherwise"
+  [server]
+  (session/with-vbox server [_ vbox]
+    (= (vbox/api-version vbox) supported-api-version)))
+
 (defn server
-  "Builds a connection definition to the VM Host"
+  "Builds a connection definition to the VM Host and checks that the
+  underlying system provides a supported API version
+
+  (server) will default to the url \"http://localhost:18083\""
   [& [url identity credentials]]
-  (let [url (or url "http://localhost:18083")]
-    (vmfest.virtualbox.model.Server. url (or identity "") (or credentials ""))))
+  (let [url (or url "http://localhost:18083")
+        server
+        (vmfest.virtualbox.model.Server. url (or identity "") (or credentials ""))]
+    (when-not (check-vbox-api-version server)
+      (throw+ {:type :unsupported-vbox-api-version
+               :message
+               (format
+                "This version of VMFest only supports VirtualBox API v. %s "
+                supported-api-version )}))
+    server))
 
 (def user-home (System/getProperty "user.home"))
 

@@ -21,7 +21,7 @@ Can be found [here](vmfest/blob/master/relnotes.md).
 
 ## Install Virtualbox 4.2.x
 
-Download and install [VirtualBox 4.2.x][vbox42]. It won't work with
+Download and install [VirtualBox 4.2.x][vbox-download]. It won't work with
 any older version.
 
 Start the VirtualBox server (`vboxwebsrv`) by issuing the following on the shell:
@@ -36,7 +36,7 @@ Finally, disable login authorization in virtualbox server:
 $ VBoxManage setproperty websrvauthlibrary null
 ```
 
-[vbox41]: https://www.virtualbox.org/wiki/Downloads
+[vbox-download]: https://www.virtualbox.org/wiki/Downloads
 
 ## Setup VMFest in your project
 

@@ -32,8 +32,9 @@ machines are stored in ~/.vmfest/nodes ."
 
 (defn server
   "Builds a connection definition to the VM Host"
-  [url & [identity credentials]]
-  (vmfest.virtualbox.model.Server. url (or identity "") (or credentials "")))
+  [& [url identity credentials]]
+  (let [url (or url "http://localhost:18083")]
+    (vmfest.virtualbox.model.Server. url (or identity "") (or credentials ""))))
 
 (def user-home (System/getProperty "user.home"))
 

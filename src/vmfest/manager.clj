@@ -510,10 +510,17 @@ VirtualBox"
   (session/with-vbox server [_ vbox]
     (doall (map #(model/dry % server) (.getHardDisks vbox)))))
 
-(defn machines [server]
+(defn machines [server & groups]
   {:pre [(model/Server? server)]}
   (session/with-vbox server [_ vbox]
-    (doall (map #(model/dry % server) (.getMachines vbox)))))
+    (let [machines
+          (if groups
+            (.getMachinesByGroups vbox groups)
+            (.getMachines vbox))]
+      (doall (map #(model/dry % server) machines)))))
+
+(defn managed-machines [server]
+  (machines server "/vmfest"))
 
 (defn get-machine
   "Will raise a condition if machine cannot be found."

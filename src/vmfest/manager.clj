@@ -21,7 +21,8 @@ machines are stored in ~/.vmfest/nodes ."
             [clojure.java.io :as io]
             vmfest.virtualbox.medium
             clojure.set)
-  (:use [slingshot.slingshot :only [throw+ try+]])
+  (:use [slingshot.slingshot :only [throw+ try+]]
+        [vmfest.virtualbox.version :only (xpcom?)])
   (:import [org.virtualbox_4_2
             SessionState
             HostNetworkInterfaceType
@@ -30,10 +31,32 @@ machines are stored in ~/.vmfest/nodes ."
            vmfest.virtualbox.model.Machine)
   (:import [java.net NetworkInterface InetAddress]))
 
+(def supported-api-version "4_2")
+
+(defn check-vbox-api-version
+  "Checks whether the underlying VirtualBox system provides an API
+  version supported by this version of VMFEST. True if it does, false
+  otherwise"
+  [server]
+  (session/with-vbox server [_ vbox]
+    (= (vbox/api-version vbox) supported-api-version)))
+
 (defn server
-  "Builds a connection definition to the VM Host"
-  [url & [identity credentials]]
-  (vmfest.virtualbox.model.Server. url (or identity "") (or credentials "")))
+  "Builds a connection definition to the VM Host and checks that the
+  underlying system provides a supported API version
+
+  (server) will default to the url \"http://localhost:18083\""
+  [& [url identity credentials]]
+  (let [url (or url "http://localhost:18083")
+        server
+        (vmfest.virtualbox.model.Server. url (or identity "") (or credentials ""))]
+    (when-not (check-vbox-api-version server)
+      (throw+ {:type :unsupported-vbox-api-version
+               :message
+               (format
+                "This version of VMFest only supports VirtualBox API v. %s "
+                supported-api-version )}))
+    server))
 
 (def user-home (System/getProperty "user.home"))
 
@@ -452,8 +475,15 @@ VirtualBox"
 (defn stop
   [^Machine m]
   {:pre [(model/Machine? m)]}
-  (session/with-session m :shared [s _]
-    (machine/stop (.getConsole s))))
+  (let [return-val
+        (session/with-session m :shared [s _]
+          (machine/stop (.getConsole s)))]
+    ;; When using the XPCOM bridge, it seems that power-down gets
+    ;; the session stuck. Recreating the session seems to fix it!
+    (when xpcom?
+      (session/with-session m :shared [s _]))
+    ;; return the return value of the first call
+    return-val))
 
 (defn pause
   [^Machine m]
@@ -471,8 +501,14 @@ VirtualBox"
   [^Machine m]
   {:pre [(model/Machine? m)]}
   (try+
-    (session/with-session m :shared [s _]
-      (machine/power-down (.getConsole s)))
+   (let [return-val
+         (session/with-session m :shared [s _]
+           (machine/power-down (.getConsole s)))]
+     ;; When using the XPCOM bridge, it seems that power-down gets the
+     ;; session stuck. Recreating the session seems to fix it!
+     (when xpcom?
+       (session/with-session m :shared [s _]))
+     return-val)
     (catch [:type :vbox-runtime] _
       (log/warn "Trying to stop an already stopped machine"))))
 
@@ -509,10 +545,17 @@ VirtualBox"
   (session/with-vbox server [_ vbox]
     (doall (map #(model/dry % server) (.getHardDisks vbox)))))
 
-(defn machines [server]
+(defn machines [server & groups]
   {:pre [(model/Server? server)]}
   (session/with-vbox server [_ vbox]
-    (doall (map #(model/dry % server) (.getMachines vbox)))))
+    (let [machines
+          (if groups
+            (.getMachinesByGroups vbox groups)
+            (.getMachines vbox))]
+      (doall (map #(model/dry % server) machines)))))
+
+(defn managed-machines [server]
+  (machines server "/vmfest"))
 
 (defn get-machine
   "Will raise a condition if machine cannot be found."

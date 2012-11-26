@@ -19,24 +19,22 @@ Can be found [here](vmfest/blob/master/relnotes.md).
 
 # Usage
 
+__NOTE:__ VMFest 0.3.0 adds support for XPCOM-based communication with
+VirtualBox. Using XPCOM only works when VMFest and VirtualBox are in
+the same machine, but it is the easiest setup, and also generally
+faster. VMFest still supports WebServices communication, which is what
+VMFest version 0.2.6 and older supported, and this support is still
+needed for when VMFest and VirtualBox are on separate machines. The
+instructions below are for using the new XPCOM communication
+subsystem, and hence, are shorter :). You can still find how to setup
+the webservices communication at the end of this page.
+
 ## Install Virtualbox 4.2.x
 
-Download and install [VirtualBox 4.2.x][vbox42]. It won't work with
+Download and install [VirtualBox 4.2.x][vbox-download]. It won't work with
 any older version.
 
-Start the VirtualBox server (`vboxwebsrv`) by issuing the following on the shell:
-
-```bash
-$ vboxwebsrv -t0
-```
-
-Finally, disable login authorization in virtualbox server: 
-
-``` 
-$ VBoxManage setproperty websrvauthlibrary null
-```
-
-[vbox41]: https://www.virtualbox.org/wiki/Downloads
+[vbox-download]: https://www.virtualbox.org/wiki/Downloads
 
 ## Setup VMFest in your project
 
@@ -46,11 +44,11 @@ but sticking vmfest in your classpath will suffice.
 
 [lein]: https://github.com/technomancy/leiningen
 
-
 Add the following dependencies to your ```project.clj```:
 
 ```clojure
-   [vmfest "0.2.6-beta.1"]
+   [vmfest "0.3.0-alpha.1"]
+   [org.clojars.tbatchelli/vboxjxpcom "4.2.4"]
 ```
 
 NOTE: add more detailed instructions for non-clojurians
@@ -253,7 +251,7 @@ VMFest. You can find the tutorial [here][tutorial].
 
 ;; First we need to define a connection to our VirtualBox host
 ;; service.
-(def my-server (server "http://localhost:18083"))
+(def my-server (server))
 
 ;; We need an image model to play with. This will set up a fairly up-to-date
 ;; Debian image.
@@ -318,6 +316,28 @@ VMFest. You can find the tutorial [here][tutorial].
 (pmap power-down my-machines)
 (pmap destroy my-machines)
 ```
+
+# Connecting to VirtualBox via WebServices
+
+Replace the `vboxjxpcom` dependency in `project.clj` with this one:
+
+```clojure
+   [org.clojars.tbatchelli/vboxjws "4.2.4"]
+```
+
+Start the VirtualBox server (`vboxwebsrv`) by issuing the following on the shell:
+
+```bash
+$ vboxwebsrv -t0
+```
+
+Finally, disable login authorization in virtualbox server: 
+
+``` 
+$ VBoxManage setproperty websrvauthlibrary null
+```
+
+
 # Contact
 
 If you need help setting up or programming VMFest, or have

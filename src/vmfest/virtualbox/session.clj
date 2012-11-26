@@ -5,6 +5,7 @@ destruction of sessions with the VBox servers"
             [vmfest.virtualbox.conditions :as conditions]
             [vmfest.virtualbox.model :as model]
             [vmfest.virtualbox.enums :as enums])
+  (:use [vmfest.virtualbox.version :only [xpcom? vbox-binding]])
   (:import [org.virtualbox_4_2
             VirtualBoxManager
             IVirtualBox
@@ -40,6 +41,12 @@ destruction of sessions with the VBox servers"
 
 ;; ## Low Level Functions
 
+
+;; When using the XPCOM Bridge, we don't create a session with the
+;; server, instead, we just instantiate a singleton of the VBM
+(defonce instance
+  (if xpcom? (VirtualBoxManager/createInstance nil)))
+
 ;; To interact with VBox server we need to create a web session. We do
 ;; this via IWebSessionManager. This does not create a connection to
 ;; the server yet, it just creates a data structure containing the
@@ -52,8 +59,13 @@ If no home is passed, it will use the default
        create-session-manager: (String)
              -> VirtualBoxManager"
   [& [home]]
-   (log/trace (str "Creating session manager for home=" (or home "default")))
-   (VirtualBoxManager/createInstance home))
+  (log/trace (str "Creating session manager for home=" (or home "default")))
+  (if xpcom?
+    instance
+    (VirtualBoxManager/createInstance home)))
+
+
+
 
 ;; Before we can interact with the server we need to create a Virtual
 ;; Box object trhough our session, to keep track of our actions on the
@@ -71,7 +83,9 @@ VirtualBoxManager object plus the credentials or by a Server object.
      (log/tracef
       "creating new vbox with a logon for url=%s and username=%s" url username)
      (try
-       (.connect mgr url username password)
+       ;; we only connect when using web services
+       (when-not xpcom?
+         (.connect mgr url username password))
        (.getVBox mgr)
        (catch VBoxException e
          (conditions/wrap-exception
@@ -119,10 +133,17 @@ with a virtualbox.
      (try
        ~@body
        (finally (when ~mgr
-                  (try (.disconnect ~mgr)
-                       (catch Exception e#
-                         (conditions/wrap-exception
-                          e# {:message "unable to close session"}))))))))
+                  (try
+                    ;; in xpcom we just cleanup (not sure if this does
+                    ;; nothing, but when using webservices we just
+                    ;; disconnect to force the cleanup.
+                    (when-not xpcom?
+                      (when instance
+                        (.cleanup instance))
+                      (.disconnect ~mgr))
+                    (catch Exception e#
+                      (conditions/wrap-exception
+                       e# {:message "unable to close session"}))))))))
 
 (def lock-type-constant
   {:write LockType/Write

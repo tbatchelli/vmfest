@@ -1,6 +1,7 @@
 (ns vmfest.virtualbox.session-test
   (:use vmfest.virtualbox.session :reload)
-  (:use [vmfest.virtualbox.virtualbox :only (find-vb-m)])
+  (:use [vmfest.virtualbox.virtualbox :only (find-vb-m)]
+        [vmfest.virtualbox.version :only (evaluate-when)])
   (:use clojure.test
         vmfest.fixtures
         vmfest.virtualbox.model)
@@ -22,9 +23,12 @@
         (let [vbox (create-vbox mgr *url* *username* *password*)]
           (testing "Get a connection to the remote VBox Server"
             (is (not (nil? (.getVersion vbox)))))
-          (testing "Connecting to a malformed address should throwh a condition"
-            (is (thrown-with-msg? ExceptionInfo #"Cannot connect"
-                  (create-vbox mgr "bogus address" "" ""))))))
+          ;; this test only makes sense when using the web services.
+          (evaluate-when
+           :ws
+           (testing "Connecting to a malformed address should throwh a condition"
+             (is (thrown-with-msg? ExceptionInfo #"Cannot connect"
+                   (create-vbox mgr "bogus address" "" "")))))))
       (finally (when mgr
                  (try (.disconnect mgr) (catch Exception _))))))
   (testing "create-mgr-vbox"

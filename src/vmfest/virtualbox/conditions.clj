@@ -1,12 +1,8 @@
 (ns vmfest.virtualbox.conditions
-  (:use [slingshot.slingshot :only [try+ throw+]])
+  (:use [slingshot.slingshot :only [try+ throw+]]
+        [vmfest.virtualbox.version :only [evaluate-when]])
   (:require [clojure.tools.logging :as log])
-  (:import [org.virtualbox_4_2.jaxws
-            InvalidObjectFault
-            InvalidObjectFaultMsg
-            RuntimeFault
-            RuntimeFaultMsg]
-           [org.virtualbox_4_2 VBoxException]))
+  (:import [org.virtualbox_4_2 VBoxException]))
 
 (defn unsigned-int-to-long [ui]
   (bit-and (long ui) 0xffffffff))
@@ -59,29 +55,36 @@
           wrapped (.getWrapped this)]
       (merge
        (when wrapped (as-map wrapped))
-       {:message message})))
-  RuntimeFaultMsg
-  (as-map [this]
-    (let [message (.getMessage this)
-          info (try (.getFaultInfo this)
-                    (catch Exception e)) ;; runtime fault
-          interface-id (when info (.getInterfaceID info))
-          component (when info (.getComponent info))
-          result-code (when info
-                        (unsigned-int-to-long
-                         (int (.getResultCode info))))
-          text (when info (.getText info))]
-      {:type :vbox-runtime
-       :original-message message
-       :origin-id interface-id
-       :origin-component component
-       :error-code result-code
-       :original-error-type (error-code-map result-code)
-       :text text}))
-  InvalidObjectFaultMsg
-  (as-map [this]
-    {:type :vbox-invalid-object
-     :original-message (.getMessage this)}))
+       {:message message}))))
+
+(evaluate-when
+ :ws
+ (import '[org.virtualbox_4_2.jaxws
+           InvalidObjectFaultMsg
+           RuntimeFaultMsg])
+ (extend-protocol fault
+   RuntimeFaultMsg
+   (as-map [this]
+     (let [message (.getMessage this)
+           info (try (.getFaultInfo this)
+                     (catch Exception e)) ;; runtime fault
+           interface-id (when info (.getInterfaceID info))
+           component (when info (.getComponent info))
+           result-code (when info
+                         (unsigned-int-to-long
+                          (int (.getResultCode info))))
+           text (when info (.getText info))]
+       {:type :vbox-runtime
+        :original-message message
+        :origin-id interface-id
+        :origin-component component
+        :error-code result-code
+        :original-error-type (error-code-map result-code)
+        :text text}))
+   InvalidObjectFaultMsg
+   (as-map [this]
+     {:type :vbox-invalid-object
+      :original-message (.getMessage this)})))
 
 (defn condition-from-exception [e]
   (try

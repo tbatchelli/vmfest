@@ -21,7 +21,8 @@ machines are stored in ~/.vmfest/nodes ."
             [clojure.java.io :as io]
             vmfest.virtualbox.medium
             clojure.set)
-  (:use [slingshot.slingshot :only [throw+ try+]])
+  (:use [slingshot.slingshot :only [throw+ try+]]
+        [vmfest.virtualbox.version :only (xpcom?)])
   (:import [org.virtualbox_4_2
             SessionState
             HostNetworkInterfaceType
@@ -474,8 +475,15 @@ VirtualBox"
 (defn stop
   [^Machine m]
   {:pre [(model/Machine? m)]}
-  (session/with-session m :shared [s _]
-    (machine/stop (.getConsole s))))
+  (let [return-val
+        (session/with-session m :shared [s _]
+          (machine/stop (.getConsole s)))]
+    ;; When using the XPCOM bridge, it seems that power-down gets
+    ;; the session stuck. Recreating the session seems to fix it!
+    (when xpcom?
+      (session/with-session m :shared [s _]))
+    ;; return the return value of the first call
+    return-val))
 
 (defn pause
   [^Machine m]
@@ -493,8 +501,14 @@ VirtualBox"
   [^Machine m]
   {:pre [(model/Machine? m)]}
   (try+
-    (session/with-session m :shared [s _]
-      (machine/power-down (.getConsole s)))
+   (let [return-val
+         (session/with-session m :shared [s _]
+           (machine/power-down (.getConsole s)))]
+     ;; When using the XPCOM bridge, it seems that power-down gets the
+     ;; session stuck. Recreating the session seems to fix it!
+     (when xpcom?
+       (session/with-session m :shared [s _]))
+     return-val)
     (catch [:type :vbox-runtime] _
       (log/warn "Trying to stop an already stopped machine"))))
 

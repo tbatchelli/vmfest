@@ -29,6 +29,13 @@ instructions below are for using the new XPCOM communication
 subsystem, and hence, are shorter :). You can still find how to setup
 the webservices communication at the end of this page.
 
+__WARNING: the java/XPCOM bridge sems to be broken for Debian Weezy 
+and Ubuntu 12.10__ 
+(see [ticket #11232](https://www.virtualbox.org/ticket/11232) for 
+more details. You'll get a nice segmentation fault in those cases. In 
+these cases, please revert  to the WebServices configuration listed at 
+the end of this page.
+
 ## Install Virtualbox 4.2.x
 
 Download and install [VirtualBox 4.2.x][vbox-download]. It won't work with
@@ -49,6 +56,15 @@ Add the following dependencies to your ```project.clj```:
 ```clojure
    [vmfest "0.3.0-alpha.1"]
    [org.clojars.tbatchelli/vboxjxpcom "4.2.4"]
+```
+
+and tell VMFest where virtualbox is installed. In OSX this would be:
+```clojure
+   :jvm-opts ["-Dvbox.home=/Applications/VirtualBox.app/Contents/MacOS"]
+```
+and for Ubuntu/Debian this would be:
+```clojure
+ :jvm-opts ["-Dvbox.home=/usr/lib/virtualbox"]
 ```
 
 NOTE: add more detailed instructions for non-clojurians
@@ -331,7 +347,8 @@ Start the VirtualBox server (`vboxwebsrv`) by issuing the following on the shell
 $ vboxwebsrv -t0
 ```
 
-Finally, disable login authorization in virtualbox server: 
+Finally, disable login authorization in virtualbox server 
+(you'll only need to do it this one time): 
 
 ``` 
 $ VBoxManage setproperty websrvauthlibrary null

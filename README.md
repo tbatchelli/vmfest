@@ -30,7 +30,7 @@ subsystem, and hence, are shorter :). You can still find how to setup
 the webservices communication at the end of this page.
 
 __WARNING: the java/XPCOM bridge sems to be broken for Debian Weezy 
-and Ubuntu 12.10__ 
+and Ubuntu 12.x__ 
 (see [ticket #11232](https://www.virtualbox.org/ticket/11232) for 
 more details. You'll get a nice segmentation fault in those cases. In 
 these cases, please revert  to the WebServices configuration listed at 

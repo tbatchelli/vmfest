@@ -153,18 +153,30 @@ with a virtualbox.
   {:write LockType/Write
    :shared LockType/Shared})
 
+(defn lock-machine
+  [^IMachine vb-machine ^ISession session lock-type]
+  {:pre [vb-machine session]}
+  (log/debugf "lock-machine %s %s" (.getName vb-machine) lock-type)
+  (.lockMachine vb-machine session (get lock-type-constant lock-type)))
+
+(defn unlock-machine
+  [^ISession session]
+  {:pre [session]}
+  (log/debugf "unlock-machine %s" (.. session getMachine getName))
+  (.unlockMachine session))
+
 (defmacro with-session
   [machine type [session vb-m] & body]
   #_{:pre [(model/Machine? machine)]}
   `(try
      (with-vbox (:server ~machine) [mgr# vbox#]
-       (let [~session (.getSessionObject mgr#)
-             immutable-vb-m# (.findMachine vbox# (:id ~machine))]
-         (.lockMachine immutable-vb-m# ~session (~type lock-type-constant))
+       (let [~session (.getSessionObject ^VirtualBoxManager mgr#)
+             immutable-vb-m# (.findMachine ^IVirtualBox vbox# (:id ~machine))]
+         (lock-machine immutable-vb-m# ~session ~type)
          (let [~vb-m (.getMachine ~session)]
            (try
              ~@body
-             (finally (.unlockMachine ~session))))))
+             (finally (unlock-machine ~session))))))
      (catch VBoxException e#
        (conditions/wrap-exception
         e#

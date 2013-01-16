@@ -6,14 +6,17 @@
             vmfest.virtualbox.guest-os-type)
   (:import [org.virtualbox_4_2
             VirtualBoxManager
+            IMachine
+            IMedium
             IVirtualBox
-            VBoxException]
+            VBoxException
+            IDHCPServer]
            [vmfest.virtualbox.model
             Server
             Machine]))
 
-(defn find-vb-m
-  [vbox id-or-name]
+(defn ^IMachine find-vb-m
+  [^IVirtualBox vbox ^String id-or-name]
   {:pre [(model/IVirtualBox? vbox)]}
   (try
     (log/tracef "find-vb-m: looking for machine '%s'" id-or-name)
@@ -24,8 +27,8 @@
       (log/warnf
        "find-vb-m: Machine identified by '%s' not found." id-or-name))))
 
-(defn open-medium
-  [vbox location & [type access-mode force-new-uuid?]]
+(defn ^IMedium open-medium
+  [^IVirtualBox vbox ^String location & [type access-mode force-new-uuid?]]
   {:pre [(model/IVirtualBox? vbox)
          (if type (#{:hard-disk :floppy :dvd} type) true)]}
   (let [type (enums/key-to-device-type (or type :hard-disk))
@@ -41,9 +44,9 @@ at the specified location."
        "Invalid medium storage format."
        :VBOX_E_INVALID_OBJECT_STATE
        "Medium has already been added to a media registry."}
-      (.openMedium vbox location type access-mode force-new-uuid?))))
+      (.openMedium vbox location type access-mode (boolean force-new-uuid?)))))
 
-(defn find-medium
+(defn ^IMedium find-medium
   [vbox id-or-location & [type]]
   #_{:pre [(model/IVirtualBox? vbox)
          (if type (#{:hard-disk :floppy :dvd} type) true)]}
@@ -60,7 +63,7 @@ at the specified location."
        (catch Exception e
          (log/warnf "find-medium: location %s not found" id-or-location))))
 
-(defn register-machine [vbox machine]
+(defn register-machine [^IVirtualBox vbox ^IMachine machine]
   {:pre [(model/IVirtualBox? vbox)
          (model/IMachine? machine)]}
   (conditions/with-vbox-exception-translation
@@ -69,12 +72,12 @@ at the specified location."
      "Virtual machine was not created within this VirtualBox instance."}
     (.registerMachine vbox machine)))
 
-(defn create-machine
+(defn ^IMachine create-machine
   ([vbox name os-type-id]
      (create-machine vbox name os-type-id false))
   ([vbox name os-type-id overwrite?]
      (create-machine vbox name os-type-id overwrite? nil))
-  ([vbox name os-type-id overwrite? base-folder]
+  ([^IVirtualBox vbox ^String name os-type-id overwrite? ^String base-folder]
      {:pre [(model/IVirtualBox? vbox)]}
      (let [flags (if overwrite? "forceOverwrite=1" nil)
            path (when base-folder
@@ -95,12 +98,12 @@ at the specified location."
          ;; using no groups for now (groups=nil)
          (.createMachine vbox path name ["/vmfest"] os-type-id flags)))))
 
-(defn api-version [vbox]
+(defn api-version [^IVirtualBox vbox]
   (.getAPIVersion vbox))
 
 ;;; DHCP
 
-(defn find-dhcp-by-interface-name
+(defn ^IDHCPServer find-dhcp-by-interface-name
   "Find a dhcp server by the interface name to which it is attached.
 
   NOTE: This is not very reliable, as the original function does not
@@ -112,13 +115,13 @@ at the specified location."
   `HostNetworkInterfaceType-NAME` where NAME is the name of the host
   interface"
 
-  [vbox interface-name]
+  [^IVirtualBox vbox interface-name]
   (try (.findDHCPServerByNetworkName
         vbox
         (str "HostInterfaceNetworking-" interface-name))
        (catch Exception e nil)))
 
-(defn create-dhcp-server [vbox interface-name]
+(defn ^IDHCPServer create-dhcp-server [^IVirtualBox vbox interface-name]
   (conditions/with-vbox-exception-translation
     {:E_INVALIDARG "Host network interface name already exists."}
     (.createDHCPServer

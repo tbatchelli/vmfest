@@ -1,13 +1,15 @@
 (ns vmfest.virtualbox.host
-  (:import [org.virtualbox_4_2 HostNetworkInterfaceType Holder IHostNetworkInterface])
+  (:import [org.virtualbox_4_2
+            HostNetworkInterfaceType Holder IHost IHostNetworkInterface
+            IVirtualBox IDHCPServer])
   (:require [vmfest.virtualbox.conditions :as conditions]
             [clojure.tools.logging :as log])
   (:use [vmfest.virtualbox.virtualbox :only [find-dhcp-by-interface-name
                                              create-dhcp-server]]))
 
-(defn- add-one-host-only-interface
+(defn- ^IHostNetworkInterface add-one-host-only-interface
   "Creates the next host-only interface in the host"
-  [host]
+  [^IHost host]
   ;; There is no way (that I could find) to create an interface
   ;; object, but I found this trick by inspecting the source code of
   ;; the java API.
@@ -18,11 +20,12 @@
   ;;
   ;; What we're interested is in the contents (`value`) of this
   ;; `holder`
-  (let [interface-holder (Holder. (IHostNetworkInterface/queryInterface host))]
+  (let [iface (IHostNetworkInterface/queryInterface host)
+        interface-holder (Holder. iface)]
     (.waitForCompletion
      (.createHostOnlyNetworkInterface host interface-holder) (Integer. -1))
     (let [interface (.value interface-holder)]
-      (log/infof "Created Host Only network interface %s" (.getName interface))
+      (log/infof "Created Host Only network interface %s" (.getName iface))
       interface)))
 
 (defn- add-host-only-interface*
@@ -43,7 +46,7 @@
                    (.getName interface))
         (recur host if-name (conj temp-ifs interface))))))
 
-(defn remove-host-only-interface [host if-uuid]
+(defn remove-host-only-interface [^IHost host if-uuid]
   (conditions/with-vbox-exception-translation
     {:VBOX_E_OBJECT_NOT_FOUND "No host network interface matching id found"}
     (.removeHostOnlyNetworkInterface host if-uuid)))
@@ -66,8 +69,8 @@
 
   All ip addresses are verctors of 4 numbers e.g. 192.168.0.1 -> [192 168 0 1]
   "
-  [server server-ip netmask from-ip to-ip]
-  (let [[server-ip netmask from-ip to-ip]
+  [^IDHCPServer server server-ip netmask from-ip to-ip]
+  (let [[^String server-ip ^String netmask ^String from-ip ^String to-ip]
         (map ip-vec-to-string [server-ip netmask from-ip to-ip])]
     (log/infof
      "Configuring DHCP server %s with ip %s mask %s from %s to %s"
@@ -76,7 +79,7 @@
       {:E_INVALIDARG "invalid configuration supplied" }
       (.setConfiguration server server-ip netmask from-ip to-ip))))
 
-(defn- ensure-dhcp-with-defaults [vbox host interface]
+(defn- ensure-dhcp-with-defaults [vbox host ^IHostNetworkInterface interface]
   (let [if-ip (ip-string-to-vec (.getIPAddress interface))
         if-name (.getName interface)
         base-ip (subvec if-ip 0 3)
@@ -106,7 +109,7 @@
         ;; which seems to do the trick.
         (.start dhcp-server if-name nil nil)))))
 
-(defn add-host-only-interface [vbox if-name]
+(defn add-host-only-interface [^IVirtualBox vbox if-name]
   ;; For some reason the vbox API does not let yous set the name of
   ;; the network interface and instead it creates interfaces named
   ;; "vboxnetN", where N is the name lowest number for which an
@@ -127,7 +130,7 @@
     (log/warn "Creating a new Host Only network interface")
     (let [[interface ifs-to-delete] (add-host-only-interface* host if-name [])]
       ;; delete temporarily created interfaces
-      (doseq [if-to-delete ifs-to-delete]
+      (doseq [^IHostNetworkInterface if-to-delete ifs-to-delete]
         (log/warnf "Executing scheduled deletion of interface %s"
                    (.getName if-to-delete))
         (remove-host-only-interface host (.getId if-to-delete)))

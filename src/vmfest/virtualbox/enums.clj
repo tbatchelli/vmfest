@@ -127,7 +127,7 @@
    [SessionType/Shared :shared ""]])
 (defn session-type-to-key [type]
   (find-key-by-value type session-type-to-key-table))
-(defn key-to-session-type [key]
+(defn ^SessionType key-to-session-type [key]
   (find-value-by-key key session-type-to-key-table))
 
 ;;;StorageBus
@@ -140,7 +140,7 @@
    [StorageBus/SAS :sas ""]])
 (defn storage-bus-to-key [bus]
   (find-key-by-value bus storage-bus-to-key-table))
-(defn key-to-storage-bus [key]
+(defn ^StorageBus key-to-storage-bus [key]
   (find-value-by-key key storage-bus-to-key-table))
 
 (def storage-controller-type-to-key-table
@@ -170,7 +170,7 @@
    [DeviceType/SharedFolder :shared-folder "Shared folder device."]])
 (defn device-type-to-key [type]
   (find-key-by-value type device-type-to-key-table))
-(defn key-to-device-type [key]
+(defn ^DeviceType key-to-device-type [key]
   (find-value-by-key key device-type-to-key-table))
 
 ;;; NetworkAttachmentType
@@ -202,7 +202,7 @@
     "A medium which is is indirectly attached, so that one base medium can be used for several VMs which have their own differencing medium to store their modifications. In some sense a variant of Immutable with unset AutoReset flag in each differencing medium."]])
 (defn medium-type-type-to-key [type]
   (find-key-by-value type medium-type-type-to-key-table))
-(defn key-to-medium-type-type [key]
+(defn ^MediumType key-to-medium-type-type [key]
   (find-value-by-key key medium-type-type-to-key-table))
 
 (def host-network-interface-type-to-key-table
@@ -238,7 +238,7 @@
    [AccessMode/ReadWrite :read-write "Read & Write"]])
 (defn access-mode-type-to-key [type]
   (find-key-by-value type access-mode-type-to-key-table))
-(defn key-to-access-mode [key]
+(defn ^AccessMode key-to-access-mode [key]
   (find-value-by-key key access-mode-type-to-key-table))
 
 ;;; MediumVariant
@@ -260,5 +260,5 @@
          " Only used when passing the medium variant as an input parameter.")]])
 (defn medium-variant-type-to-key [type]
   (find-key-by-value type medium-variant-type-to-key-table))
-(defn key-to-medium-variant [key]
+(defn ^MediumVariant key-to-medium-variant [key]
   (find-value-by-key key medium-variant-type-to-key-table))

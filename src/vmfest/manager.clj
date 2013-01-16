@@ -26,7 +26,9 @@ machines are stored in ~/.vmfest/nodes ."
   (:import [org.virtualbox_4_2
             SessionState
             HostNetworkInterfaceType
-            HostNetworkInterfaceStatus]
+            HostNetworkInterfaceStatus
+            IHostNetworkInterface
+            IVirtualBox]
            java.io.File
            vmfest.virtualbox.model.Machine)
   (:import [java.net NetworkInterface InetAddress]))
@@ -138,23 +140,24 @@ machines are stored in ~/.vmfest/nodes ."
 
 Note: :os-name is how vbox identifies the host network interfaces."
   [server]
-  (session/with-vbox server [vbox mgr]
+  (session/with-vbox server [_ vbox]
     (let [os-interface-name
           ;; needed because of how OSX adds a name to the OS i/f name
           ;; e.g. "en1: Airport" vs. "en1"
-          (fn [name]
+          (fn [^String name]
             (let [index  (.indexOf name ":")]
               (if (> index 0)
                 (.substring name 0 index)
                 name)))
           all-interfaces
-          (map (fn [ni] {:name (.getName ni) ;; the full OSX name
-                        :os-name (os-interface-name (.getName ni))
-                        :ip-address (.getIPAddress ni)
-                        :status (.getStatus ni)
-                        :interface-type (.getInterfaceType ni)
-                        :medium-type (.getMediumType ni)})
-               (.getNetworkInterfaces (.getHost mgr)))
+          (map (fn [^IHostNetworkInterface ni]
+                 {:name (.getName ni) ;; the full OSX name
+                  :os-name (os-interface-name (.getName ni))
+                  :ip-address (.getIPAddress ni)
+                  :status (.getStatus ni)
+                  :interface-type (.getInterfaceType ni)
+                  :medium-type (.getMediumType ni)})
+               (.getNetworkInterfaces (.getHost ^IVirtualBox vbox)))
           usable? ;; determine if an I/F is usable
           (fn [if]
             (and
@@ -176,10 +179,10 @@ Returns a sequence of interfaces as maps containing:
                          (some true? (map :reachable? ips)))
         nis (enumeration-seq (NetworkInterface/getNetworkInterfaces))
         ni-infos
-        (map (fn [ni]
+        (map (fn [^NetworkInterface ni]
                (let [ip-addresses (enumeration-seq (.getInetAddresses ni))
                      ip-info (map
-                              (fn [ip]
+                              (fn [^java.net.InetAddress ip]
                                 {:ip-address ip
                                  :reachable? (.isReachable ip 1000)})
                               ip-addresses)]
@@ -217,7 +220,7 @@ VirtualBox"
 
 ;;; jclouds/pallet-style infrastructure
 
-;; These are the hardware models to be instantiated. 
+;; These are the hardware models to be instantiated.
 (def ^{:dynamic true} *machine-models*
   {:micro
    {:memory-size 512
@@ -232,7 +235,7 @@ VirtualBox"
 
 (def ^{:dynamic true} *images* nil)
 
-(defn fs-dir [path]
+(defn fs-dir [^String path]
   (seq (.listFiles (java.io.File. path))))
 
 (defn image-meta-file? [^java.io.File file]
@@ -501,6 +504,7 @@ VirtualBox"
   [^Machine m]
   {:pre [(model/Machine? m)]}
   (try+
+   ;; when using the web iface, a lock is sometimes still held
    (let [return-val
          (session/with-session m :shared [s _]
            (machine/power-down (.getConsole s)))]
@@ -521,7 +525,7 @@ VirtualBox"
       (let [media (machine/unregister vb-m :detach-all-return-hard-disks-only)]
         (.waitForCompletion
          (machine/delete vb-m (if delete-disks media nil))
-         (Integer. timeout))))))
+         (Integer. (int timeout)))))))
 
 (defn send-keyboard [machine entries]
   "Given a sequence with a mix of character strings and keywords it
@@ -543,15 +547,15 @@ VirtualBox"
 (defn hard-disks [server]
   {:pre [(model/Server? server)]}
   (session/with-vbox server [_ vbox]
-    (doall (map #(model/dry % server) (.getHardDisks vbox)))))
+    (doall (map #(model/dry % server) (.getHardDisks ^IVirtualBox vbox)))))
 
 (defn machines [server & groups]
   {:pre [(model/Server? server)]}
   (session/with-vbox server [_ vbox]
     (let [machines
           (if groups
-            (.getMachinesByGroups vbox groups)
-            (.getMachines vbox))]
+            (.getMachinesByGroups ^IVirtualBox vbox groups)
+            (.getMachines ^IVirtualBox vbox))]
       (doall (map #(model/dry % server) machines)))))
 
 (defn managed-machines [server]
@@ -579,7 +583,7 @@ VirtualBox"
                       os-type-map
                       [:id :description :family-description :64-bit?]))]
       (map (comp get-keys vmfest.virtualbox.guest-os-type/map-from-IGuestOSType)
-           (.getGuestOSTypes vbox)))))
+           (.getGuestOSTypes ^IVirtualBox vbox)))))
 
 ;;; model forwards
 

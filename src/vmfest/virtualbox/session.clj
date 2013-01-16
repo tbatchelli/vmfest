@@ -11,6 +11,7 @@ destruction of sessions with the VBox servers"
             IVirtualBox
             VBoxException
             LockType
+            IMachine
             ISession]
            [vmfest.virtualbox.model
             Server
@@ -122,6 +123,9 @@ VirtualBoxManager object plus the credentials or by a Server object.
 ;; wraps a code block and creates a vbox with a session before the
 ;; code in the block is executed, and it will disconnect once the
 ;; block has been executed, thus cleaning up the session.
+(defn cleanup-and-diconnect [^VirtualBoxManager mgr]
+  :pre [mgr]
+  (.cleanup mgr)) ;; cleanup calls disconnect in 4.2
 
 (defmacro with-vbox [^Server server [mgr vbox] & body]
   "Wraps a code block with the creation and the destruction of a session
@@ -140,10 +144,10 @@ with a virtualbox.
                     (when-not xpcom?
                       (when instance
                         (.cleanup instance))
-                      (.disconnect ~mgr))
-                    (catch Exception e#
-                      (conditions/wrap-exception
-                       e# {:message "unable to close session"}))))))))
+                      (cleanup-and-diconnect ~mgr)
+                      (catch Exception e#
+                        (conditions/wrap-exception
+                         e# {:message "unable to close session"})))))))))
 
 (def lock-type-constant
   {:write LockType/Write

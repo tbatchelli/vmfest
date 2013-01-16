@@ -1,5 +1,6 @@
 (ns vmfest.virtualbox.conditions
-  (:use [slingshot.slingshot :only [try+ throw+]]
+  (:use [clojure.stacktrace :only [root-cause]]
+        [slingshot.slingshot :only [try+ throw+]]
         [vmfest.virtualbox.version :only [evaluate-when]])
   (:require [clojure.tools.logging :as log])
   (:import [org.virtualbox_4_2 VBoxException]))
@@ -39,9 +40,10 @@
     (log/warnf
      "Processing exception %s as a java.lang.Exception. Cause %s"
      (class this)
-     (.getCause this))
+     (root-cause this))
+    (log/debugf (root-cause this) "Ex")
     {:original-message (.getMessage this)
-     :cause (.getCause this)
+     :cause (root-cause this)
      :type :exception})
   java.net.ConnectException
   (as-map [this]
@@ -66,8 +68,9 @@
    RuntimeFaultMsg
    (as-map [this]
      (let [message (.getMessage this)
-           info (try (.getFaultInfo this)
-                     (catch Exception e)) ;; runtime fault
+           ^org.virtualbox_4_2.jaxws.RuntimeFault info
+           (try (.getFaultInfo this)
+                (catch Exception e)) ;; runtime fault
            interface-id (when info (.getInterfaceID info))
            component (when info (.getComponent info))
            result-code (when info
@@ -86,9 +89,9 @@
      {:type :vbox-invalid-object
       :original-message (.getMessage this)})))
 
-(defn condition-from-exception [e]
+(defn condition-from-exception [^Exception e]
   (try
-    (if-let [cause (try (.getWrapped e) (catch Exception _))]
+    (if-let [cause (try (.getWrapped ^VBoxException e) (catch Exception _))]
       (let [condition (as-map cause)]
         (log/debug (format "formatting wrapped exception %s" condition))
         condition)
@@ -100,7 +103,7 @@
        "Cannot parse the error since the object is unavailable %s" e)
       {})))
 
-(defn wrap-exception [exception optional-keys]
+(defn wrap-exception [^Exception exception optional-keys]
   (try+
     (let [message (or (:message optional-keys) "An exception occurred.")
           full-message (format "%s: %s" message (.getMessage exception))]
@@ -194,7 +197,7 @@ e.g:
   (def my-no-machine (vmfest.virtualbox.model.Machine. "bogus" my-server nil)) ;; a bogus machine
 
   (use 'vmfest.virtualbox.machine)
-  (use 'clojure.contrib.condition) 
+  (use 'clojure.contrib.condition)
   (require '[vmfest.virtualbox.conditions :as conditions])
   ;; handle error based on original error type
   (handler-case :type

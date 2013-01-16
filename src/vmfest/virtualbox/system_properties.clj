@@ -1,12 +1,13 @@
 (ns vmfest.virtualbox.system-properties
-  (:import [org.virtualbox_4_2 ISystemProperties IMachine IVirtualBox]))
+  (:import [org.virtualbox_4_2
+            ISystemProperties IMachine IVirtualBox IMediumFormat]))
 
-(defmulti system-properties class)
+(defmulti ^ISystemProperties system-properties class)
 
-(defmethod system-properties IVirtualBox [vbox]
+(defmethod system-properties IVirtualBox [^IVirtualBox vbox]
   (.getSystemProperties vbox))
 
-(defmethod system-properties IMachine [m]
+(defmethod system-properties IMachine [^IMachine m]
   (system-properties (.getParent m)))
 
 
@@ -79,8 +80,8 @@
   [o]
   (let [supported-formats (medium-formats o)
         format-ids
-        (map #(.getId %) supported-formats)]
-    (doall (map #(keyword (.toLowerCase %)) format-ids))))
+        (map #(.getId ^IMediumFormat %) supported-formats)]
+    (doall (map #(keyword (.toLowerCase ^String %)) format-ids))))
 
 ;; TODO: add missing functions:
 ;; getDefaultIoCacheSettingForStorageController

@@ -10,7 +10,7 @@
             [clojure.string :as string]
             [vmfest.virtualbox.enums :as enums])
   (:import [org.virtualbox_4_2 DeviceType AccessMode MediumVariant
-            MediumType IMedium MediumState]
+            MediumType IMedium MediumState IProgress IVirtualBox]
            [java.util.zip GZIPInputStream]
            [java.io File]))
 
@@ -24,14 +24,15 @@
               output (output-stream to)]
     (copy input output :buffer-size (* 1024 1024))))
 
-(defn register [vbox image]
+(defn register [vbox ^String image]
   (with-vbox vbox [_ vb]
-    (.openMedium vb image DeviceType/HardDisk AccessMode/ReadOnly false)))
+    (.openMedium
+     ^IVirtualBox vb image DeviceType/HardDisk AccessMode/ReadOnly false)))
 
-(defn make-immutable [medium]
+(defn make-immutable [^IMedium medium]
   (.setType medium MediumType/MultiAttach))
 
-(defn directory-and-file-name-from-url [url]
+(defn directory-and-file-name-from-url [^String url]
   (let [last-forward-slash-index (+ 1 (.lastIndexOf url "/"))]
     [(.substring url 0 last-forward-slash-index)
      (.substring url last-forward-slash-index )]))
@@ -41,9 +42,10 @@
       (string/replace #"\.gz$" "")
       (string/replace #"\.[^.]+$" "")))
 
-(defn register-model [orig dest vbox]
-  (with-vbox vbox [_ vb]
-    (let [orig-medium
+(defn register-model [^String orig ^String dest vbox]
+  (with-vbox vbox [_ ^IVirtualBox vb]
+    (let [^IVirtualBox vb vb
+          orig-medium
           (.openMedium vb orig DeviceType/HardDisk AccessMode/ReadOnly false)
           dest-medium (.createHardDisk vb "vdi" dest)
           progress (.cloneTo orig-medium dest-medium (long 0) nil)]
@@ -74,7 +76,8 @@
    & {:keys [model-name temp-dir meta-file-name
              meta-url meta model-file-name model-path]
       :as options}]
-  (let [[directory image-file-name] (directory-and-file-name-from-url image-url)
+  (let [[directory ^String image-file-name] (directory-and-file-name-from-url
+                                             image-url)
         image-name (file-name-without-extensions image-file-name)
         gzipped? (.endsWith image-file-name ".gz")
         model-name (or model-name image-name)
@@ -176,7 +179,7 @@
   [image-url vbox & {:as options}]
   (let [job (apply prepare-job image-url vbox (reduce into [] options))]
     (log/info (str "About to execute job \n" (with-out-str (pprint job))))
-    (if (.exists (File. (:model-file job)))
+    (if (.exists (File. ^String (:model-file job)))
       (log/errorf
        "The model %s already exists. Manually specifiy another file name with :model-name"
        (:model-file job))
@@ -198,7 +201,7 @@
 
 ;;; new image creation
 
-(defn- create-base-storage
+(defn- ^IProgress create-base-storage
   "Creates the actual base storage for this medium. If no variant
   flags are passed it will default to [].
 
@@ -207,16 +210,17 @@
   logical-size in MB
   variants is a sequence of MediumVariant keys
           (see enums/medium-variant-type-to-key-table) "
-  [medium logical-size variant-seq]
+  [^IMedium medium logical-size variant-seq]
   (let [ ;; variants are flags. Get all the flags into a single long value
         variants (long (reduce bit-or 0
-                               (map (comp #(.value %) enums/key-to-medium-variant)
+                               (map (comp #(.value ^MediumVariant %)
+                                          enums/key-to-medium-variant)
                                     (or variant-seq []))))
         logical-size (long (* 1024 1024 logical-size))]
     (log/infof
      "create-base-storage: Creating medium with size %sMB and variants %s"
      logical-size variants)
-    (.createBaseStorage medium logical-size variants)))
+    (.createBaseStorage medium (long logical-size) (long variants))))
 
 (defn create-medium
   "Creates a hard disk in the path described by `location`.
@@ -232,14 +236,15 @@
   NOTE: not all formats and variants are supported for all hosts, nor
   all combinations of variatns are valid. Error reporting on this
   front is spotty at best."
-  [vbox location format-key size variants]
+  [^IVirtualBox vbox ^String location format-key size variants]
   (let [format-key
         ;; ensure that a format is specified. Not sure this is needed,
         ;; but at least it makes it explicit what format will be used
         ;; when none is specified
         (or format-key
             (let [format-key (keyword
-                              (.toLowerCase (default-hard-disk-format vbox)))]
+                              (.toLowerCase
+                               ^String (default-hard-disk-format vbox)))]
               (log/warnf
                "create-medium: No format specified for %s. Defaulting to %s"
                location format-key)
@@ -267,6 +272,3 @@
                (format (str "The format %s for image %s is not supported in this"
                             " host.")
                        format-key location)}))))
-
-
-

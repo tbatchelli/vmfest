@@ -4,7 +4,7 @@
   (:import [org.virtualbox_4_2 IGuestOSType]))
 
 (defn map-from-IGuestOSType
-  [o]
+  [^IGuestOSType o]
   {:family-id (.getFamilyId o)
    :family-description (.getFamilyDescription o)
    :id (.getId o)

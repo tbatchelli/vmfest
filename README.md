@@ -13,16 +13,29 @@ welcome. Please use the
 [vbox]: http://www.virtualbox.org 
 [palletops]: http://palletops.com
 
+# Notice
+
+This is the latest stable release of the 0.2 version. New development
+will be exclusively done in the 0.3.x code, which is now in the
+[develop](vmfest/tree/develop) branch.  
+
+0.3.0 will be the first release to not require the use of the web
+services interface to VirtualBox, allowing the use of XPCOM too. If
+your VirtualBox host is local to vmfest, using the XPCOM interface is
+more convenient as it doesn't require starting up and configuring the
+VirtualBox server. Give it a try!
+
 # Release Notes
 
-Can be found [here](vmfest/blob/master/relnotes.md).
+Can be found [here](vmfest/blob/support/0.2.6/relnotes.md).
 
 # Usage
 
 ## Install Virtualbox 4.2.x
 
-Download and install [VirtualBox 4.2.x][vbox42]. It won't work with
-any older version.
+Download and install the latest [VirtualBox 4.2][vbox]. Notice that
+VMFest It won't work with any VirtualBox version version other than
+4.2.
 
 Start the VirtualBox server (`vboxwebsrv`) by issuing the following on the shell:
 
@@ -36,7 +49,7 @@ Finally, disable login authorization in virtualbox server:
 $ VBoxManage setproperty websrvauthlibrary null
 ```
 
-[vbox41]: https://www.virtualbox.org/wiki/Downloads
+[vbox]: https://www.virtualbox.org/wiki/Downloads
 
 ## Setup VMFest in your project
 
@@ -50,7 +63,7 @@ but sticking vmfest in your classpath will suffice.
 Add the following dependencies to your ```project.clj```:
 
 ```clojure
-   [vmfest "0.2.6-beta.1"]
+   [vmfest "0.2.6"]
 ```
 
 NOTE: add more detailed instructions for non-clojurians

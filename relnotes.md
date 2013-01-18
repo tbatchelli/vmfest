@@ -1,5 +1,22 @@
 # Release Notes
 
+## 0.2.6
+
+- Project and documentation updates for release
+
+## 0.2.6-beta.1
+
+- Support VirtualBox 4.2.x. 
+      - Removed `find-medium` after the removal from the API. Use
+        `open-medium` instead
+      - VMfest now creates all nodes in the "vmfest" group (new
+        feature of 4.2)
+      - Incorporate vbox's API function/attribute name changes for
+        4.2.x
+
+- Drop support for VirtualBox 4.1.x or older
+
+
 ## 0.2.5
 
 - Add support for get-extra-data-keys

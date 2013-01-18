@@ -27,7 +27,7 @@ VirtualBox server. Give it a try!
 
 # Release Notes
 
-Can be found [here](vmfest/blob/support/0.2.6/relnotes.md).
+Can be found [here](vmfest/blob/support/v0.2.6/relnotes.md).
 
 # Usage
 

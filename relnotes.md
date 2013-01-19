@@ -1,5 +1,9 @@
 # Release Notes
 
+## 0.2.7
+
+- remove bogus dependency on clj-http (was causing logging issues)
+
 ## 0.2.6
 
 - Project and documentation updates for release

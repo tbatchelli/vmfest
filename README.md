@@ -27,7 +27,7 @@ VirtualBox server. Give it a try!
 
 # Release Notes
 
-Can be found [here](vmfest/blob/support/v0.2.6/relnotes.md).
+Can be found [here](vmfest/blob/support/v0.2.7/relnotes.md).
 
 # Usage
 
@@ -63,7 +63,7 @@ but sticking vmfest in your classpath will suffice.
 Add the following dependencies to your ```project.clj```:
 
 ```clojure
-   [vmfest "0.2.6"]
+   [vmfest "0.2.7"]
 ```
 
 NOTE: add more detailed instructions for non-clojurians

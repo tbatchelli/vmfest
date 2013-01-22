@@ -1,5 +1,9 @@
 # Release Notes
 
+## 0.2.8
+
+- Automatically make model images immutable if they aren't
+
 ## 0.2.7
 
 - remove bogus dependency on clj-http (was causing logging issues)

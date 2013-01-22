@@ -304,17 +304,27 @@ VirtualBox"
   "If the medium in the location is not open, it will open it as multi-attach"
   (let [medium
         (vbox/find-medium vbox location :hard-disk)]
-   (when-not medium
-     (log/debugf
-      (str "ensure-image-is-registered: %s not registered. Will "
-           "attempt at registering if it is a hard drive")
-      location)
-     (let [medium (vbox/open-medium vbox location :hard-disk :read-only false)]
-       (image/make-immutable medium)
-       (log/debugf
-        "ensure-image-is-registered: hard disk %s successfully registered."
-        location)
-       medium))))
+    ;; if the image is not registered, register it
+    (when-not medium
+      (log/debugf
+       (str "ensure-image-is-registered: %s not registered. Will "
+            "attempt at registering if it is a hard drive")
+       location)
+      (let [medium (vbox/open-medium vbox location :hard-disk :read-only false)]
+        (log/debugf
+         "ensure-image-is-registered: hard disk %s successfully registered."
+         location)
+        (.close medium)))
+    ;; ensure the image is not immutable, make it immutable
+    (let [medium (vbox/find-medium vbox location :hard-disk)]
+      (when-not (image/mutable? medium)
+        (log/warnf "ensure-image-is-registered: %s is not mutable." location)
+        (log/debugf
+         "ensure-image-is-registered: attempting to make %s immutable."
+         location)
+        (image/make-immutable medium)))
+    ;; Check that the image is successfully registered and immutable
+    (image/valid-model? vbox location)))
 
 (defn create-machine
   [server name os-type-id config image-uuid & [base-folder]]

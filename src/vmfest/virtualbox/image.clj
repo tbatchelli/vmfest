@@ -159,19 +159,24 @@
   (delete-file image-file true)
   options)
 
+(defn mutable? [medium]
+   (let [type (enums/medium-type-type-to-key (.getType medium))]
+     (or (= type :immutable) (= type :multi-attach))))
+
 (defn valid-model? [vbox id-or-location]
   ;; is the image registered?
   (let [medium (find-medium vbox id-or-location)]
     (if-not medium
-      (throw (RuntimeException.
-              (str "This model's image is not registered in VirtualBox: "
-                   id-or-location))))
+      (throw+ {:type :model-not-registered
+               :message
+               (str "This model's image is not registered in VirtualBox: "
+                    id-or-location)}))
     ;; is the image immutable?
-    (let [type (enums/medium-type-type-to-key (.getType medium))]
-      (if-not (or (= type :immutable) (= type :multi-attach))
-        (throw (RuntimeException.
-                (str "This model's image is not immutable nor multi-attach: "
-                     id-or-location)))))))
+    (if-not (mutable? medium)
+      (throw+ {:type :model-not-immutable
+               :message
+               (str "This model's image is not immutable nor multi-attach: "
+                    id-or-location)}))))
 
 (defn setup-model
   "Download a disk image from `image-url` and register it with `vbox`. Returns a

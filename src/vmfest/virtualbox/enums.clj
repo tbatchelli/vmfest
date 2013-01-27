@@ -4,7 +4,8 @@
    [org.virtualbox_4_2 IMachine MachineState ClipboardMode PointingHIDType
     FirmwareType KeyboardHIDType SessionState SessionType StorageBus
     DeviceType NetworkAttachmentType CleanupMode StorageControllerType
-    MediumType HostNetworkInterfaceType AccessMode MediumVariant]))
+    MediumType HostNetworkInterfaceType AccessMode MediumVariant
+    NATProtocol]))
 
 
 (defmacro find-key-by-value [value table]
@@ -185,6 +186,14 @@
   (find-key-by-value type network-attachment-type-to-key-table))
 (defn key-to-network-attachment-type [key]
   (find-value-by-key key network-attachment-type-to-key-table))
+
+(def nat-protocol-type-to-key-table
+  [[NATProtocol/UDP :udp ""]
+   [NATProtocol/TCP :tcp ""]])
+(defn nat-protocol-type-to-key [type]
+  (find-key-by-value type nat-protocol-type-to-key-table))
+(defn nat-protocol-type [key]
+  (find-value-by-key key nat-protocol-type-to-key-table))
 
 ;;; MediumType
 (def medium-type-type-to-key-table

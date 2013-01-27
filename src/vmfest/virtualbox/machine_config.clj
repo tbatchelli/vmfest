@@ -10,7 +10,7 @@
             [vmfest.virtualbox.conditions :as conditions])
   (:import [org.virtualbox_4_2 AccessMode VBoxException NetworkAttachmentType
             HostNetworkInterfaceType INetworkAdapter IMedium IMachine
-            IHostNetworkInterface]))
+            IHostNetworkInterface INATEngine]))
 
 (defn ^IMedium get-medium
   [^IMachine m {:keys [location device-type create] :as device}]
@@ -189,6 +189,23 @@
         (log/errorf
          "configure-adapter: unrecognized attachment type %s" attachment-type)))
 
+(defn add-nat-rules
+  [adapter rules]
+  (let [nat-engine (.getNATEngine adapter)]
+    (doseq [r rules]
+      (log/debugf "add-nat-rules: adding nat-rule %s for adapter %s"
+                  r (.getSlot adapter))
+      (.addRedirect nat-engine (:name r) (enums/nat-protocol-type (:protocol r))
+                    (:host-ip r) (int (:host-port r)) (:guest-ip r) (int (:guest-port r))))))
+
+(defn remove-nat-rules
+  [adapter rules]
+  (let [nat-engine (.getNATEngine adapter)]
+    (doseq [r rules]
+      (log/debugf "remove-nat-rules: removing nat-rule %s from adapter %s"
+                  r (.getSlot adapter))
+      (.removeRedirect nat-engine (:name r)))))
+
 (defn configure-adapter
   [^IMachine m slot config]
   (let [attachment-type (:attachment-type config)]
@@ -196,8 +213,9 @@
      "configure-adapter: Configuring network adapter for machine '%s' slot %s with %s"
      (.getName m) slot config)
     (let [adapter (.getNetworkAdapter m (long slot))]
-      (configure-adapter-object adapter config)
-      (attach-adapter m adapter attachment-type))))
+      (configure-adapter-object adapter (dissoc config :nat-rules))
+      (attach-adapter m adapter attachment-type)
+      (add-nat-rules adapter (:nat-rules config)))))
 
 (defn configure-network [^IMachine m config]
   (log/debugf "Configuring network for machine %s with %s"

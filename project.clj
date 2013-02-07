@@ -4,7 +4,6 @@
   :dependencies [[org.clojure/clojure "1.2.1"]
                  [slingshot "0.10.3"]
                  [org.clojure/tools.logging "0.2.3"]
-                 [clj-http "0.5.8"]
                  [fs "1.0.0"]
                  [org.apache.commons/commons-compress "1.4.1"]]
   :license {:name "Eclipse Public License"

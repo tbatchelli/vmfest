@@ -5,10 +5,13 @@
             [vmfest.virtualbox.model :as model]
             [vmfest.virtualbox.enums :as enums]
             [vmfest.virtualbox.session :as session])
-  (:use [vmfest.virtualbox.scan-codes :only (scan-codes)])
+  (:use [vmfest.virtualbox.scan-codes :only (scan-codes)]
+        [vmfest.virtualbox.system-properties :only [system-properties]]
+        [clojure.string :only [blank?]])
   (:import [org.virtualbox_4_2 IMachine IConsole VBoxException ISession
             VirtualBoxManager IVirtualBox IMedium NetworkAttachmentType
-            IStorageController INetworkAdapter IProgress]
+            IStorageController INetworkAdapter IProgress
+            IHostNetworkInterface INATEngine ChipsetType]
            [vmfest.virtualbox.model GuestOsType Machine]))
 
 
@@ -327,6 +330,54 @@ See IVirtualbox::openRemoteSession for more details"
         :generic (.setAttachmentType adapter NetworkAttachmentType/Generic)
         ;;todo -- raise a condition
       ))))
+
+(defn get-network-interfaces
+  "Returns a map for each active host network interfaces."
+  [server filter-map]
+  (letfn [(matches? [if]
+            (= filter-map (select-keys if (keys filter-map))))
+          (os-interface-name [^String name]
+            (let [index  (.indexOf name ":")]
+              (if (> index 0)
+                (.substring name 0 index)
+                name)))]
+    (->>
+     (.getNetworkInterfaces (.getHost ^IVirtualBox (.getParent server)))
+     (map (fn [^IHostNetworkInterface ni]
+            {:name (.getName ni) ;; the full OSX name
+             :os-name (os-interface-name (.getName ni))
+             :ip-address (.getIPAddress ni)
+             :status (enums/host-network-interface-status-to-key
+                      (.getStatus ni))
+             :interface-type (enums/host-network-interface-type-to-key
+                              (.getInterfaceType ni))
+             :medium-type (enums/host-network-interface-medium-type-to-key
+                           (.getMediumType ni))}))
+     (filter matches?)
+     doall)))
+
+(defn get-network-adapters
+  "Returns a map for each network adapter."
+  [server filter-map]
+  (letfn [(matches? [if]
+            (= filter-map (select-keys if (keys filter-map))))
+          (nat-info [^INATEngine nat-engine]
+            {:host-ip (.getHostIP nat-engine)
+             :forwards
+             (->> (.getRedirects nat-engine)
+                  (map
+                   #(zipmap
+                     [:name :protocol :host-ip :host-port :guest-ip :guest-port]
+                     (.split % ",")))
+                  (map #(->> % (remove (comp blank? val)) (into {}))))})]
+    (->>
+     (map #(.getNetworkAdapter server %)
+          (range (.getMaxNetworkAdapters
+                  (system-properties server)
+                  (.getChipsetType server))))
+     (map (fn [^INetworkAdapter ni] {:nat (nat-info (.getNATEngine ni))}))
+     (filter matches?)
+     doall)))
 
 (defn stop
   [^IConsole c]

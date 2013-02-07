@@ -5,8 +5,7 @@
     FirmwareType KeyboardHIDType SessionState SessionType StorageBus
     DeviceType NetworkAttachmentType CleanupMode StorageControllerType
     MediumType HostNetworkInterfaceType AccessMode MediumVariant
-    NATProtocol]))
-
+    HostNetworkInterfaceStatus HostNetworkInterfaceMediumType  NATProtocol]))
 
 (defmacro find-key-by-value [value table]
   `(let [[v# k# _#] (first (filter (fn [[v# _# _#]] (= ~value v#)) ~table))]
@@ -221,6 +220,25 @@
   (find-key-by-value type host-network-interface-type-to-key-table))
 (defn key-to-host-network-interface-type [key]
   (find-value-by-key key host-network-interface-type-to-key-table))
+
+(def host-network-interface-medium-type-to-key-table
+  [[HostNetworkInterfaceMediumType/Ethernet :ethernet ""]
+   [HostNetworkInterfaceMediumType/PPP :ppp ""]
+   [HostNetworkInterfaceMediumType/SLIP :slip ""]
+   [HostNetworkInterfaceMediumType/Unknown :unknown ""]])
+(defn host-network-interface-medium-type-to-key [medium-type]
+  (find-key-by-value medium-type host-network-interface-medium-type-to-key-table))
+(defn key-to-host-network-interface-medium-type [key]
+  (find-value-by-key key host-network-interface-medium-type-to-key-table))
+
+(def host-network-interface-status-to-key-table
+  [[HostNetworkInterfaceStatus/Up :up ""]
+   [HostNetworkInterfaceStatus/Down :down ""]
+   [HostNetworkInterfaceStatus/Unknown :unknown ""]])
+(defn host-network-interface-status-to-key [status]
+  (find-key-by-value status host-network-interface-status-to-key-table))
+(defn key-to-host-network-interface-status [key]
+  (find-value-by-key key host-network-interface-status-to-key-table))
 
 
 ;;; CleanupMode

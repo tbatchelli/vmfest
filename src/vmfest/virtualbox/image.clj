@@ -147,19 +147,21 @@
 
 (defn threaded-get-metadata
   [{:keys [model-name image-file meta meta-url vagrant-box?] :as options}]
-  (if meta
+  (if vagrant-box?
     (do
-      (log/infof "%s: Metadata provided explicitly" model-name)
-      options)
-    (if vagrant-box?
+      (log/infof "%s: Creating metadata for vagrant box" model-name)
+      (update-in options [:meta]
+                 #(merge
+                   {:username "vagrant"
+                    :password "vagrant"
+                    :sudo-password "vagrant"
+                    :no-sudo false
+                    :network-type :nat}
+                   %)))
+    (if meta
       (do
-        (log/infof "%s: Creating metadata for vagrant box" model-name)
-        (update-in options [:meta]
-                   #(merge
-                     {:username "vagrant"
-                      :sudo-password "vagrant"
-                      :no-sudo false}
-                     %)))
+        (log/infof "%s: Metadata provided explicitly" model-name)
+        options)
       (do
         (log/infof "%s: Loading metadata from %s" model-name meta-url)
         (assoc options :meta (load-string (slurp meta-url)))))))

@@ -2,6 +2,7 @@
   (:use [clojure.java.io]
         [vmfest.virtualbox.session :only (with-vbox)]
         [clojure.pprint :only (pprint)]
+        [vmfest.utils :only [untar]]
         [vmfest.virtualbox.virtualbox :only (find-medium)]
         [vmfest.virtualbox.system-properties :only [supported-medium-formats
                                                     default-hard-disk-format]]
@@ -80,6 +81,7 @@
                                              image-url)
         image-name (file-name-without-extensions image-file-name)
         gzipped? (.endsWith image-file-name ".gz")
+        vagrant-box? (.endsWith image-file-name ".box")
         model-name (or model-name image-name)
         model-unique-name (str "vmfest-" model-name)
         meta-url (or meta-url
@@ -93,10 +95,15 @@
      :image-file-name image-file-name
      :gzipped? gzipped?
      :gzipped-image-file (str temp-dir File/separator image-file-name)
-     :image-file (str temp-dir File/separator image-name ".vdi")
+     :vagrant-box? vagrant-box?
+     :image-file (if vagrant-box?
+                   (str temp-dir File/separator "box-disk1.vmdk")
+                   (str temp-dir File/separator image-name ".vdi"))
      :model-name model-name
      :model-path model-path
-     :model-file (str model-path File/separator model-unique-name ".vdi")
+     :model-file (if vagrant-box?
+                   (str model-path File/separator model-unique-name ".vmdk")
+                   (str model-path File/separator model-unique-name ".vdi"))
      :model-meta (str model-path File/separator model-unique-name ".meta")
      :temp-dir temp-dir
      :meta meta
@@ -107,9 +114,10 @@
 (def ^:dynamic *dry-run* false)
 
 (defn threaded-download
-  [{:keys [model-name image-url gzipped? gzipped-image-file image-file]
+  [{:keys [model-name image-url gzipped? gzipped-image-file image-file
+           vagrant-box?]
     :as options}]
-  (let [dest (if gzipped? gzipped-image-file image-file)]
+  (let [dest (if (or gzipped? vagrant-box?) gzipped-image-file image-file)]
     (log/infof "%s: Downloading %s into %s" model-name image-url dest )
     (when-not *dry-run*
       (download image-url dest)))
@@ -126,15 +134,35 @@
     (log/infof "%s: File %s is already uncompressed" model-name image-file))
   options)
 
+(defn threaded-unbox
+  [{:keys [model-name vagrant-box? temp-dir gzipped-image-file] :as options}]
+  (if vagrant-box?
+    (do
+      (log/infof "%s: Unpacking %s into %s"
+                 model-name gzipped-image-file temp-dir)
+      (when-not *dry-run*
+        (untar gzipped-image-file temp-dir)))
+    (log/infof "%s: Fileis not a vagrant box" model-name))
+  options)
+
 (defn threaded-get-metadata
-  [{:keys [model-name image-file meta meta-url] :as options}]
+  [{:keys [model-name image-file meta meta-url vagrant-box?] :as options}]
   (if meta
     (do
       (log/infof "%s: Metadata provided explicitly" model-name)
       options)
-    (do
-      (log/infof "%s: Loading metadata from %s" model-name meta-url)
-      (assoc options :meta (load-string (slurp meta-url))))))
+    (if vagrant-box?
+      (do
+        (log/infof "%s: Creating metadata for vagrant box" model-name)
+        (update-in options [:meta]
+                   #(merge
+                     {:username "vagrant"
+                      :sudo-password "vagrant"
+                      :no-sudo false}
+                     %)))
+      (do
+        (log/infof "%s: Loading metadata from %s" model-name meta-url)
+        (assoc options :meta (load-string (slurp meta-url)))))))
 
 (defn threaded-register-model
   [{:keys [image-file model-file vbox model-name] :as options}]
@@ -188,14 +216,15 @@
       (log/errorf
        "The model %s already exists. Manually specifiy another file name with :model-name"
        (:model-file job))
-      (do
-        (-> job
-            threaded-download
-            threaded-gunzip
-            threaded-get-metadata
-            threaded-register-model
-            threaded-create-meta
-            threaded-cleanup-temp-files)))))
+      (-> job
+          threaded-download
+          threaded-gunzip
+          threaded-unbox
+          threaded-get-metadata
+          threaded-register-model
+          threaded-create-meta
+          threaded-cleanup-temp-files))))
+
 
 (comment
  (use 'vmfest.manager)

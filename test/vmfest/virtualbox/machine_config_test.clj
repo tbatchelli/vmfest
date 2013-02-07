@@ -196,11 +196,21 @@
 
 (deftest ^{:integration true}
   nat-config-tests
-  (testing "You can add a NAT adapter"
+  (testing "You can add a NAT Rules for an adapter"
     (with-config-machine
       (let [config
-            [{:attachment-type :nat}]]))))
-
+            [{:attachment-type :nat
+              :nat-rules [{:name "http", :protocol :tcp,
+                           :host-ip "", :host-port 8080,
+                           :guest-ip "", :guest-port 80}]}]]
+        (configure-network m config)
+        (let [redirects (-> m (.getNetworkAdapter (long 0)) .getNATEngine .getRedirects)]
+          (is (= (count redirects) 1))
+          (is (= (first redirects)
+                 (format "%s,%s,%s,%s,%s,%s"
+                         "http" (.ordinal (enums/nat-protocol-type :tcp))
+                         "" (int 8080) "" (int 80)))))))))
+ 
 (def machine-config
   {:cpu-count 2
    :memory-size 555

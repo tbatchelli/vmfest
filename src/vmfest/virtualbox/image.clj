@@ -161,6 +161,12 @@
   (if vagrant-box?
     (do
       (log/infof "%s: Creating metadata for vagrant box" model-name)
+      (when-not (every? (or (:meta options) {})
+                        [:os-family :os-version :os-64-bit])
+        (throw+
+         {:supplied-options (:meta options)}
+         (str "To install vagrant boxes, you must specify os-family, os-version"
+              " and os-64-bit")))
       (update-in options [:meta]
                  #(merge
                    {:username "vagrant"

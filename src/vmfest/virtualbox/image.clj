@@ -96,6 +96,8 @@
      :gzipped? gzipped?
      :gzipped-image-file (str temp-dir File/separator image-file-name)
      :vagrant-box? vagrant-box?
+     :key-file (str model-path File/separator "vagrant-key")
+     :key-url "https://raw.github.com/mitchellh/vagrant/master/keys/vagrant"
      :image-file (if vagrant-box?
                    (str temp-dir File/separator "box-disk1.vmdk")
                    (str temp-dir File/separator image-name ".vdi"))
@@ -145,8 +147,17 @@
     (log/infof "%s: Fileis not a vagrant box" model-name))
   options)
 
+(defn threaded-get-key
+  [{:keys [model-name vagrant-box? key-url key-file] :as options}]
+  (when vagrant-box?
+    (log/infof "%s: Checking vagrant key is available" model-name)
+    (when-not (.exists (file key-file))
+      (download (java.net.URL. key-url) (file key-file))))
+  options)
+
 (defn threaded-get-metadata
-  [{:keys [model-name image-file meta meta-url vagrant-box?] :as options}]
+  [{:keys [model-name image-file meta meta-url vagrant-box? key-file]
+    :as options}]
   (if vagrant-box?
     (do
       (log/infof "%s: Creating metadata for vagrant box" model-name)
@@ -155,6 +166,7 @@
                    {:username "vagrant"
                     :password "vagrant"
                     :sudo-password "vagrant"
+                    :private-key-path key-file
                     :no-sudo false
                     :network-type :nat}
                    %)))
@@ -223,6 +235,7 @@
           threaded-gunzip
           threaded-unbox
           threaded-get-metadata
+          threaded-get-key
           threaded-register-model
           threaded-create-meta
           threaded-cleanup-temp-files))))

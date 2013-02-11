@@ -47,7 +47,7 @@ but sticking vmfest in your classpath will suffice.
 Add the following dependencies to your ```project.clj```:
 
 ```clojure
-   [vmfest "0.3.0-alpha.1"]
+   [vmfest "0.3.0-alpha.2"]
    [org.clojars.tbatchelli/vboxjxpcom "4.2.4"]
 ```
 
@@ -366,7 +366,7 @@ suggestions, or just want to chat, here are your options:
  
 # License
 
-Copyright © 2012 Antoni Batchelli
+Copyright © 2013 Antoni Batchelli and Hugo Duncan
 
 Distributed under the Eclipse Public License, the same as Clojure.
  

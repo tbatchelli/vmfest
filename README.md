@@ -15,7 +15,7 @@ welcome. Please use the
 
 # Release Notes
 
-Can be found [here](vmfest/blob/master/relnotes.md).
+Can be found [here](relnotes.md).
 
 # Usage
 
@@ -47,12 +47,9 @@ but sticking vmfest in your classpath will suffice.
 Add the following dependencies to your ```project.clj```:
 
 ```clojure
-   [vmfest "0.3.0-alpha.1"]
+   [vmfest "0.3.0-alpha.2"]
    [org.clojars.tbatchelli/vboxjxpcom "4.2.4"]
 ```
-
-NOTE: add more detailed instructions for non-clojurians
-
 
 # Basic Features
 
@@ -182,7 +179,7 @@ exact same VM as above with:
 (instance my-server "my-vmfest-vm" :debian-6.0.2.1-64bit-v0.3 :micro)
 ```
 
-### Setting up Image Models
+### Setting up VMFest Image Models
 
 We have created a few images to be used with VMFest. Although VMFest
 can operate on any image, we want to build high quality images that
@@ -195,6 +192,24 @@ images on your local VMFest setup.
 
 This will download and install this image as immutable. From there on
 you can start using it as :debian-6.0.2.1-64bit-v0.3.
+
+### Using Vagrant Boxes as Image Models
+
+__NOTE:__ this feature is Alpha.
+
+VMFest can use any well configured [Vagrant](vagrant) box as an image
+model. To do so, will setup the image similarly as above, but passing
+some extra parameters, e.g.:
+
+```clojure
+(setup-model "http://files.vagrantup.com/lucid64.box" my-server
+   :os-family :ubuntu :os-version "10.04" :os-64-bit true)
+```
+
+Once installed, the Vagrant box can be used just as any other VMFest
+model.
+
+[vagrant]: http://vagrantup.com
 
 ## Fast VM Instantiation
 
@@ -351,7 +366,7 @@ suggestions, or just want to chat, here are your options:
  
 # License
 
-Copyright © 2012 Antoni Batchelli
+Copyright © 2013 Antoni Batchelli and Hugo Duncan
 
 Distributed under the Eclipse Public License, the same as Clojure.
  

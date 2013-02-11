@@ -5,74 +5,78 @@
             [vmfest.virtualbox.model :as model]
             [vmfest.virtualbox.enums :as enums]
             [vmfest.virtualbox.session :as session])
-  (:use [vmfest.virtualbox.scan-codes :only (scan-codes)])
-  (:import [org.virtualbox_4_2 IMachine IConsole VBoxException
-            VirtualBoxManager IVirtualBox IMedium NetworkAttachmentType]
+  (:use [vmfest.virtualbox.scan-codes :only (scan-codes)]
+        [vmfest.virtualbox.system-properties :only [system-properties]]
+        [clojure.string :only [blank?]])
+  (:import [org.virtualbox_4_2 IMachine IConsole VBoxException ISession
+            VirtualBoxManager IVirtualBox IMedium NetworkAttachmentType
+            IStorageController INetworkAdapter IProgress
+            IHostNetworkInterface INATEngine ChipsetType]
            [vmfest.virtualbox.model GuestOsType Machine]))
 
 
 (def getters
-  {:name #(.getName %)
-   :description #(.getDescription %)
-   :accessible? #(.getAccessible %)
-   :access-error #(.getAccessError %) ;; todo. get object
-;;;   :os-type #(let [type-id (.getOSTypeId %)
+  {:name #(.getName ^IMachine %)
+   :description #(.getDescription ^IMachine %)
+   :accessible? #(.getAccessible ^IMachine %)
+   :access-error #(.getAccessError ^IMachine %) ;; todo. get object
+;;;   :os-type #(let [type-id (.getOSTypeId ^IMachine %)
 ;;;                  object (GuestOsType. type-id server)]
 ;;;              (model/as-map object))
-   :hardware-version #(.getHardwareVersion %)
-   :hardware-uuid #(.getHardwareUUID %)
-   :cpu-count #(.getCPUCount %)
-   :cpu-hot-plug-enabled? #(.getCPUHotPlugEnabled %)
-   :memory-size #(.getMemorySize %)
-   :memory-ballon-size #(.getMemoryBalloonSize %)
-   :page-fusion-enabled? #(.getPageFusionEnabled %)
-   :vram-size #(.getVRAMSize %)
-   :accelerate-3d-enabled? #(.getAccelerate3DEnabled %)
-   :accelerate-2d-video-enabled? #(.getAccelerate2DVideoEnabled %)
-   :monitor-count #(.getMonitorCount %)
-   :bios-settings #(.getBIOSSettings %) ;todo: get object
+   :hardware-version #(.getHardwareVersion ^IMachine %)
+   :hardware-uuid #(.getHardwareUUID ^IMachine %)
+   :cpu-count #(.getCPUCount ^IMachine %)
+   :cpu-hot-plug-enabled? #(.getCPUHotPlugEnabled ^IMachine %)
+   :memory-size #(.getMemorySize ^IMachine %)
+   :memory-ballon-size #(.getMemoryBalloonSize ^IMachine %)
+   :page-fusion-enabled? #(.getPageFusionEnabled ^IMachine %)
+   :vram-size #(.getVRAMSize ^IMachine %)
+   :accelerate-3d-enabled? #(.getAccelerate3DEnabled ^IMachine %)
+   :accelerate-2d-video-enabled? #(.getAccelerate2DVideoEnabled ^IMachine %)
+   :monitor-count #(.getMonitorCount ^IMachine %)
+   :bios-settings #(.getBIOSSettings ^IMachine %) ;todo: get object
    :firmware-type #(enums/firmware-type-to-key
-                   (.getFirmwareType %)) ;todo: get object
+                   (.getFirmwareType ^IMachine %)) ;todo: get object
    :pointing-hid-type #(enums/pointing-hid-type-to-key
-                       (.getPointingHIDType %)) ;todo: get object
+                       (.getPointingHIDType ^IMachine %)) ;todo: get object
    :keyboard-hid-type #(enums/keyboard-hid-type-to-key
-                       (.getKeyboardHIDType %)) ;todo: get object
-   :hpet-enabled #(.getHPETEnabled %)
-   :snapshot-folder #(.getSnapshotFolder %)
-   :vrde-server #(.getVRDEServer %) ;todo: get object
-   :medium-attachments #(.getMediumAttachments %) ;todo: get
+                       (.getKeyboardHIDType ^IMachine %)) ;todo: get object
+   :hpet-enabled #(.getHPETEnabled ^IMachine %)
+   :snapshot-folder #(.getSnapshotFolder ^IMachine %)
+   :vrde-server #(.getVRDEServer ^IMachine %) ;todo: get object
+   :medium-attachments #(.getMediumAttachments ^IMachine %) ;todo: get
                                         ;objects
-   :usb-controller #(.getUSBController %) ;todo: get object
-   :audio-adapter #(.getAudioAdapter %) ; todo: get object
-   :storage-controllers #(.getStorageControllers %) ;todo: get
+   :usb-controller #(.getUSBController ^IMachine %) ;todo: get object
+   :audio-adapter #(.getAudioAdapter ^IMachine %) ; todo: get object
+   :storage-controllers #(.getStorageControllers ^IMachine %) ;todo: get
                                         ;objects
-   :settings-file-path #(.getSettingsFilePath %)
-   :settings-modified? #(try (.getSettingsModified %)
+   :settings-file-path #(.getSettingsFilePath ^IMachine %)
+   :settings-modified? #(try (.getSettingsModified ^IMachine %)
                             (catch Exception e (comment "Do nothing")))
    :session-state #(enums/session-state-to-key
-                   (.getSessionState %)) ;todo: get object
-   :session-type #(enums/session-type-to-key (.getSessionType %))
-   :session-pid #(.getSessionPID %)
-   :state #(enums/machine-state-to-key (.getState %)) ;todo: get object
-   :last-state-change #(.getLastStateChange %) ;todo: make-date?
-   :state-file-path #(.getStateFilePath %)
-   :logFolder #(.getLogFolder %)
-   :current-snapshot #(.getCurrentSnapshot %)
-   :snapshot-count #(.getSnapshotCount %)
-   :current-state-modified? #(.getCurrentStateModified %)
-   :shared-folders #(.getSharedFolders %) ;todo: get objects
+                   (.getSessionState ^IMachine %)) ;todo: get object
+   :session-type #(enums/session-type-to-key (.getSessionType ^IMachine %))
+   :session-pid #(.getSessionPID ^IMachine %)
+   :state #(enums/machine-state-to-key (.getState ^IMachine %)) ;todo: get object
+   :last-state-change #(.getLastStateChange ^IMachine %) ;todo: make-date?
+   :state-file-path #(.getStateFilePath ^IMachine %)
+   :logFolder #(.getLogFolder ^IMachine %)
+   :current-snapshot #(.getCurrentSnapshot ^IMachine %)
+   :snapshot-count #(.getSnapshotCount ^IMachine %)
+   :current-state-modified? #(.getCurrentStateModified ^IMachine %)
+   :shared-folders #(.getSharedFolders ^IMachine %) ;todo: get objects
    :clipboard-mode #(enums/clipboard-mode-to-key
-                    (.getClipboardMode %)) ;todo: get object
+                    (.getClipboardMode ^IMachine %)) ;todo: get object
    :guest-property-notification-patterns
-   #(.getGuestPropertyNotificationPatterns %)
-   :teleporter-enabled? #(.getTeleporterEnabled %)
-   :teleporter-port #(.getTeleporterPort %)
-   :teleporter-address #(.getTeleporterAddress %)
-   :teleporter-password #(.getTeleporterPassword %)
-   :rtc-use-utc? #(.getRTCUseUTC %)
-   :io-cache-enabled? #(.getIOCacheEnabled %)
-   :io-cache-size #(.getIoCacheSize %)
-   ;;   :io-bandwidth-max #(.getIoBandwidthMax %)
+   #(.getGuestPropertyNotificationPatterns ^IMachine %)
+   :teleporter-enabled? #(.getTeleporterEnabled ^IMachine %)
+   :teleporter-port #(.getTeleporterPort ^IMachine %)
+   :teleporter-address #(.getTeleporterAddress ^IMachine %)
+   :teleporter-password #(.getTeleporterPassword ^IMachine %)
+   :rtc-use-utc? #(.getRTCUseUTC ^IMachine %)
+   :io-cache-enabled? #(.getIOCacheEnabled ^IMachine %)
+   :io-cache-size #(.getIOCacheSize ^IMachine %)
+   ;;   :io-bandwidth-max #(.getIoBandwidthMax ^IMachine %)
    })
 
 (defn get-attribute [vb-m getter-key]
@@ -146,35 +150,37 @@
    })
 
 (def setters
-  {:name #(.setName %2 %1)
-   :description #(.setDescription %2 %1)
-   :os-type-id #(.setOSTypeId %2 %1) ;; name is correct?
-   :hardware-version #(.setHardwareVersion %2 %1)
-   :hardware-uuid #(.setHardwareUUID %2 %1)
-   :cpu-count #(.setCPUCount %2 (long %1))
-   :cpu-hot-plug-enabled? #(.setCPUHotPlugEnabled %2 %1)
-   :memory-size #(.setMemorySize %2 (long %1))
-   :memory-balloon-size #(.setMemoryBalloonSize %2 (long %1))
-   :page-fusion-enabled? #(.setPageFusionEnabled %2 %1)
-   :vram-size #(.setVRAMSize %2 (long %1))
-   :accelerate-3d-enabled? #(.setAccelerate3DEnabled %2 %1)
-   :accelerate-2d-enabled? #(.setAccelerate2DEnabled %2 %1)
-   :monitor-count #(.setMonitorCount %2 (long %1))
-   :firmware-type #(.setFirmwareType %2 %1)
-   :pointing-hid-type #(.setPointingHIDType %2 %1)
-   :keyboard-hid-type #(.setKeyboardHIDType %2 %1)
-   :hpet-enabled #(.setHpetEnabled %2 %1)
-   :snapshot-folder #(.setSnapshotFolder %2 %1)
-   :clipboard-mode #(.setClipboardMode %2 %1)
-   :teleporter-enabled? #(.setTeleporterEnabled %2 %1)
+  {:name #(.setName ^IMachine %2 %1)
+   :description #(.setDescription ^IMachine %2 %1)
+   :os-type-id #(.setOSTypeId ^IMachine %2 %1) ;; name is correct?
+   :hardware-version #(.setHardwareVersion ^IMachine %2 %1)
+   :hardware-uuid #(.setHardwareUUID ^IMachine %2 %1)
+   :cpu-count #(.setCPUCount ^IMachine %2 (long %1))
+   :cpu-hot-plug-enabled? #(.setCPUHotPlugEnabled ^IMachine %2 %1)
+   :memory-size #(.setMemorySize ^IMachine %2 (long %1))
+   :memory-balloon-size #(.setMemoryBalloonSize ^IMachine %2 (long %1))
+   :page-fusion-enabled? #(.setPageFusionEnabled ^IMachine %2 %1)
+   :vram-size #(.setVRAMSize ^IMachine %2 (long %1))
+   :accelerate-3d-enabled? #(.setAccelerate3DEnabled
+                             ^IMachine %2 (boolean %1))
+   :accelerate-2d-video-enabled? #(.setAccelerate2DVideoEnabled
+                                   ^IMachine %2 (boolean %1))
+   :monitor-count #(.setMonitorCount ^IMachine %2 (long %1))
+   :firmware-type #(.setFirmwareType ^IMachine %2 %1)
+   :pointing-hid-type #(.setPointingHIDType ^IMachine %2 %1)
+   :keyboard-hid-type #(.setKeyboardHIDType ^IMachine %2 %1)
+   :hpet-enabled #(.setHPETEnabled ^IMachine %2 %1)
+   :snapshot-folder #(.setSnapshotFolder ^IMachine %2 %1)
+   :clipboard-mode #(.setClipboardMode ^IMachine %2 %1)
+   :teleporter-enabled? #(.setTeleporterEnabled ^IMachine %2 %1)
    :guest-property-notification-patters
-   #(.setGuestPropertyNotificationPatterns %2 %1)
-   :teleporter-port #(.setTeleporterPort %2 %1)
-   :teleporter-address #(.setTeleporterAddress %2 %1)
-   :teleporter-password #(.setTeleporterAddress %2 %1)
-   :rtc-use-utc? #(.setRTCUseUTC %2 %1)
-   :io-cache-enabled? #(.setIOCacheEnabled %2 %1)
-   :io-cache-size #(.setIOCacheSize %2 (long %1))
+   #(.setGuestPropertyNotificationPatterns ^IMachine %2 %1)
+   :teleporter-port #(.setTeleporterPort ^IMachine %2 %1)
+   :teleporter-address #(.setTeleporterAddress ^IMachine %2 %1)
+   :teleporter-password #(.setTeleporterAddress ^IMachine %2 %1)
+   :rtc-use-utc? #(.setRTCUseUTC ^IMachine %2 %1)
+   :io-cache-enabled? #(.setIOCacheEnabled ^IMachine %2 %1)
+   :io-cache-size #(.setIOCacheSize ^IMachine %2 (long %1))
    ;;   :io-bandwidth-max #(.setIoBandwidthMax %2 (long %1))
    })
 
@@ -226,12 +232,12 @@ Optional parameters are:
    :session-type 'gui', 'headless' or 'sdl'. Default is 'gui'
    :env environment as String to be passed to the machine at startup.
 See IVirtualbox::openRemoteSession for more details"
-  [mgr vbox machine-id & opt-kv]
+  [^VirtualBoxManager mgr ^IVirtualBox vbox machine-id & opt-kv]
   {:pre [(model/VirtualBoxManager? mgr)
          (model/IVirtualBox? vbox)]}
   (let [opts (apply hash-map opt-kv)
         session (.getSessionObject mgr)
-        session-type  (or (:session-type opts) "gui")
+        ^String session-type  (or (:session-type opts) "gui")
         env (or (:env opts) "DISPLAY:0.0")]
     (try
       (conditions/with-vbox-exception-translation
@@ -260,7 +266,7 @@ See IVirtualbox::openRemoteSession for more details"
          {:message "An error occurred while starting machine"})))))
 
 
-(defn save-settings [machine]
+(defn save-settings [^IMachine machine]
   {:pre [(model/IMachine? machine)]}
   (try
     (conditions/with-vbox-exception-translation
@@ -276,7 +282,7 @@ See IVirtualbox::openRemoteSession for more details"
 
 
 ;; TODO: This is redundant with machine-config/add-storage-controller
-(defn add-storage-controller  [m name bus-type]
+(defn add-storage-controller  [^IMachine m ^String name bus-type]
   {:pre [(model/IMachine? m)
          name
          (enums/key-to-storage-bus bus-type)]}
@@ -309,7 +315,7 @@ See IVirtualbox::openRemoteSession for more details"
                      type
                      medium))))
 
-(defn set-network-adapter [m port type interface]
+(defn set-network-adapter [^IMachine m port type ^INetworkAdapter interface]
   {:pre [(model/IMachine? m)
          port interface
          (enums/key-to-network-attachment-type type)]}
@@ -324,6 +330,54 @@ See IVirtualbox::openRemoteSession for more details"
         :generic (.setAttachmentType adapter NetworkAttachmentType/Generic)
         ;;todo -- raise a condition
       ))))
+
+(defn get-network-interfaces
+  "Returns a map for each active host network interfaces."
+  [server filter-map]
+  (letfn [(matches? [if]
+            (= filter-map (select-keys if (keys filter-map))))
+          (os-interface-name [^String name]
+            (let [index  (.indexOf name ":")]
+              (if (> index 0)
+                (.substring name 0 index)
+                name)))]
+    (->>
+     (.getNetworkInterfaces (.getHost ^IVirtualBox (.getParent server)))
+     (map (fn [^IHostNetworkInterface ni]
+            {:name (.getName ni) ;; the full OSX name
+             :os-name (os-interface-name (.getName ni))
+             :ip-address (.getIPAddress ni)
+             :status (enums/host-network-interface-status-to-key
+                      (.getStatus ni))
+             :interface-type (enums/host-network-interface-type-to-key
+                              (.getInterfaceType ni))
+             :medium-type (enums/host-network-interface-medium-type-to-key
+                           (.getMediumType ni))}))
+     (filter matches?)
+     doall)))
+
+(defn get-network-adapters
+  "Returns a map for each network adapter."
+  [server filter-map]
+  (letfn [(matches? [if]
+            (= filter-map (select-keys if (keys filter-map))))
+          (nat-info [^INATEngine nat-engine]
+            {:host-ip (.getHostIP nat-engine)
+             :forwards
+             (->> (.getRedirects nat-engine)
+                  (map
+                   #(zipmap
+                     [:name :protocol :host-ip :host-port :guest-ip :guest-port]
+                     (.split % ",")))
+                  (map #(->> % (remove (comp blank? val)) (into {}))))})]
+    (->>
+     (map #(.getNetworkAdapter server %)
+          (range (.getMaxNetworkAdapters
+                  (system-properties server)
+                  (.getChipsetType server))))
+     (map (fn [^INetworkAdapter ni] {:nat (nat-info (.getNATEngine ni))}))
+     (filter matches?)
+     doall)))
 
 (defn stop
   [^IConsole c]
@@ -430,7 +484,7 @@ See IVirtualbox::openRemoteSession for more details"
 
 ;;;;;;;
 
-(defn unregister [vb-m & [cleanup-key]]
+(defn unregister [^IMachine vb-m & [cleanup-key]]
   {:pre [(model/IMachine? vb-m)
          (if cleanup-key (enums/key-to-cleanup-mode cleanup-key) true)]}
   ;; todo, make sure the key is valid
@@ -446,7 +500,7 @@ See IVirtualbox::openRemoteSession for more details"
        cleanup-mode)
       (.unregister vb-m cleanup-mode))))
 
-(defn delete [vb-m media]
+(defn ^IProgress delete [^IMachine vb-m ^IMedium media]
   {:pre [(model/IMachine? vb-m)]}
   (conditions/with-vbox-exception-translation
     {:VBOX_E_INVALID_VM_STATE
@@ -461,12 +515,13 @@ See IVirtualbox::openRemoteSession for more details"
   {:pre [(model/IMachine? vb-m)]}
   (enums/machine-state-to-key (.getState vb-m)))
 
-(defn get-storage-controller-by-name [m name]
+(defn ^IStorageController get-storage-controller-by-name
+  [^IMachine m ^String name]
   {:pre [(model/IMachine? m)]}
   (.getStorageControllerByName m name))
 
 ;;; scan codes
-(defn send-keyboard-entries [vb-m entries]
+(defn send-keyboard-entries [^ISession vb-m entries]
   "Given a sequence with a mix of:
      - strings corresponding to text
      - keywords corresponding to non-char key presses
@@ -490,5 +545,5 @@ See IVirtualbox::openRemoteSession for more details"
     (log/debugf "Sending to %s the scan-codes %s" (.getName (.getMachine vb-m)) scan-code-seq)
     (doseq [sc scan-code-seq]
       (if (number? sc)
-        (.putScancode keyboard (Integer. sc))
+        (.putScancode keyboard (Integer. (int sc)))
         (Thread/sleep (first sc))))))

@@ -7,7 +7,11 @@
          (try (import 'org.virtualbox_4_1.jaxws.IVirtualBoxCreateHardDisk)
               :ws
               (catch Exception e
-                :error)))))
+                (try
+                  (import 'org.virtualbox_4_2.jaxws.IVirtualBoxCreateHardDisk)
+                  :ws
+                  (catch Exception e
+                    :error)))))))
 
 (defonce xpcom? (= (vbox-binding) :xpcom))
 

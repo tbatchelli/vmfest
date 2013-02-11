@@ -11,6 +11,7 @@ destruction of sessions with the VBox servers"
             IVirtualBox
             VBoxException
             LockType
+            IMachine
             ISession]
            [vmfest.virtualbox.model
             Server
@@ -44,7 +45,7 @@ destruction of sessions with the VBox servers"
 
 ;; When using the XPCOM Bridge, we don't create a session with the
 ;; server, instead, we just instantiate a singleton of the VBM
-(defonce instance
+(defonce ^VirtualBoxManager instance
   (if xpcom? (VirtualBoxManager/createInstance nil)))
 
 ;; To interact with VBox server we need to create a web session. We do
@@ -122,45 +123,61 @@ VirtualBoxManager object plus the credentials or by a Server object.
 ;; wraps a code block and creates a vbox with a session before the
 ;; code in the block is executed, and it will disconnect once the
 ;; block has been executed, thus cleaning up the session.
+(defn cleanup-and-diconnect [^VirtualBoxManager mgr]
+  :pre [mgr]
+  (.cleanup mgr)) ;; cleanup calls disconnect in 4.2
 
-(defmacro with-vbox [^Server server [mgr vbox] & body]
+(defmacro with-vbox [server [mgr vbox] & body]
   "Wraps a code block with the creation and the destruction of a session
 with a virtualbox.
        with-vbox: Server x [symbol symbol] x body
           -> body"
-  {:pre [(model/VirtualBoxManager? server)]}
-  `(let [[~mgr ~vbox] (create-mgr-vbox ~server)]
-     (try
-       ~@body
-       (finally (when ~mgr
-                  (try
-                    ;; in xpcom we just cleanup (not sure if this does
-                    ;; nothing, but when using webservices we just
-                    ;; disconnect to force the cleanup.
-                    (when-not xpcom?
+  ;; {:pre [(model/VirtualBoxManager? server)]}
+  (let [mgr (vary-meta mgr assoc :tag org.virtualbox_4_2.VirtualBoxManager)
+        vbox (vary-meta vbox assoc :tag org.virtualbox_4_2.IVirtualBox)]
+    `(let [[~mgr ~vbox] (create-mgr-vbox ~server)]
+       (try
+         ~@body
+         (finally (when ~mgr
+                    (try
+                      ;; in xpcom we just cleanup (not sure if this does
+                      ;; nothing, but when using webservices we just
+                      ;; disconnect to force the cleanup.
                       (when instance
                         (.cleanup instance))
-                      (.disconnect ~mgr))
-                    (catch Exception e#
-                      (conditions/wrap-exception
-                       e# {:message "unable to close session"}))))))))
+                      (cleanup-and-diconnect ~mgr)
+                      (catch Exception e#
+                        (conditions/wrap-exception
+                         e# {:message "unable to close session"})))))))))
 
 (def lock-type-constant
   {:write LockType/Write
    :shared LockType/Shared})
+
+(defn lock-machine
+  [^IMachine vb-machine ^ISession session lock-type]
+  {:pre [vb-machine session]}
+  (log/debugf "lock-machine %s %s" (.getName vb-machine) lock-type)
+  (.lockMachine vb-machine session (get lock-type-constant lock-type)))
+
+(defn unlock-machine
+  [^ISession session]
+  {:pre [session]}
+  (log/debugf "unlock-machine %s" (.. session getMachine getName))
+  (.unlockMachine session))
 
 (defmacro with-session
   [machine type [session vb-m] & body]
   #_{:pre [(model/Machine? machine)]}
   `(try
      (with-vbox (:server ~machine) [mgr# vbox#]
-       (let [~session (.getSessionObject mgr#)
-             immutable-vb-m# (.findMachine vbox# (:id ~machine))]
-         (.lockMachine immutable-vb-m# ~session (~type lock-type-constant))
+       (let [~session (.getSessionObject ^VirtualBoxManager mgr#)
+             immutable-vb-m# (.findMachine ^IVirtualBox vbox# (:id ~machine))]
+         (lock-machine immutable-vb-m# ~session ~type)
          (let [~vb-m (.getMachine ~session)]
            (try
              ~@body
-             (finally (.unlockMachine ~session))))))
+             (finally (unlock-machine ~session))))))
      (catch VBoxException e#
        (conditions/wrap-exception
         e#
@@ -170,11 +187,11 @@ with a virtualbox.
 
 
 (defmacro with-no-session
-  [^Machine machine [vb-m] & body]
+  [machine [vb-m] & body]
   #_{:pre [(model/Machine? machine)]}
   `(try
      (with-vbox (:server ~machine) [_# vbox#]
-       (let [~vb-m (.findMachine vbox# (:id ~machine))]
+       (let [~vb-m (.findMachine ^IVirtualBox vbox# (:id ~machine))]
          ~@body))
        (catch Exception e#
          (conditions/wrap-exception e# {:log-level :error

@@ -15,7 +15,7 @@ welcome. Please use the
 
 # Release Notes
 
-Can be found [here](vmfest/blob/master/relnotes.md).
+Can be found [here](relnotes.md).
 
 # Usage
 
@@ -66,9 +66,6 @@ and for Ubuntu/Debian this would be:
 ```clojure
  :jvm-opts ["-Dvbox.home=/usr/lib/virtualbox"]
 ```
-
-NOTE: add more detailed instructions for non-clojurians
-
 
 # Basic Features
 
@@ -198,7 +195,7 @@ exact same VM as above with:
 (instance my-server "my-vmfest-vm" :debian-6.0.2.1-64bit-v0.3 :micro)
 ```
 
-### Setting up Image Models
+### Setting up VMFest Image Models
 
 We have created a few images to be used with VMFest. Although VMFest
 can operate on any image, we want to build high quality images that
@@ -211,6 +208,24 @@ images on your local VMFest setup.
 
 This will download and install this image as immutable. From there on
 you can start using it as :debian-6.0.2.1-64bit-v0.3.
+
+### Using Vagrant Boxes as Image Models
+
+__NOTE:__ this feature is Alpha.
+
+VMFest can use any well configured [Vagrant](vagrant) box as an image
+model. To do so, will setup the image similarly as above, but passing
+some extra parameters, e.g.:
+
+```clojure
+(setup-model "http://files.vagrantup.com/lucid64.box" my-server
+   :os-family :ubuntu :os-version "10.04" :os-64-bit true)
+```
+
+Once installed, the Vagrant box can be used just as any other VMFest
+model.
+
+[vagrant]: http://vagrantup.com
 
 ## Fast VM Instantiation
 

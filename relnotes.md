@@ -1,5 +1,79 @@
 # Release Notes
 
+## 0.3.0-alpha.2
+
+- Add Vagrant support info on README.
+
+- Enforce psssing of os-family, etc, for .box images
+  The information is unavailable in the .box file, so has to be supplied
+  manually.
+
+- Add usage of public vagrant key for .box images
+
+- Fix the virtualbox metadata
+  When options are supplied, merge them rather than rely only on the
+  options passed.
+
+- Remove clj-http dependency
+
+- Add get-network-adapters and get-network-interfaces
+  Add functions in manager and machine to get network interface and
+  adapters as maps.
+
+- Add import of vagrant .box urls to setup-model
+
+- Merge pull request #47 from briprowe/develop
+  Add support for NAT port-forwarding rules in network adapters.
+
+- configure-network can now add port-forwarding rules to adapters.
+  Example: to configure an adapter that port forwards the host's port 8008
+  to the guest's port 80:
+
+  (configure-network machine {:attachment-type :nat
+                             :nat-rules [{:name "http", :protocol :tcp,
+                                          :host-ip "", :host-port 8080,
+                                          :guest-ip "", :guest-port 80}]})
+
+
+- Ensure model images are immutable before use (Fixes #46)
+
+- Remove reflection warnings
+
+- Factor out lock-machine and unlock-machine
+
+- Update session cleanup and disconnect
+
+## 0.3.0-alpha.1
+
+- Update README with the new features in 0.3.0.
+
+- Provide support for the XPCOM bridge along with WS.
+  - Code now supports XPCOM or WS depending of what vbox jar is in the
+   classpath.
+  - Requires lein 2.0 now, and running tests requires combining
+   profiles, e.g. "dev,xpcom,1.3" to test the xpcom bridge using
+   clojure 1.3
+
+- Make vbox download link in readme to be version agnostic.
+
+- Bark when running an unsupported version of VirtualBox
+
+- List machines by group(s). Add function to list vmfest-managed machines.
+
+- Make "http://localhost:18083" the default server URL when none is passed.
+
+## 0.2.6-beta.1
+
+- Update README to version 0.2.6-beta.1 + VBox 4.2
+
+- Adapt vmfest to VirtualBox 4.2
+    - Removed `find-medium` after the removal from the API. Use
+     `open-medium` instead
+   - VMfest now creates all nodes in the "vmfest" group (new feature of
+     4.2)
+
+- Incorporate vbox's API function/attribute name changes for 4.2.x
+
 ## 0.2.5
 
 - Add support for get-extra-data-keys

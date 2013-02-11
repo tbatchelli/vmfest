@@ -130,6 +130,19 @@ machines are stored in ~/.vmfest/nodes ."
 
 
 ;;; host functions
+(defn get-network-interfaces
+  "Returns a map for each active host network interfaces."
+  ([machine filter-map]
+     (session/with-session machine :shared [_ server]
+       (machine/get-network-interfaces server filter-map)))
+  ([machine] (get-network-interfaces machine {:status :up})))
+
+(defn get-network-adapters
+  "Returns a map for each active host network interfaces."
+  ([machine filter-map]
+     (session/with-session machine :shared [_ server]
+       (machine/get-network-adapters server filter-map)))
+  ([machine] (get-network-adapters machine {})))
 
 (defn get-usable-network-interfaces-from-vbox
   "Finds what host network interfaces are usable for bridging

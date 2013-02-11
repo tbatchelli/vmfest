@@ -10,7 +10,7 @@
 
 (defprotocol vbox-object
   (as-map [this])
-  (soak [this vbox]))
+  (soak [this ^IVirtualBox vbox]))
 
 (defprotocol vbox-remote-object
   (dry [this server]))

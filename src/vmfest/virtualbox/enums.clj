@@ -4,8 +4,8 @@
    [org.virtualbox_4_2 IMachine MachineState ClipboardMode PointingHIDType
     FirmwareType KeyboardHIDType SessionState SessionType StorageBus
     DeviceType NetworkAttachmentType CleanupMode StorageControllerType
-    MediumType HostNetworkInterfaceType AccessMode MediumVariant]))
-
+    MediumType HostNetworkInterfaceType AccessMode MediumVariant
+    HostNetworkInterfaceStatus HostNetworkInterfaceMediumType  NATProtocol]))
 
 (defmacro find-key-by-value [value table]
   `(let [[v# k# _#] (first (filter (fn [[v# _# _#]] (= ~value v#)) ~table))]
@@ -127,7 +127,7 @@
    [SessionType/Shared :shared ""]])
 (defn session-type-to-key [type]
   (find-key-by-value type session-type-to-key-table))
-(defn key-to-session-type [key]
+(defn ^SessionType key-to-session-type [key]
   (find-value-by-key key session-type-to-key-table))
 
 ;;;StorageBus
@@ -140,7 +140,7 @@
    [StorageBus/SAS :sas ""]])
 (defn storage-bus-to-key [bus]
   (find-key-by-value bus storage-bus-to-key-table))
-(defn key-to-storage-bus [key]
+(defn ^StorageBus key-to-storage-bus [key]
   (find-value-by-key key storage-bus-to-key-table))
 
 (def storage-controller-type-to-key-table
@@ -170,7 +170,7 @@
    [DeviceType/SharedFolder :shared-folder "Shared folder device."]])
 (defn device-type-to-key [type]
   (find-key-by-value type device-type-to-key-table))
-(defn key-to-device-type [key]
+(defn ^DeviceType key-to-device-type [key]
   (find-value-by-key key device-type-to-key-table))
 
 ;;; NetworkAttachmentType
@@ -185,6 +185,14 @@
   (find-key-by-value type network-attachment-type-to-key-table))
 (defn key-to-network-attachment-type [key]
   (find-value-by-key key network-attachment-type-to-key-table))
+
+(def nat-protocol-type-to-key-table
+  [[NATProtocol/UDP :udp ""]
+   [NATProtocol/TCP :tcp ""]])
+(defn nat-protocol-type-to-key [type]
+  (find-key-by-value type nat-protocol-type-to-key-table))
+(defn nat-protocol-type [key]
+  (find-value-by-key key nat-protocol-type-to-key-table))
 
 ;;; MediumType
 (def medium-type-type-to-key-table
@@ -202,7 +210,7 @@
     "A medium which is is indirectly attached, so that one base medium can be used for several VMs which have their own differencing medium to store their modifications. In some sense a variant of Immutable with unset AutoReset flag in each differencing medium."]])
 (defn medium-type-type-to-key [type]
   (find-key-by-value type medium-type-type-to-key-table))
-(defn key-to-medium-type-type [key]
+(defn ^MediumType key-to-medium-type-type [key]
   (find-value-by-key key medium-type-type-to-key-table))
 
 (def host-network-interface-type-to-key-table
@@ -212,6 +220,25 @@
   (find-key-by-value type host-network-interface-type-to-key-table))
 (defn key-to-host-network-interface-type [key]
   (find-value-by-key key host-network-interface-type-to-key-table))
+
+(def host-network-interface-medium-type-to-key-table
+  [[HostNetworkInterfaceMediumType/Ethernet :ethernet ""]
+   [HostNetworkInterfaceMediumType/PPP :ppp ""]
+   [HostNetworkInterfaceMediumType/SLIP :slip ""]
+   [HostNetworkInterfaceMediumType/Unknown :unknown ""]])
+(defn host-network-interface-medium-type-to-key [medium-type]
+  (find-key-by-value medium-type host-network-interface-medium-type-to-key-table))
+(defn key-to-host-network-interface-medium-type [key]
+  (find-value-by-key key host-network-interface-medium-type-to-key-table))
+
+(def host-network-interface-status-to-key-table
+  [[HostNetworkInterfaceStatus/Up :up ""]
+   [HostNetworkInterfaceStatus/Down :down ""]
+   [HostNetworkInterfaceStatus/Unknown :unknown ""]])
+(defn host-network-interface-status-to-key [status]
+  (find-key-by-value status host-network-interface-status-to-key-table))
+(defn key-to-host-network-interface-status [key]
+  (find-value-by-key key host-network-interface-status-to-key-table))
 
 
 ;;; CleanupMode
@@ -238,7 +265,7 @@
    [AccessMode/ReadWrite :read-write "Read & Write"]])
 (defn access-mode-type-to-key [type]
   (find-key-by-value type access-mode-type-to-key-table))
-(defn key-to-access-mode [key]
+(defn ^AccessMode key-to-access-mode [key]
   (find-value-by-key key access-mode-type-to-key-table))
 
 ;;; MediumVariant
@@ -260,5 +287,5 @@
          " Only used when passing the medium variant as an input parameter.")]])
 (defn medium-variant-type-to-key [type]
   (find-key-by-value type medium-variant-type-to-key-table))
-(defn key-to-medium-variant [key]
+(defn ^MediumVariant key-to-medium-variant [key]
   (find-value-by-key key medium-variant-type-to-key-table))

@@ -2,6 +2,7 @@
   (:use [clojure.java.io]
         [vmfest.virtualbox.session :only (with-vbox)]
         [clojure.pprint :only (pprint)]
+        [vmfest.utils :only [untar]]
         [vmfest.virtualbox.virtualbox :only (find-medium)]
         [vmfest.virtualbox.system-properties :only [supported-medium-formats
                                                     default-hard-disk-format]]
@@ -10,7 +11,7 @@
             [clojure.string :as string]
             [vmfest.virtualbox.enums :as enums])
   (:import [org.virtualbox_4_2 DeviceType AccessMode MediumVariant
-            MediumType IMedium MediumState]
+            MediumType IMedium MediumState IProgress IVirtualBox]
            [java.util.zip GZIPInputStream]
            [java.io File]))
 
@@ -24,14 +25,15 @@
               output (output-stream to)]
     (copy input output :buffer-size (* 1024 1024))))
 
-(defn register [vbox image]
+(defn register [vbox ^String image]
   (with-vbox vbox [_ vb]
-    (.openMedium vb image DeviceType/HardDisk AccessMode/ReadOnly false)))
+    (.openMedium
+     ^IVirtualBox vb image DeviceType/HardDisk AccessMode/ReadOnly false)))
 
-(defn make-immutable [medium]
+(defn make-immutable [^IMedium medium]
   (.setType medium MediumType/MultiAttach))
 
-(defn directory-and-file-name-from-url [url]
+(defn directory-and-file-name-from-url [^String url]
   (let [last-forward-slash-index (+ 1 (.lastIndexOf url "/"))]
     [(.substring url 0 last-forward-slash-index)
      (.substring url last-forward-slash-index )]))
@@ -41,9 +43,10 @@
       (string/replace #"\.gz$" "")
       (string/replace #"\.[^.]+$" "")))
 
-(defn register-model [orig dest vbox]
-  (with-vbox vbox [_ vb]
-    (let [orig-medium
+(defn register-model [^String orig ^String dest vbox]
+  (with-vbox vbox [_ ^IVirtualBox vb]
+    (let [^IVirtualBox vb vb
+          orig-medium
           (.openMedium vb orig DeviceType/HardDisk AccessMode/ReadOnly false)
           dest-medium (.createHardDisk vb "vdi" dest)
           progress (.cloneTo orig-medium dest-medium (long 0) nil)]
@@ -74,9 +77,11 @@
    & {:keys [model-name temp-dir meta-file-name
              meta-url meta model-file-name model-path]
       :as options}]
-  (let [[directory image-file-name] (directory-and-file-name-from-url image-url)
+  (let [[directory ^String image-file-name] (directory-and-file-name-from-url
+                                             image-url)
         image-name (file-name-without-extensions image-file-name)
         gzipped? (.endsWith image-file-name ".gz")
+        vagrant-box? (.endsWith image-file-name ".box")
         model-name (or model-name image-name)
         model-unique-name (str "vmfest-" model-name)
         meta-url (or meta-url
@@ -90,10 +95,17 @@
      :image-file-name image-file-name
      :gzipped? gzipped?
      :gzipped-image-file (str temp-dir File/separator image-file-name)
-     :image-file (str temp-dir File/separator image-name ".vdi")
+     :vagrant-box? vagrant-box?
+     :key-file (str model-path File/separator "vagrant-key")
+     :key-url "https://raw.github.com/mitchellh/vagrant/master/keys/vagrant"
+     :image-file (if vagrant-box?
+                   (str temp-dir File/separator "box-disk1.vmdk")
+                   (str temp-dir File/separator image-name ".vdi"))
      :model-name model-name
      :model-path model-path
-     :model-file (str model-path File/separator model-unique-name ".vdi")
+     :model-file (if vagrant-box?
+                   (str model-path File/separator model-unique-name ".vmdk")
+                   (str model-path File/separator model-unique-name ".vdi"))
      :model-meta (str model-path File/separator model-unique-name ".meta")
      :temp-dir temp-dir
      :meta meta
@@ -104,9 +116,10 @@
 (def ^:dynamic *dry-run* false)
 
 (defn threaded-download
-  [{:keys [model-name image-url gzipped? gzipped-image-file image-file]
+  [{:keys [model-name image-url gzipped? gzipped-image-file image-file
+           vagrant-box?]
     :as options}]
-  (let [dest (if gzipped? gzipped-image-file image-file)]
+  (let [dest (if (or gzipped? vagrant-box?) gzipped-image-file image-file)]
     (log/infof "%s: Downloading %s into %s" model-name image-url dest )
     (when-not *dry-run*
       (download image-url dest)))
@@ -123,15 +136,53 @@
     (log/infof "%s: File %s is already uncompressed" model-name image-file))
   options)
 
+(defn threaded-unbox
+  [{:keys [model-name vagrant-box? temp-dir gzipped-image-file] :as options}]
+  (if vagrant-box?
+    (do
+      (log/infof "%s: Unpacking %s into %s"
+                 model-name gzipped-image-file temp-dir)
+      (when-not *dry-run*
+        (untar gzipped-image-file temp-dir)))
+    (log/infof "%s: Fileis not a vagrant box" model-name))
+  options)
+
+(defn threaded-get-key
+  [{:keys [model-name vagrant-box? key-url key-file] :as options}]
+  (when vagrant-box?
+    (log/infof "%s: Checking vagrant key is available" model-name)
+    (when-not (.exists (file key-file))
+      (download (java.net.URL. key-url) (file key-file))))
+  options)
+
 (defn threaded-get-metadata
-  [{:keys [model-name image-file meta meta-url] :as options}]
-  (if meta
+  [{:keys [model-name image-file meta meta-url vagrant-box? key-file]
+    :as options}]
+  (if vagrant-box?
     (do
-      (log/infof "%s: Metadata provided explicitly" model-name)
-      options)
-    (do
-      (log/infof "%s: Loading metadata from %s" model-name meta-url)
-      (assoc options :meta (load-string (slurp meta-url))))))
+      (log/infof "%s: Creating metadata for vagrant box" model-name)
+      (when-not (every? (or (:meta options) {})
+                        [:os-family :os-version :os-64-bit])
+        (throw+
+         {:supplied-options (:meta options)}
+         (str "To install vagrant boxes, you must specify os-family, os-version"
+              " and os-64-bit")))
+      (update-in options [:meta]
+                 #(merge
+                   {:username "vagrant"
+                    :password "vagrant"
+                    :sudo-password "vagrant"
+                    :private-key-path key-file
+                    :no-sudo false
+                    :network-type :nat}
+                   %)))
+    (if meta
+      (do
+        (log/infof "%s: Metadata provided explicitly" model-name)
+        options)
+      (do
+        (log/infof "%s: Loading metadata from %s" model-name meta-url)
+        (assoc options :meta (load-string (slurp meta-url)))))))
 
 (defn threaded-register-model
   [{:keys [image-file model-file vbox model-name] :as options}]
@@ -156,19 +207,24 @@
   (delete-file image-file true)
   options)
 
+(defn mutable? [medium]
+   (let [type (enums/medium-type-type-to-key (.getType medium))]
+     (or (= type :immutable) (= type :multi-attach))))
+
 (defn valid-model? [vbox id-or-location]
   ;; is the image registered?
   (let [medium (find-medium vbox id-or-location)]
     (if-not medium
-      (throw (RuntimeException.
-              (str "This model's image is not registered in VirtualBox: "
-                   id-or-location))))
+      (throw+ {:type :model-not-registered
+               :message
+               (str "This model's image is not registered in VirtualBox: "
+                    id-or-location)}))
     ;; is the image immutable?
-    (let [type (enums/medium-type-type-to-key (.getType medium))]
-      (if-not (or (= type :immutable) (= type :multi-attach))
-        (throw (RuntimeException.
-                (str "This model's image is not immutable nor multi-attach: "
-                     id-or-location)))))))
+    (if-not (mutable? medium)
+      (throw+ {:type :model-not-immutable
+               :message
+               (str "This model's image is not immutable nor multi-attach: "
+                    id-or-location)}))))
 
 (defn setup-model
   "Download a disk image from `image-url` and register it with `vbox`. Returns a
@@ -176,18 +232,20 @@
   [image-url vbox & {:as options}]
   (let [job (apply prepare-job image-url vbox (reduce into [] options))]
     (log/info (str "About to execute job \n" (with-out-str (pprint job))))
-    (if (.exists (File. (:model-file job)))
+    (if (.exists (File. ^String (:model-file job)))
       (log/errorf
        "The model %s already exists. Manually specifiy another file name with :model-name"
        (:model-file job))
-      (do
-        (-> job
-            threaded-download
-            threaded-gunzip
-            threaded-get-metadata
-            threaded-register-model
-            threaded-create-meta
-            threaded-cleanup-temp-files)))))
+      (-> job
+          threaded-download
+          threaded-gunzip
+          threaded-unbox
+          threaded-get-metadata
+          threaded-get-key
+          threaded-register-model
+          threaded-create-meta
+          threaded-cleanup-temp-files))))
+
 
 (comment
  (use 'vmfest.manager)
@@ -198,7 +256,7 @@
 
 ;;; new image creation
 
-(defn- create-base-storage
+(defn- ^IProgress create-base-storage
   "Creates the actual base storage for this medium. If no variant
   flags are passed it will default to [].
 
@@ -207,16 +265,17 @@
   logical-size in MB
   variants is a sequence of MediumVariant keys
           (see enums/medium-variant-type-to-key-table) "
-  [medium logical-size variant-seq]
+  [^IMedium medium logical-size variant-seq]
   (let [ ;; variants are flags. Get all the flags into a single long value
         variants (long (reduce bit-or 0
-                               (map (comp #(.value %) enums/key-to-medium-variant)
+                               (map (comp #(.value ^MediumVariant %)
+                                          enums/key-to-medium-variant)
                                     (or variant-seq []))))
         logical-size (long (* 1024 1024 logical-size))]
     (log/infof
      "create-base-storage: Creating medium with size %sMB and variants %s"
      logical-size variants)
-    (.createBaseStorage medium logical-size variants)))
+    (.createBaseStorage medium (long logical-size) (long variants))))
 
 (defn create-medium
   "Creates a hard disk in the path described by `location`.
@@ -232,14 +291,15 @@
   NOTE: not all formats and variants are supported for all hosts, nor
   all combinations of variatns are valid. Error reporting on this
   front is spotty at best."
-  [vbox location format-key size variants]
+  [^IVirtualBox vbox ^String location format-key size variants]
   (let [format-key
         ;; ensure that a format is specified. Not sure this is needed,
         ;; but at least it makes it explicit what format will be used
         ;; when none is specified
         (or format-key
             (let [format-key (keyword
-                              (.toLowerCase (default-hard-disk-format vbox)))]
+                              (.toLowerCase
+                               ^String (default-hard-disk-format vbox)))]
               (log/warnf
                "create-medium: No format specified for %s. Defaulting to %s"
                location format-key)
@@ -267,6 +327,3 @@
                (format (str "The format %s for image %s is not supported in this"
                             " host.")
                        format-key location)}))))
-
-
-

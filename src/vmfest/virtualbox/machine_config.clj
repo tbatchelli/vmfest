@@ -9,9 +9,11 @@
             [vmfest.virtualbox.virtualbox :as vbox]
             [vmfest.virtualbox.conditions :as conditions])
   (:import [org.virtualbox_4_2 AccessMode VBoxException NetworkAttachmentType
-            HostNetworkInterfaceType]))
+            HostNetworkInterfaceType INetworkAdapter IMedium IMachine
+            IHostNetworkInterface INATEngine]))
 
-(defn get-medium [m {:keys [location device-type create] :as device}]
+(defn ^IMedium get-medium
+  [^IMachine m {:keys [location device-type create] :as device}]
   (let [vbox (.getParent m)]
     (when location
       (vbox/find-medium vbox location device-type))))
@@ -25,7 +27,8 @@
 (defn check-controller-type [bus controller-type]
   ((bus controller-type-checkers) controller-type))
 
-(defn add-storage-controller [m name storage-bus-key & [controller-type-key]]
+(defn add-storage-controller
+  [^IMachine m ^String name storage-bus-key & [controller-type-key]]
   (when (and controller-type-key
              (not (check-controller-type storage-bus-key controller-type-key)))
     (throw+ {:type :machine-builder
@@ -43,7 +46,7 @@
       (when controller-type
         (.setControllerType sc controller-type)))))
 
-(defn attach-device [m controller-name device port slot]
+(defn attach-device [^IMachine m ^String controller-name device port slot]
   {:pre (model/IMachine? m)}
   (log/debugf
    "attach-device: Attaching %s in controller %s slot %s port %s for machine %s"
@@ -66,15 +69,15 @@
        "A medium is already attached to this or another virtual machine."}
       (.attachDevice m
                      controller-name
-                     (Integer. port)
-                     (Integer. slot)
+                     (Integer. (int port))
+                     (Integer. (int slot))
                      device-type
                      medium))))
 
 (defmulti attach-devices
   (fn [m bus-type controller-name devices] bus-type))
 
-(defmethod attach-devices :ide [m bus-type controller-name devices]
+(defmethod attach-devices :ide [^IMachine m bus-type controller-name devices]
   (log/debugf
    "attach-devices: Attaching devices to %s in controller %s: %s"
    (.getName m) controller-name devices)
@@ -84,7 +87,7 @@
             (attach-device m controller-name device port slot)))
         devices [0 1 0 1] [0 0 1 1])))
 
-(defn simple-attach-devices [m controller-name devices]
+(defn simple-attach-devices [^IMachine m controller-name devices]
   (log/debugf
    "attach-devices: Attaching devices to %s in controller %s: %s"
    (.getName m) controller-name devices)
@@ -102,7 +105,7 @@
 (defmethod attach-devices :scsi [m bus-type controller-name devices]
   (simple-attach-devices m controller-name devices) )
 
-(defn configure-controller [m config]
+(defn configure-controller [^IMachine m config]
   (log/debugf
    "configure-controller: Configuring controller for machine '%s': %s"
    (.getName m) config)
@@ -110,7 +113,7 @@
         controller (add-storage-controller m name bus type)]
     (attach-devices m bus name devices)))
 
-(defn configure-storage [m config]
+(defn configure-storage [^IMachine m config]
   (log/debugf "Configuring storage for machine %s: %s"
               (.getName m) config)
   (doseq [controller-config config]
@@ -120,7 +123,7 @@
 
 ;;; network
 
-(defn set-adapter-property [adapter property-key value]
+(defn set-adapter-property [^INetworkAdapter adapter property-key value]
   (when value
     (condp = property-key
         :adapter-type (.setAdapterType adapter value)
@@ -146,19 +149,19 @@
     (doseq [[k v] config]
       (set-adapter-property adapter k v))))
 
-(defn attach-to-bridged [adapter]
+(defn attach-to-bridged [^INetworkAdapter adapter]
   (.setAttachmentType adapter NetworkAttachmentType/Bridged))
 
-(defn attach-to-nat [adapter]
+(defn attach-to-nat [^INetworkAdapter adapter]
   (.setAttachmentType adapter NetworkAttachmentType/NAT))
 
-(defn attach-to-host-only [adapter machine]
+(defn attach-to-host-only [^INetworkAdapter adapter ^IMachine machine]
   (let [vbox (.getParent machine)
         host (.getHost vbox)
         host-only-ifs (.findHostNetworkInterfacesOfType
                        host
                        HostNetworkInterfaceType/HostOnly)
-        host-if-names (map #(.getName %) host-only-ifs)
+        host-if-names (map #(.getName ^IHostNetworkInterface %) host-only-ifs)
         if-name (.getHostOnlyInterface adapter)]
     (when-not (some (partial = if-name) host-if-names)
       (log/warnf
@@ -173,7 +176,7 @@
                          if-name)}))))
   (.setAttachmentType adapter NetworkAttachmentType/HostOnly))
 
-(defn attach-to-internal [adapter]
+(defn attach-to-internal [^INetworkAdapter adapter]
   (.setAttachmentType adapter NetworkAttachmentType/Internal))
 
 (defn attach-adapter [machine adapter attachment-type]
@@ -186,17 +189,35 @@
         (log/errorf
          "configure-adapter: unrecognized attachment type %s" attachment-type)))
 
+(defn add-nat-rules
+  [adapter rules]
+  (let [nat-engine (.getNATEngine adapter)]
+    (doseq [r rules]
+      (log/debugf "add-nat-rules: adding nat-rule %s for adapter %s"
+                  r (.getSlot adapter))
+      (.addRedirect nat-engine (:name r) (enums/nat-protocol-type (:protocol r))
+                    (:host-ip r) (int (:host-port r)) (:guest-ip r) (int (:guest-port r))))))
+
+(defn remove-nat-rules
+  [adapter rules]
+  (let [nat-engine (.getNATEngine adapter)]
+    (doseq [r rules]
+      (log/debugf "remove-nat-rules: removing nat-rule %s from adapter %s"
+                  r (.getSlot adapter))
+      (.removeRedirect nat-engine (:name r)))))
+
 (defn configure-adapter
-  [m slot config]
+  [^IMachine m slot config]
   (let [attachment-type (:attachment-type config)]
     (log/debugf
      "configure-adapter: Configuring network adapter for machine '%s' slot %s with %s"
      (.getName m) slot config)
     (let [adapter (.getNetworkAdapter m (long slot))]
-      (configure-adapter-object adapter config)
-      (attach-adapter m adapter attachment-type))))
+      (configure-adapter-object adapter (dissoc config :nat-rules))
+      (attach-adapter m adapter attachment-type)
+      (add-nat-rules adapter (:nat-rules config)))))
 
-(defn configure-network [m config]
+(defn configure-network [^IMachine m config]
   (log/debugf "Configuring network for machine %s with %s"
               (.getName m) config)
   (let [vbox (.getParent m)
@@ -211,7 +232,7 @@
   (doseq [[entry value] config]
     (condp = entry
         :network (configure-network m value)
-        :storage nil ;; ignored. 
+        :storage nil ;; ignored.
         :boot-mount-point nil ;; ignored.
         (if-let [setter (entry machine/setters)]
           (setter value m)

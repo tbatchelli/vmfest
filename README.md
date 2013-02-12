@@ -17,7 +17,7 @@ welcome. Please use the
 
 This is the latest stable release of the 0.2 version. New development
 will be exclusively done in the 0.3.x code, which is now in the
-[develop](vmfest/tree/develop) branch.  
+[develop](https://github.com/tbatchelli/vmfest/tree/develop) branch.  
 
 0.3.0 will be the first release to not require the use of the web
 services interface to VirtualBox, allowing the use of XPCOM too. If
@@ -27,7 +27,7 @@ VirtualBox server. Give it a try!
 
 # Release Notes
 
-Can be found [here](vmfest/blob/support/v0.2.8/relnotes.md).
+Can be found [here](relnotes.md).
 
 # Usage
 

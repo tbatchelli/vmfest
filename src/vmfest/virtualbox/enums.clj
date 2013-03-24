@@ -5,7 +5,8 @@
     FirmwareType KeyboardHIDType SessionState SessionType StorageBus
     DeviceType NetworkAttachmentType CleanupMode StorageControllerType
     MediumType HostNetworkInterfaceType AccessMode MediumVariant
-    HostNetworkInterfaceStatus HostNetworkInterfaceMediumType  NATProtocol]))
+    HostNetworkInterfaceStatus HostNetworkInterfaceMediumType  NATProtocol
+    ProcessorFeature]))
 
 (defmacro find-key-by-value [value table]
   `(let [[v# k# _#] (first (filter (fn [[v# _# _#]] (= ~value v#)) ~table))]
@@ -289,3 +290,23 @@
   (find-key-by-value type medium-variant-type-to-key-table))
 (defn ^MediumVariant key-to-medium-variant [key]
   (find-value-by-key key medium-variant-type-to-key-table))
+
+(def processor-feature-to-key-table
+  [[ProcessorFeature/HWVirtEx :hw-virt-ex "HWVirtEx"]
+   [ProcessorFeature/PAE :pae "PAE"]
+   [ProcessorFeature/LongMode :long-mode "LongMode"]
+   [ProcessorFeature/NestedPaging :nested-paging "NestedPaging"]])
+
+(def processor-feature-to-key-table
+  [[ProcessorFeature/HWVirtEx :hw-virt-ex "HWVirtEx"]
+   [ProcessorFeature/PAE :pae "PAE"]
+   [ProcessorFeature/LongMode :long-mode "LongMode"]
+   [ProcessorFeature/NestedPaging :nested-paging "NestedPaging"]])
+
+(defn processor-feature--to-key [feature]
+  (find-key-by-value feature processor-feature-to-key-table))
+(defn ^ProcessorFeature key-to-processor-feature [key]
+  (find-value-by-key key processor-feature-to-key-table))
+
+
+

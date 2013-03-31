@@ -241,23 +241,32 @@
       (log/debugf "Configuring adapter %s with %s" slot adapter-config)
       (when adapter-config (configure-adapter m slot adapter-config)))))
 
+(defn attach-share [^IMachine m name host-path & [auto-mount? writable?]]
+  (let [writable? (or writable? true)
+        auto-mount? (or auto-mount? false)]
+    (log/debugf "Attaching share on %s: %s->%s, writable? %s auto-mount? %s"
+                (.getName m) name host-path writable? auto-mount?)
+    (.createSharedFolder m name host-path writable? auto-mount?)))
+
+(defn configure-shares [^IMachine m shares]
+  (doall (map #(apply attach-share m %) shares)))
+
 (defn configure-machine [m config]
-  (doseq [[entry value] config]
-    (condp = entry
   (let [config
         (if (> (:cpu-count config) 1)
           ;; using more than one cpu requires IO APIC enabled
           (assoc config :io-apic-enabled? true)
           config)]
     (doseq [[entry value] config]
+      (condp = entry
         :network (configure-network m value)
-        :storage nil ;; ignored.
-        :boot-mount-point nil ;; ignored.
+        :shared-folders (configure-shares m value)
+        :storage nil            ;; ignored.
+        :boot-mount-point nil   ;; ignored.
         (if-let [setter (entry machine/setters)]
           (setter value m)
           (log/warnf
            "There is no such setting %s in a machine configuration"
-           entry)))))
            entry))))))
 
 (defn configure-machine-storage [m {:keys [storage]}]

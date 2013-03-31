@@ -138,20 +138,21 @@
 (defn set-adapter-property [^INetworkAdapter adapter property-key value]
   (when value
     (condp = property-key
-        :adapter-type (.setAdapterType adapter value)
-        :network (.setNetwork adapter value)
-        ;; equiv. to bridged-interface 4.0.x and below
-        :host-interface (.setBridgedInterface adapter value)
-        :bridged-interface (.setBridgedInterface adapter value)
-        :internal-network (.setInternalNetwork adapter value)
-        :host-only-interface (.setHostOnlyInterface adapter value)
-        :enabled (.setEnabled adapter value)
-        :cable-connected (.setCableConnected adapter value)
-        :mac-address (.setMACAddress adapter value)
-        :line-speed (.setLineSpeed adapter value)
-        :nat-driver (log/error "Setting NAT driver not supported")
-        :attachment-type nil ;; do nothing
-        (log/errorf "set-adapter-property: unknown property %s" property-key))))
+      :adapter-type (.setAdapterType adapter
+                                     (enums/key-to-network-adapter-type value))
+      :network (.setNetwork adapter value)
+      ;; equiv. to bridged-interface 4.0.x and below
+      :host-interface (.setBridgedInterface adapter value)
+      :bridged-interface (.setBridgedInterface adapter value)
+      :internal-network (.setInternalNetwork adapter value)
+      :host-only-interface (.setHostOnlyInterface adapter value)
+      :enabled (.setEnabled adapter value)
+      :cable-connected (.setCableConnected adapter value)
+      :mac-address (.setMACAddress adapter value)
+      :line-speed (.setLineSpeed adapter value)
+      :nat-driver (log/error "Setting NAT driver not supported")
+      :attachment-type nil ;; do nothing
+      (log/errorf "set-adapter-property: unknown property %s" property-key))))
 
 (defn configure-adapter-object [adapter config]
   (let [nat-forwards (:nat-forwards config)

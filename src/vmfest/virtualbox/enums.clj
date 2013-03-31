@@ -6,7 +6,7 @@
     DeviceType NetworkAttachmentType CleanupMode StorageControllerType
     MediumType HostNetworkInterfaceType AccessMode MediumVariant
     HostNetworkInterfaceStatus HostNetworkInterfaceMediumType  NATProtocol
-    ProcessorFeature]))
+    ProcessorFeature NetworkAdapterType]))
 
 (defmacro find-key-by-value [value table]
   `(let [[v# k# _#] (first (filter (fn [[v# _# _#]] (= ~value v#)) ~table))]
@@ -303,10 +303,21 @@
    [ProcessorFeature/LongMode :long-mode "LongMode"]
    [ProcessorFeature/NestedPaging :nested-paging "NestedPaging"]])
 
-(defn processor-feature--to-key [feature]
+(defn processor-feature-to-key [feature]
   (find-key-by-value feature processor-feature-to-key-table))
 (defn ^ProcessorFeature key-to-processor-feature [key]
   (find-value-by-key key processor-feature-to-key-table))
 
+(def network-adapter-type-to-key-table
+  [[NetworkAdapterType/Null :null  "(never used by the API)."]
+   [NetworkAdapterType/Am79C970A :am79c970a "AMD PCNet-PCI II network card (Am79C970A)."]
+   [NetworkAdapterType/Am79C973 :am79c973 "AMD PCNet-FAST III network card (Am79C973)."]
+   [NetworkAdapterType/I82540EM :i82540em "Intel PRO/1000 MT Desktop network card (82540EM)."]
+   [NetworkAdapterType/I82543GC :i82543gc "Intel PRO/1000 T Server network card (82543GC)."]
+   [NetworkAdapterType/I82545EM :i82545em "Intel PRO/1000 MT Server network card (82545EM)."]
+   [NetworkAdapterType/Virtio :vitrio "Virtio network device."]])
 
-
+(defn network-adapter-type-to-key [type]
+  (find-key-by-value type network-adapter-type-to-key-table))
+(defn ^NetworkAdapterType key-to-network-adapter-type [key]
+  (find-value-by-key key network-adapter-type-to-key-table))

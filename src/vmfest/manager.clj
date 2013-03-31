@@ -550,6 +550,14 @@ VirtualBox"
          (machine/delete vb-m (if delete-disks media nil))
          (Integer. (int timeout)))))))
 
+(defn nuke
+  "Powers down a machine and destroys it"
+  [machine & options]
+  {:pre [(model/Machine? machine)]}
+  (try (power-down machine)
+       (catch Exception e nil))
+  (destroy machine))
+
 (defn send-keyboard [machine entries]
   "Given a sequence with a mix of character strings and keywords it
  sends to the machine the scan codes via the virtual keyboard that

@@ -7,16 +7,28 @@
             [vmfest.virtualbox.model :as model]
             [clojure.tools.logging :as log]
             [vmfest.virtualbox.virtualbox :as vbox]
-            [vmfest.virtualbox.conditions :as conditions])
+            [vmfest.virtualbox.conditions :as conditions]
+            [vmfest.virtualbox.image :as image])
   (:import [org.virtualbox_4_2 AccessMode VBoxException NetworkAttachmentType
             HostNetworkInterfaceType INetworkAdapter IMedium IMachine
             IHostNetworkInterface INATEngine]))
 
+(defn- create-machine-disk
+  [^IMachine m location size format variants]
+  (let [name (.getName m)
+        _ (log/infof "create-machine-disk m=%s: building disk image in %s"
+                     name location)
+        ^IVirtualBox vbox (.getParent m)]
+    (image/create-medium vbox location format size variants)))
+
 (defn ^IMedium get-medium
-  [^IMachine m {:keys [location device-type create] :as device}]
+  [^IMachine m {:keys [location device-type create?
+                       size format variants] :as device}]
   (let [vbox (.getParent m)]
-    (when location
-      (vbox/find-medium vbox location device-type))))
+    (if (and create? size)
+      (create-machine-disk m location size format variants)
+      (when location
+        (vbox/find-medium vbox location device-type)))))
 
 (def controller-type-checkers
   {:scsi #{:lsi-logic :bus-logic}

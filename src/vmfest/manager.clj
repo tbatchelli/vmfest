@@ -468,7 +468,7 @@ VirtualBox"
   "Wait for the machine to be in a state which could be locked.
    Returns true if wait succeeds, nil otherwise."
   [m & [timout-in-ms]]
-  (let [end-time (+ (current-time-millis) timout-in-ms)
+  (let [end-time (+ (current-time-millis) (or timout-in-ms 1500))
         unlocked? (fn []
                     (let [state (or (try
                                       (session/with-session
@@ -524,26 +524,29 @@ VirtualBox"
     (machine/resume (.getConsole s))))
 
 (defn power-down
-  [^Machine m]
+  [^Machine m & {:keys [timeout] :or {timeout -1}}]
   {:pre [(model/Machine? m)]}
   (try+
    ;; when using the web iface, a lock is sometimes still held
    (let [return-val
          (session/with-session m :shared [s _]
-           (machine/power-down (.getConsole s)))]
+           (.waitForCompletion
+            (machine/power-down (.getConsole s))
+            (Integer. (int timeout))))]
      ;; When using the XPCOM bridge, it seems that power-down gets the
      ;; session stuck. Recreating the session seems to fix it!
      (when xpcom?
        (session/with-session m :shared [s _]))
      return-val)
-    (catch [:type :vbox-runtime] _
-      (log/warn "Trying to stop an already stopped machine"))))
+   (catch [:type :vbox-runtime] _
+     (log/warn "Trying to stop an already stopped machine"))))
 
 (defn destroy [machine & {:keys [delete-disks timeout]
                           :or {delete-disks true
                                timeout -1}}]
   {:pre [(model/Machine? machine)]}
   (let [id (:id machine)]
+     (wait-for-lockable-session-state machine)
     (session/with-no-session machine [vb-m]
       (let [media (machine/unregister vb-m :detach-all-return-hard-disks-only)]
         (.waitForCompletion
@@ -556,7 +559,9 @@ VirtualBox"
   {:pre [(model/Machine? machine)]}
   (try (power-down machine)
        (catch Exception e nil))
-  (destroy machine))
+  (try (destroy machine)
+       true
+       (catch Exception e false)))
 
 (defn send-keyboard [machine entries]
   "Given a sequence with a mix of character strings and keywords it

@@ -231,6 +231,12 @@
 (defn configure-machine [m config]
   (doseq [[entry value] config]
     (condp = entry
+  (let [config
+        (if (> (:cpu-count config) 1)
+          ;; using more than one cpu requires IO APIC enabled
+          (assoc config :io-apic-enabled? true)
+          config)]
+    (doseq [[entry value] config]
         :network (configure-network m value)
         :storage nil ;; ignored.
         :boot-mount-point nil ;; ignored.
@@ -239,6 +245,7 @@
           (log/warnf
            "There is no such setting %s in a machine configuration"
            entry)))))
+           entry))))))
 
 (defn configure-machine-storage [m {:keys [storage]}]
    (when storage

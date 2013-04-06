@@ -1,4 +1,4 @@
-(defproject vmfest "0.3.0-alpha.2"
+(defproject vmfest "0.3.0-alpha.3"
   :description "Manage local VMs from the REPL"
   :min-lein-version "2.0.0"
   :dependencies [[org.clojure/clojure "1.2.1"]

@@ -77,6 +77,9 @@
    :io-cache-enabled? #(.getIOCacheEnabled ^IMachine %)
    :io-cache-size #(.getIOCacheSize ^IMachine %)
    ;;   :io-bandwidth-max #(.getIoBandwidthMax ^IMachine %)
+   ;; BIOS Settings
+   :io-apic-enabled? #(-> % (.getBIOSSettings) (.getIOAPICEnabled))
+   :acpi-enabled? #(-> % (.getBIOSSettings) (.getACPIEnabled))
    })
 
 (defn get-attribute [vb-m getter-key]
@@ -147,6 +150,9 @@
    :io-cache-enabled? (.getIOCacheEnabled vb-m)
    :io-cache-size (.getIOCacheSize vb-m)
    ;;   :io-bandwidth-max (.getIoBandwidthMax vb-m)
+   ;; BIOS Settings
+   :io-apic-enabled? (-> vb-m (.getBIOSSettings) (.getIOAPICEnabled))
+   :acpi-enabled? (-> vb-m (.getBIOSSettings) (.getACPIEnabled))
    })
 
 (def setters
@@ -182,6 +188,12 @@
    :io-cache-enabled? #(.setIOCacheEnabled ^IMachine %2 %1)
    :io-cache-size #(.setIOCacheSize ^IMachine %2 (long %1))
    ;;   :io-bandwidth-max #(.setIoBandwidthMax %2 (long %1))
+   ;; BIOS Settings
+   :io-apic-enabled? #(doto (.getBIOSSettings ^IMachine %2)
+                        (.setIOAPICEnabled %1))
+   :acpi-enabled? #(doto (.getBIOSSettings ^IMachine %2)
+                     (.setACPIEnabled %1))
+
    })
 
 

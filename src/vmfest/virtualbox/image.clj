@@ -320,6 +320,8 @@
                          " already exist in %s")
                     variants location)
                    :result-code (.getResultCode progress)}))
+        (log/info "create-medium: Image created at location="
+                  (.getLocation medium))
         medium)
       ;; the format is unsupported in this host
       (throw+ {:type :invalid-image-format

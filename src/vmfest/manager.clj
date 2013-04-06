@@ -468,7 +468,7 @@ VirtualBox"
   "Wait for the machine to be in a state which could be locked.
    Returns true if wait succeeds, nil otherwise."
   [m & [timout-in-ms]]
-  (let [end-time (+ (current-time-millis) timout-in-ms)
+  (let [end-time (+ (current-time-millis) (or timout-in-ms 1500))
         unlocked? (fn []
                     (let [state (or (try
                                       (session/with-session
@@ -527,17 +527,16 @@ VirtualBox"
   [^Machine m]
   {:pre [(model/Machine? m)]}
   (try+
-   ;; when using the web iface, a lock is sometimes still held
-   (let [return-val
-         (session/with-session m :shared [s _]
-           (machine/power-down (.getConsole s)))]
-     ;; When using the XPCOM bridge, it seems that power-down gets the
-     ;; session stuck. Recreating the session seems to fix it!
-     (when xpcom?
-       (session/with-session m :shared [s _]))
-     return-val)
-    (catch [:type :vbox-runtime] _
-      (log/warn "Trying to stop an already stopped machine"))))
+   (session/with-session m :shared [s _]
+     (machine/power-down (.getConsole s)))
+   ;; don't return until the VM is in a lockable state. power-down
+   ;; doesn't seem to be always returning the IProgress object, and
+   ;; when it does, waiting for the operation to finish doesn't seem
+   ;; to result in a lockable VM, so we just wait for a lockable state
+   ;; by polling. Ugly, I know.
+   (wait-for-lockable-session-state m)
+   (catch [:type :vbox-runtime] _
+     (log/warn "Trying to stop an already stopped machine"))))
 
 (defn destroy [machine & {:keys [delete-disks timeout]
                           :or {delete-disks true
@@ -549,6 +548,16 @@ VirtualBox"
         (.waitForCompletion
          (machine/delete vb-m (if delete-disks media nil))
          (Integer. (int timeout)))))))
+
+(defn nuke
+  "Powers down a machine and destroys it"
+  [machine & options]
+  {:pre [(model/Machine? machine)]}
+  (try (power-down machine)
+       (catch Exception e nil))
+  (try (destroy machine)
+       true
+       (catch Exception e false)))
 
 (defn send-keyboard [machine entries]
   "Given a sequence with a mix of character strings and keywords it

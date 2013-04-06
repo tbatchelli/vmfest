@@ -4,13 +4,16 @@
             [vmfest.virtualbox.conditions :as conditions]
             [vmfest.virtualbox.enums :as enums]
             vmfest.virtualbox.guest-os-type)
+  (:use [vmfest.virtualbox.version :only [xpcom?]])
   (:import [org.virtualbox_4_2
             VirtualBoxManager
             IMachine
             IMedium
             IVirtualBox
+            IHostNetworkInterface
             VBoxException
-            IDHCPServer]
+            IDHCPServer
+            IHost]
            [vmfest.virtualbox.model
             Server
             Machine]))
@@ -100,6 +103,69 @@ at the specified location."
 
 (defn api-version [^IVirtualBox vbox]
   (.getAPIVersion vbox))
+
+(defn dhcp-info [^IDHCPServer dhcp]
+  {:ip-address (.getIPAddress dhcp)
+   :enabled? (.getEnabled dhcp)
+   :network-mask (.getNetworkMask dhcp)
+   :network-name (.getNetworkName dhcp)
+   :lower-ip (.getLowerIP dhcp)
+   :upper-ip (.getUpperIP dhcp)})
+
+(defn dhcp-infos [^IVirtualBox vb]
+  (let [infos (map dhcp-info (.getDHCPServers vb))]
+    (zipmap (map :network-name infos)
+            (map #(dissoc % :network-name ) infos))))
+
+(defn interface-info [^IHostNetworkInterface interface dhcps]
+   (let [network-internal-name (.getNetworkName interface)
+            dhcp-server (get dhcps network-internal-name )]
+     {:network-name (.getName interface)
+      :network-internal-name network-internal-name
+      :dhcp-enabled? (or (.getDHCPEnabled interface)
+                         (:enabled? dhcp-server))
+      :dhcp-server dhcp-server
+      :ip-address (.getIPAddress interface)
+      :medium-type (enums/host-network-interface-medium-type-to-key
+                    (.getMediumType interface))
+      :status (enums/host-network-interface-status-to-key
+               (.getStatus interface))
+      :interface-type (enums/host-network-interface-type-to-key
+                       (.getInterfaceType interface))}))
+
+(defn interface-infos [^IHost host ^IVirtualBox vbox]
+  (let [dhcps (dhcp-infos vbox)
+        interfaces (map #(interface-info % dhcps) (.getNetworkInterfaces host))]
+    (zipmap (map :network-name interfaces)
+            (map #(dissoc % :network-name) interfaces))))
+
+(defn processor-feature-data [^IHost host]
+  (let [keys [:hw-virt-ex :pae :long-mode :nested-paging]]
+    (zipmap keys
+            (map #(.getProcessorFeature
+                  host
+                  (enums/key-to-processor-feature %))
+                 keys))))
+
+(defn host-info [^IHost host ^IVirtualBox vbox]
+  {:processor-count (.getProcessorCount host)
+   :memory-size (/ (.getMemorySize host) 1024)
+   :memory-available-pct  (/ (* 100.0 (.getMemoryAvailable host))
+                             (.getMemorySize host))
+   :operating-system (.getOperatingSystem host)
+   :os-version (.getOSVersion host)
+   :processor-features (processor-feature-data host)
+   :network-interfaces (interface-infos host vbox)})
+
+(defn vbox-info [^IVirtualBox vbox]
+  {:api-version (.getAPIVersion vbox)
+   :protocol (if xpcom? :xpcom :ws)
+   :package-type (.getPackageType vbox)
+   :home-filder (.getHomeFolder vbox)
+   :settings-file-path (.getSettingsFilePath vbox)
+   :host (host-info (.getHost vbox) vbox)
+   ;; :dhcp-servers (dhcp-infos vbox)
+   :internal-networks (into [] (.getInternalNetworks vbox))})
 
 ;;; DHCP
 

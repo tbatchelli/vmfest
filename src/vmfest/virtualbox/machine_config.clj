@@ -7,16 +7,28 @@
             [vmfest.virtualbox.model :as model]
             [clojure.tools.logging :as log]
             [vmfest.virtualbox.virtualbox :as vbox]
-            [vmfest.virtualbox.conditions :as conditions])
+            [vmfest.virtualbox.conditions :as conditions]
+            [vmfest.virtualbox.image :as image])
   (:import [org.virtualbox_4_2 AccessMode VBoxException NetworkAttachmentType
             HostNetworkInterfaceType INetworkAdapter IMedium IMachine
             IHostNetworkInterface INATEngine]))
 
+(defn- create-machine-disk
+  [^IMachine m location size format variants]
+  (let [name (.getName m)
+        _ (log/infof "create-machine-disk m=%s: building disk image in %s"
+                     name location)
+        ^IVirtualBox vbox (.getParent m)]
+    (image/create-medium vbox location format size variants)))
+
 (defn ^IMedium get-medium
-  [^IMachine m {:keys [location device-type create] :as device}]
+  [^IMachine m {:keys [location device-type create?
+                       size format variants] :as device}]
   (let [vbox (.getParent m)]
-    (when location
-      (vbox/find-medium vbox location device-type))))
+    (if (and create? size)
+      (create-machine-disk m location size format variants)
+      (when location
+        (vbox/find-medium vbox location device-type)))))
 
 (def controller-type-checkers
   {:scsi #{:lsi-logic :bus-logic}
@@ -126,20 +138,21 @@
 (defn set-adapter-property [^INetworkAdapter adapter property-key value]
   (when value
     (condp = property-key
-        :adapter-type (.setAdapterType adapter value)
-        :network (.setNetwork adapter value)
-        ;; equiv. to bridged-interface 4.0.x and below
-        :host-interface (.setBridgedInterface adapter value)
-        :bridged-interface (.setBridgedInterface adapter value)
-        :internal-network (.setInternalNetwork adapter value)
-        :host-only-interface (.setHostOnlyInterface adapter value)
-        :enabled (.setEnabled adapter value)
-        :cable-connected (.setCableConnected adapter value)
-        :mac-address (.setMACAddress adapter value)
-        :line-speed (.setLineSpeed adapter value)
-        :nat-driver (log/error "Setting NAT driver not supported")
-        :attachment-type nil ;; do nothing
-        (log/errorf "set-adapter-property: unknown property %s" property-key))))
+      :adapter-type (.setAdapterType adapter
+                                     (enums/key-to-network-adapter-type value))
+      :network (.setNetwork adapter value)
+      ;; equiv. to bridged-interface 4.0.x and below
+      :host-interface (.setBridgedInterface adapter value)
+      :bridged-interface (.setBridgedInterface adapter value)
+      :internal-network (.setInternalNetwork adapter value)
+      :host-only-interface (.setHostOnlyInterface adapter value)
+      :enabled (.setEnabled adapter value)
+      :cable-connected (.setCableConnected adapter value)
+      :mac-address (.setMACAddress adapter value)
+      :line-speed (.setLineSpeed adapter value)
+      :nat-driver (log/error "Setting NAT driver not supported")
+      :attachment-type nil ;; do nothing
+      (log/errorf "set-adapter-property: unknown property %s" property-key))))
 
 (defn configure-adapter-object [adapter config]
   (let [nat-forwards (:nat-forwards config)
@@ -228,17 +241,33 @@
       (log/debugf "Configuring adapter %s with %s" slot adapter-config)
       (when adapter-config (configure-adapter m slot adapter-config)))))
 
+(defn attach-share [^IMachine m name host-path & [auto-mount? writable?]]
+  (let [writable? (or writable? true)
+        auto-mount? (or auto-mount? false)]
+    (log/debugf "Attaching share on %s: %s->%s, writable? %s auto-mount? %s"
+                (.getName m) name host-path writable? auto-mount?)
+    (.createSharedFolder m name host-path writable? auto-mount?)))
+
+(defn configure-shares [^IMachine m shares]
+  (doall (map #(apply attach-share m %) shares)))
+
 (defn configure-machine [m config]
-  (doseq [[entry value] config]
-    (condp = entry
+  (let [config
+        (if (> (:cpu-count config) 1)
+          ;; using more than one cpu requires IO APIC enabled
+          (assoc config :io-apic-enabled? true)
+          config)]
+    (doseq [[entry value] config]
+      (condp = entry
         :network (configure-network m value)
-        :storage nil ;; ignored.
-        :boot-mount-point nil ;; ignored.
+        :shared-folders (configure-shares m value)
+        :storage nil            ;; ignored.
+        :boot-mount-point nil   ;; ignored.
         (if-let [setter (entry machine/setters)]
           (setter value m)
           (log/warnf
            "There is no such setting %s in a machine configuration"
-           entry)))))
+           entry))))))
 
 (defn configure-machine-storage [m {:keys [storage]}]
    (when storage

@@ -1,5 +1,65 @@
 # Release Notes
 
+## 0.3.0-alpha.3
+
+- Make manager/power-down more stable.
+  Before, power-down would return even when the VM was not in a lockable 
+  state. Now it polls for the state until it is lockable. This was causing
+  calls to destroy after a power down to fail in some instances because of
+  this race condition. Might be a bug in VBox.
+
+- Add support for VMs mounting shared host directories. Closes #57
+  When a local "folder" is shared, for example "/tmp" shared as
+  "my-tmp", then the shared folder can be mounted by the VM's OS by issuing
+  the following at the command line:
+
+  ```shell
+  $ mount -t vboxfs my-tmp /mnt/tmp
+  ```
+
+  This is done at the Hardware DSL level, by adding a new top level entry
+  :shared-folders that contains a vector of shares. Each share is a vector
+  of share name, host path, auto-mount?, writable?, the last two being
+  optional and defaulting to false and true (no auto-mount, writable), e.g.
+
+  ```clojure
+  {...
+  :shared-folders [["my-tmp" "/tmp" nil true] ["my-var" "/var"]]
+  ...}
+  ```
+
+- Fix issue with destroy after power-down failing sometimes Fixes #56.
+  destroy will now wait for the VM to be in a lockable state before 
+  attempting to lock. Apparently power-down returns leaving a temporary 
+  lock on the VM, and I can't explain why atm.
+
+- Refine support for setting network adapter type (chipset).
+
+- Add disk image creation for Hardware DSL.
+  With this change, when specifying the storage device to attach to a 
+  storage controller, you can define an image to be created.
+
+  e.g.  {:device-type :hard-disk
+        :location disk-location
+        :create? true
+        :size disk-in-mb
+        :attachment-type :normal}
+
+  The presence of :created? (set to true), :location and :size will prompt 
+  the creation of the disk image. Other optional keys are :variants and
+  :format (see image/create-medium).
+
+- Add 'nuke' to manager to unconditionally destroy a VM.
+
+- Fix IO-APIC for when # CPU > 1. fixes #55
+  When the HW DSL specifies more than one CPU, the system will 
+  automatically enable :io-apic-enabled?
+
+- Add v.v.v/vbox-info to get a map with vbox host's info
+  This includes virtualbox info (e.g. api version, ws/xpcom, etc.), and 
+  also host info (cpus, memory, O, host network interfaces and their DHCP
+  config, etc)
+
 ## 0.3.0-alpha.2
 
 - Add Vagrant support info on README.

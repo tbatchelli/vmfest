@@ -524,20 +524,17 @@ VirtualBox"
     (machine/resume (.getConsole s))))
 
 (defn power-down
-  [^Machine m & {:keys [timeout] :or {timeout -1}}]
+  [^Machine m]
   {:pre [(model/Machine? m)]}
   (try+
-   ;; when using the web iface, a lock is sometimes still held
-   (let [return-val
-         (session/with-session m :shared [s _]
-           (.waitForCompletion
-            (machine/power-down (.getConsole s))
-            (Integer. (int timeout))))]
-     ;; When using the XPCOM bridge, it seems that power-down gets the
-     ;; session stuck. Recreating the session seems to fix it!
-     (when xpcom?
-       (session/with-session m :shared [s _]))
-     return-val)
+   (session/with-session m :shared [s _]
+     (machine/power-down (.getConsole s)))
+   ;; don't return until the VM is in a lockable state. power-down
+   ;; doesn't seem to be always returning the IProgress object, and
+   ;; when it does, waiting for the operation to finish doesn't seem
+   ;; to result in a lockable VM, so we just wait for a lockable state
+   ;; by polling. Ugly, I know.
+   (wait-for-lockable-session-state m)
    (catch [:type :vbox-runtime] _
      (log/warn "Trying to stop an already stopped machine"))))
 
@@ -546,7 +543,6 @@ VirtualBox"
                                timeout -1}}]
   {:pre [(model/Machine? machine)]}
   (let [id (:id machine)]
-     (wait-for-lockable-session-state machine)
     (session/with-no-session machine [vb-m]
       (let [media (machine/unregister vb-m :detach-all-return-hard-disks-only)]
         (.waitForCompletion

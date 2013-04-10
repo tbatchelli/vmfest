@@ -25,7 +25,8 @@
     (.waitForCompletion
      (.createHostOnlyNetworkInterface host interface-holder) (Integer. -1))
     (let [interface (.value interface-holder)]
-      (log/infof "Created Host Only network interface %s" (.getName iface))
+      (log/infof "Created Host Only network interface %s"
+                 (.getName interface))
       interface)))
 
 (defn- add-host-only-interface*
@@ -110,7 +111,7 @@
         (.start dhcp-server if-name nil nil)))))
 
 (defn add-host-only-interface [^IVirtualBox vbox if-name]
-  ;; For some reason the vbox API does not let yous set the name of
+  ;; For some reason the vbox API does not let you set the name of
   ;; the network interface and instead it creates interfaces named
   ;; "vboxnetN", where N is the name lowest number for which an
   ;; interface vboxnetN does not exist.

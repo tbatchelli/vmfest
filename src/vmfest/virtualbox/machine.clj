@@ -7,7 +7,8 @@
             [vmfest.virtualbox.session :as session])
   (:use [vmfest.virtualbox.scan-codes :only (scan-codes)]
         [vmfest.virtualbox.system-properties :only [system-properties]]
-        [clojure.string :only [blank?]])
+        [clojure.string :only [blank?]]
+        [slingshot.slingshot :only [throw+]])
   (:import [org.virtualbox_4_2 IMachine IConsole VBoxException ISession
             VirtualBoxManager IVirtualBox IMedium NetworkAttachmentType
             IStorageController INetworkAdapter IProgress
@@ -237,6 +238,25 @@
        (let [id (.getId this)]
          (vmfest.virtualbox.model.Machine. id server nil))))
 
+(defn- will-it-run?
+  "Some hosts cannot run 64bit guest OSs, but VirtualBox will try to
+  run (and stall) anyway. This function returns true if a VM will be
+  able to run in this host"
+  [vb-m]
+  (let [vbox (.getParent vb-m)
+        host (.getHost vbox)
+        os-type-id (.getOSTypeId vb-m)
+        os-type (.getGuestOSType vbox os-type-id)
+        os-64-bit? (.getIs64Bit os-type)
+        host-64-bit? (.getProcessorFeature host (enums/key-to-processor-feature
+                                                 :hw-virt-ex))
+        will-it? (if os-64-bit? host-64-bit? true)]
+    (log/debugf "will-it-run?: %s %s -> {os-type-id %s os-64-bit? %s host-64-bit? %s}"
+                (.getName vb-m) (if will-it? "will run" "WON'T RUN")
+                os-type-id os-64-bit? host-64-bit?)
+    ;; return the whether the host will be able to run this VM or not
+    will-it?))
+
 (defn start
   "Starts the virtual machine represented by 'machine'.
 
@@ -261,8 +281,13 @@ See IVirtualbox::openRemoteSession for more details"
          :VBOX_E_IPTR_ERROR "Launching process for machine failed."
          :VBOX_E_VM_ERROR "Failed to assign machine to session."}
         (let [vb-m (virtualbox/find-vb-m vbox machine-id)
-              progress
-              (.launchVMProcess vb-m session session-type env)
+              ;; check whether this OS is 64-bit and the host supports
+              ;; such guests
+              _ (when-not (will-it-run? vb-m)
+                  (throw+
+                   {:type :unsupported-guest-os
+                    :message "This Host cannot run 64bit guest OSs"}))
+              progress (.launchVMProcess vb-m session session-type env)
               #_(.openRemoteSession vbox session machine-id session-type env)]
           (log/debug (str "start: Starting session for VM " machine-id "..."))
           (.waitForCompletion progress (Integer. 30000))

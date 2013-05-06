@@ -506,7 +506,7 @@ VirtualBox"
           (machine/stop (.getConsole s)))]
     ;; When using the XPCOM bridge, it seems that power-down gets
     ;; the session stuck. Recreating the session seems to fix it!
-    (when xpcom?
+    (when (xpcom?)
       (session/with-session m :shared [s _]))
     ;; return the return value of the first call
     return-val))
@@ -617,6 +617,15 @@ VirtualBox"
       (map (comp get-keys vmfest.virtualbox.guest-os-type/map-from-IGuestOSType)
            (.getGuestOSTypes ^IVirtualBox vbox)))))
 
+(defn diagnostics
+  "Returns a data structure with all the relevant information about
+  the state of vmfest and its configuration"
+  [server]
+  (session/with-vbox server [_ vbox]
+    {:virtualbox (vbox/vbox-info vbox)
+     :image-models (update-models)
+     :hw-models *machine-models*
+     :machines (managed-machines server)}))
 ;;; model forwards
 
 (defn as-map [& params]

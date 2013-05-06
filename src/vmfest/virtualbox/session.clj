@@ -45,8 +45,17 @@ destruction of sessions with the VBox servers"
 
 ;; When using the XPCOM Bridge, we don't create a session with the
 ;; server, instead, we just instantiate a singleton of the VBM
-(defonce ^VirtualBoxManager instance
-  (if xpcom? (VirtualBoxManager/createInstance nil)))
+(def ^VirtualBoxManager instance* (atom nil))
+
+(defn ^VirtualBoxManager instance
+  "If the loaded vbox library is xpcom, it will create an instance of
+  the xpcom service if it doesn't exist already"
+  []
+  (when (xpcom?)
+    (if-let [the-instance @instance*]
+      the-instance
+      (swap! instance* (constantly (VirtualBoxManager/createInstance nil))))))
+
 
 ;; To interact with VBox server we need to create a web session. We do
 ;; this via IWebSessionManager. This does not create a connection to
@@ -61,12 +70,9 @@ If no home is passed, it will use the default
              -> VirtualBoxManager"
   [& [home]]
   (log/trace (str "Creating session manager for home=" (or home "default")))
-  (if xpcom?
-    instance
+  (if (xpcom?)
+    (instance)
     (VirtualBoxManager/createInstance home)))
-
-
-
 
 ;; Before we can interact with the server we need to create a Virtual
 ;; Box object trhough our session, to keep track of our actions on the
@@ -85,7 +91,7 @@ VirtualBoxManager object plus the credentials or by a Server object.
       "creating new vbox with a logon for url=%s and username=%s" url username)
      (try
        ;; we only connect when using web services
-       (when-not xpcom?
+       (when-not (xpcom?)
          (.connect mgr url username password))
        (.getVBox mgr)
        (catch VBoxException e
@@ -143,8 +149,8 @@ with a virtualbox.
                       ;; in xpcom we just cleanup (not sure if this does
                       ;; nothing, but when using webservices we just
                       ;; disconnect to force the cleanup.
-                      (when instance
-                        (.cleanup instance))
+                      (when (instance)
+                        (.cleanup (instance)))
                       (cleanup-and-diconnect ~mgr)
                       (catch Exception e#
                         (conditions/wrap-exception

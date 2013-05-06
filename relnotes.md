@@ -1,5 +1,21 @@
 # Release Notes
 
+## 0.3.0-alpha.4
+
+- Allow late addition of vbox library in the classpath.
+
+- Add diagnostics function in vmfest/manager.
+  `(manager/diagnostics my-server)` will return a map with relevant
+  information about the state and configuration of the host and vmfest
+  models and machines.
+
+- Prevent VMs from starting if host doesn't support guest OS.
+  If the Guest is a 64bit os but the host's CPU doesn't provide the
+  hardware virtualization extensions necessary for running virtualized
+  64bit OS, prevent the VM from starting. Fixes #60.
+
+- Fix host-only interface automatic creation. Fixes #58.
+
 ## 0.3.0-alpha.3
 
 - Make manager/power-down more stable.

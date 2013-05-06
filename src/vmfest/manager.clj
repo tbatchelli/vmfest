@@ -506,7 +506,7 @@ VirtualBox"
           (machine/stop (.getConsole s)))]
     ;; When using the XPCOM bridge, it seems that power-down gets
     ;; the session stuck. Recreating the session seems to fix it!
-    (when xpcom?
+    (when (xpcom?)
       (session/with-session m :shared [s _]))
     ;; return the return value of the first call
     return-val))

@@ -159,7 +159,7 @@ at the specified location."
 
 (defn vbox-info [^IVirtualBox vbox]
   {:api-version (.getAPIVersion vbox)
-   :protocol (if xpcom? :xpcom :ws)
+   :protocol (if (xpcom?) :xpcom :ws)
    :package-type (.getPackageType vbox)
    :home-filder (.getHomeFolder vbox)
    :settings-file-path (.getSettingsFilePath vbox)

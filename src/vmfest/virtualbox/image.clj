@@ -144,7 +144,7 @@
                  model-name gzipped-image-file temp-dir)
       (when-not *dry-run*
         (untar gzipped-image-file temp-dir)))
-    (log/infof "%s: Fileis not a vagrant box" model-name))
+    (log/infof "%s: File is not a vagrant box" model-name))
   options)
 
 (defn threaded-get-key

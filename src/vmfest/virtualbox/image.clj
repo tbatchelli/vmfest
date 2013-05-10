@@ -161,8 +161,10 @@
   (if vagrant-box?
     (do
       (log/infof "%s: Creating metadata for vagrant box" model-name)
-      (when-not (every? (or (:meta options) {})
-                        [:os-family :os-version :os-64-bit])
+      (when-not
+          (let [required-keys #{:os-family :os-version :os-64-bit}
+                present-keys (set (keys (select-keys (:meta options) required-keys)))]
+            (= required-keys present-keys))
         (throw+
          {:supplied-options (:meta options)}
          (str "To install vagrant boxes, you must specify os-family, os-version"

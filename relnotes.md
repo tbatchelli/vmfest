@@ -1,4 +1,7 @@
 # Release Notes
+## 0.3.0-alpha.5
+
+-  Fix issue with installing 32bit Vagrant images.
 
 ## 0.3.0-alpha.4
 

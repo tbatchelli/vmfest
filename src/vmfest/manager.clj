@@ -277,7 +277,7 @@ VirtualBox"
 
 (defn model-info
   [model-key & {:keys [model-path] :or {model-path (:model-path *location*)}}]
-  (model-key (update-models :model-pathmodel-path)))
+  (model-key (update-models :model-path)))
 
 (defn check-model
   [server model-key & {:keys [model-path]

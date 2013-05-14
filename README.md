@@ -36,7 +36,7 @@ more details. You'll get a nice segmentation fault in those cases. In
 these cases, please revert  to the WebServices configuration listed at 
 the end of this page.
 
-## Install Virtualbox 4.2.x
+## Install VirtualBox 4.2.x
 
 Download and install [VirtualBox 4.2.x][vbox-download]. It won't work with
 any older version.
@@ -58,7 +58,7 @@ Add the following dependencies to your ```project.clj```:
    [org.clojars.tbatchelli/vboxjxpcom "4.2.4"]
 ```
 
-and tell VMFest where virtualbox is installed. In OSX this would be:
+and tell VMFest where VirtualBox is installed. In OSX this would be:
 ```clojure
    :jvm-opts ["-Dvbox.home=/Applications/VirtualBox.app/Contents/MacOS"]
 ```
@@ -121,7 +121,7 @@ called uuid:
 ### Create VMs from specs
 
 A new VM is created from a hardware spec and an image spec. The
-following will create a VM on the Virtualbox host defined by
+following will create a VM on the VirtualBox host defined by
 `my-server`.  
 
 ```clojure
@@ -362,7 +362,7 @@ Start the VirtualBox server (`vboxwebsrv`) by issuing the following on the shell
 $ vboxwebsrv -t0
 ```
 
-Finally, disable login authorization in virtualbox server 
+Finally, disable login authorization in VirtualBox server 
 (you'll only need to do it this one time): 
 
 ``` 

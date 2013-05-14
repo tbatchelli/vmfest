@@ -10,7 +10,7 @@ This project is work in progress, so feedback and suggestions are
 welcome. Please use the
 [issues](http://github.com/tbatchelli/vmfest/issues) for this purpose.
 
-[vbox]: http://www.virtualbox.org 
+[vbox]: http://www.virtualbox.org
 [palletops]: http://palletops.com
 
 # Release Notes
@@ -29,11 +29,11 @@ instructions below are for using the new XPCOM communication
 subsystem, and hence, are shorter :). You can still find how to setup
 the webservices communication at the end of this page.
 
-__WARNING: the java/XPCOM bridge sems to be broken for Debian Weezy 
-and Ubuntu 12.x__ 
-(see [ticket #11232](https://www.virtualbox.org/ticket/11232) for 
-more details. You'll get a nice segmentation fault in those cases. In 
-these cases, please revert  to the WebServices configuration listed at 
+__WARNING: the java/XPCOM bridge sems to be broken for Debian Weezy
+and Ubuntu 12.x__
+(see [ticket #11232](https://www.virtualbox.org/ticket/11232) for
+more details. You'll get a nice segmentation fault in those cases. In
+these cases, please revert  to the WebServices configuration listed at
 the end of this page.
 
 ## Install Virtualbox 4.2.x
@@ -72,13 +72,13 @@ and for Ubuntu/Debian this would be:
 ## Create VMs programmatically
 
 VMFest has a data oriented API to create VMs. There are two data
-structures needed to create a VM: one describing the hardware 
+structures needed to create a VM: one describing the hardware
 and the other one describing the image that the VM will boot off.
 
 ### Hardware specs
 
 You can define every hardware aspect of a VM as a hash map. Consider
-this map: 
+this map:
 
 ```clojure
    {:memory-size 512
@@ -122,12 +122,12 @@ called uuid:
 
 A new VM is created from a hardware spec and an image spec. The
 following will create a VM on the Virtualbox host defined by
-`my-server`.  
+`my-server`.
 
 ```clojure
-(def my-machine 
-     (instance my-server "my-vmfest-vm" 
-        {:uuid "/Users/tbatchelli/imgs/vmfest-Debian-6.0.2.1-64bit-v0.3.vdi"}  
+(def my-machine
+     (instance my-server "my-vmfest-vm"
+        {:uuid "/Users/tbatchelli/imgs/vmfest-Debian-6.0.2.1-64bit-v0.3.vdi"}
         {:memory-size 512
          :cpu-count 1
          :network [{:attachment-type :host-only
@@ -189,7 +189,7 @@ described above, and you can add your own too.
 
 When creating a new VM, you can reference these specs by key instead
 of passing the specs. For example, in my laptop, I can instantiate the
-exact same VM as above with: 
+exact same VM as above with:
 
 ```clojure
 (instance my-server "my-vmfest-vm" :debian-6.0.2.1-64bit-v0.3 :micro)
@@ -251,16 +251,16 @@ typically sub-second. Here is one example of how to do this:
 (def names ["slave-1" "slave-2" ... "slave-N" "master"])
 
 ;; instantiate the VMs
-(def machines 
-     (map (fn [name] 
+(def machines
+     (map (fn [name]
               (instance my-server % :debian-6.0.2.1-64bit-v0.3 :micro))
           names))
-          
+
 ;; start all the VMs
 (map start machines)
 ```
 
-# Low Level API 
+# Low Level API
 
 There is a low-level API to program VirtualBox from Cloure. This API
 eliminates some of the complexity of connecting to VirtualBox, but
@@ -362,10 +362,10 @@ Start the VirtualBox server (`vboxwebsrv`) by issuing the following on the shell
 $ vboxwebsrv -t0
 ```
 
-Finally, disable login authorization in virtualbox server 
-(you'll only need to do it this one time): 
+Finally, disable login authorization in virtualbox server
+(you'll only need to do it this one time):
 
-``` 
+```
 $ VBoxManage setproperty websrvauthlibrary null
 ```
 
@@ -380,13 +380,13 @@ suggestions, or just want to chat, here are your options:
  - Create a new issue (feat request, bug, etc.) on
    [vmfest's github repo][vmfest-issues]
  - Tweet [@palletops][palletops-tweet]
- 
+
 # License
 
 Copyright © 2013 Antoni Batchelli and Hugo Duncan
 
 Distributed under the Eclipse Public License, the same as Clojure.
- 
+
 [pallet-ml]: https://groups.google.com/forum/?fromgroups#!forum/pallet-clj
 
 [freenode]: http://freenode.net/irc_servers.shtml

@@ -29,7 +29,7 @@ instructions below are for using the new XPCOM communication
 subsystem, and hence, are shorter :). You can still find how to setup
 the webservices communication at the end of this page.
 
-__WARNING: the java/XPCOM bridge sems to be broken for Debian Weezy 
+__WARNING: the java/XPCOM bridge seems to be broken for Debian Weezy 
 and Ubuntu 12.x__ 
 (see [ticket #11232](https://www.virtualbox.org/ticket/11232) for 
 more details. You'll get a nice segmentation fault in those cases. In 
@@ -106,7 +106,7 @@ master slot master in the channel 1 of the IDE.
 You can use any VirtualBox image with VMFest, but we encourage using
 immutable ones, a must if you want to use VMFest as a cloud provider.
 
-VMFest lets you provide image medatata that will be passed on to the
+VMFest lets you provide image metadata that will be passed on to the
 libraries using VMFest. This image metadata can contain information
 like the user/password for the image, the OS family, 32 or 64 bits,
 etc., but for now we only care about one piece of data: the image
@@ -178,7 +178,7 @@ images the VMs are running have VirtualBox Guest Additions installed:
 The main use case that we had when we built VMFest was to use
 VirtualBox like a lightweight cloud provider.
 
-Most clloud providers will tipically provide a set of images and a set
+Most cloud providers will typically provide a set of images and a set
 hardware profiles, and when you want to create a new instance (VM) you
 select a profile for each, e.g., ubuntu 10.04 + Large Machine.
 
@@ -262,7 +262,7 @@ typically sub-second. Here is one example of how to do this:
 
 # Low Level API 
 
-There is a low-level API to program VirtualBox from Cloure. This API
+There is a low-level API to program VirtualBox from Clojure. This API
 eliminates some of the complexity of connecting to VirtualBox, but
 we'll leave this explanation for another day. Just know that it's
 there, and you can look at the `manager.clj` sources and the tests to

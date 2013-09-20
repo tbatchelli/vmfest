@@ -437,9 +437,11 @@ VirtualBox"
   (let [image (if (keyword? image-key-or-map)
                 (image-key-or-map *images*)
                 image-key-or-map)
+        config-overrides (:hardware image)
         config (if (keyword? machine-key-or-map)
                  (machine-key-or-map *machine-models*)
-                 machine-key-or-map)]
+                 machine-key-or-map)
+        config (merge config config-overrides)]
     (when-not image
       (throw (RuntimeException.
               (format

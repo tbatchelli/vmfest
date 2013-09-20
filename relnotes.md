@@ -1,4 +1,36 @@
 # Release Notes
+## 0.3.0-beta.1
+
+- add clojure 1.5.1 profile
+
+- Fix documentation re: setup of Vagrant boxes.
+
+- Allow hardware config overrides in .meta files
+  Add hardware DSL map under :hardware in .meta file, e.g:
+
+   ```clojure
+   {:os-family ... :hardware {:io-apic-enabled? true ...}}
+   ``` 
+
+- Skip loading models when image file is not present.
+
+- Speed up image installation.
+  We do not need to clone .dvi images anymore to register them, as they are
+  automatically registered before each use to workaround VBox forgetting
+  their mutability status. This saves space and time.
+
+  We are still cloning when installing vagrant boxes.
+
+- Merge pull request #65 from sumbach/patch-3
+  Consistently capitalize VirtualBox in README
+- Merge pull request #63 from sumbach/patch-1
+  Fix minor typos in README
+- Consistently capitalize VirtualBox
+
+- Fix minor typos
+
+- Fix typo in manager/model-info. Fixes #62
+
 ## 0.3.0-alpha.5
 
 -  Fix issue with installing 32bit Vagrant images.

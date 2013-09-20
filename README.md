@@ -219,7 +219,7 @@ some extra parameters, e.g.:
 
 ```clojure
 (setup-model "http://files.vagrantup.com/lucid64.box" my-server
-   :os-family :ubuntu :os-version "10.04" :os-64-bit true)
+   :meta {:os-family :ubuntu :os-version "10.04" :os-64-bit true})
 ```
 
 Once installed, the Vagrant box can be used just as any other VMFest

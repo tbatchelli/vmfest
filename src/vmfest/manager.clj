@@ -19,6 +19,7 @@ machines are stored in ~/.vmfest/nodes ."
             [vmfest.virtualbox.image :as image]
             [clojure.tools.logging :as log]
             [clojure.java.io :as io]
+            [fs.core :as fs]
             vmfest.virtualbox.medium
             clojure.set)
   (:use [slingshot.slingshot :only [throw+ try+]]
@@ -256,9 +257,17 @@ VirtualBox"
 
 (defn read-meta-file [^java.io.File file]
   (try
-    (read-string (slurp file))
+    (let [meta (read-string (slurp file))
+          uuid (:uuid (second (first meta)))]
+      ;; ignore metas for which the image file is not present
+      (if (fs/file? uuid)
+        meta
+        (do
+          (log/warnf "Cannot find the image file '%s' referenced in '%s'. Skipping"
+                      uuid (.getCanonicalPath file)) {})))
     (catch Exception e
-      (log/warn (format "Wrong file format %s. Skipping" (.getName file))))))
+      (log/warn (format "Wrong file format %s. Skipping" (.getName file)))
+      {})))
 
 (defn load-models
   "Return a map of all image metadata from the model-path"
@@ -277,7 +286,7 @@ VirtualBox"
 
 (defn model-info
   [model-key & {:keys [model-path] :or {model-path (:model-path *location*)}}]
-  (model-key (update-models :model-pathmodel-path)))
+  (model-key (update-models :model-path model-path)))
 
 (defn check-model
   [server model-key & {:keys [model-path]
@@ -428,9 +437,11 @@ VirtualBox"
   (let [image (if (keyword? image-key-or-map)
                 (image-key-or-map *images*)
                 image-key-or-map)
+        config-overrides (:hardware image)
         config (if (keyword? machine-key-or-map)
                  (machine-key-or-map *machine-models*)
-                 machine-key-or-map)]
+                 machine-key-or-map)
+        config (merge config config-overrides)]
     (when-not image
       (throw (RuntimeException.
               (format

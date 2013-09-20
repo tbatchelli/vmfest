@@ -1,4 +1,4 @@
-(defproject vmfest "0.3.0-alpha.5"
+(defproject vmfest "0.3.0-beta.1"
   :description "Manage local VMs from the REPL"
   :min-lein-version "2.0.0"
   :dependencies [[org.clojure/clojure "1.2.1"]
@@ -8,7 +8,8 @@
                  [org.apache.commons/commons-compress "1.4.1"]]
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
-  :profiles {:1.3 {:dependencies [[org.clojure/clojure "1.3.0"]]}
+  :profiles {:1.5.1 {:dependencies [[org.clojure/clojure "1.5.1"]]}
+             :1.3 {:dependencies [[org.clojure/clojure "1.3.0"]]}
              :1.4 {:dependencies [[org.clojure/clojure "1.4.0"]]}
              :1.2 {:dependencies [[org.clojure/clojure "1.2.1"]]}
              :ws {:dependencies [[org.clojars.tbatchelli/vboxjws "4.2.4"]]}

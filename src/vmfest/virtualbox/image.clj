@@ -9,7 +9,8 @@
         [slingshot.slingshot :only [throw+]])
   (:require [clojure.tools.logging :as log]
             [clojure.string :as string]
-            [vmfest.virtualbox.enums :as enums])
+            [vmfest.virtualbox.enums :as enums]
+            [fs.core :as fs])
   (:import [org.virtualbox_4_2 DeviceType AccessMode MediumVariant
             MediumType IMedium MediumState IProgress IVirtualBox]
            [java.util.zip GZIPInputStream]
@@ -43,19 +44,22 @@
       (string/replace #"\.gz$" "")
       (string/replace #"\.[^.]+$" "")))
 
-(defn register-model [^String orig ^String dest vbox]
-  (with-vbox vbox [_ ^IVirtualBox vb]
-    (let [^IVirtualBox vb vb
-          orig-medium
-          (.openMedium vb orig DeviceType/HardDisk AccessMode/ReadOnly false)
-          dest-medium (.createHardDisk vb "vdi" dest)
-          progress (.cloneTo orig-medium dest-medium (long 0) nil)]
-      ;; wait indefinitely for the cloning
-      (.waitForCompletion progress (Integer. -1))
-      (make-immutable dest-medium)
-      ;; We need to close the origial medium, otherwise it would
-      ;; remain registered
-      (.close orig-medium))))
+(defn register-model [^String orig ^String dest vbox vagrant?]
+  (if vagrant?
+    (with-vbox vbox [_ ^IVirtualBox vb]
+      (let [^IVirtualBox vb vb
+            orig-medium
+            (.openMedium vb orig DeviceType/HardDisk AccessMode/ReadOnly false)
+            dest-medium (.createHardDisk vb "vdi" dest)
+            progress (.cloneTo orig-medium dest-medium (long 0) nil)]
+        ;; wait indefinitely for the cloning
+        (.waitForCompletion progress (Integer. -1))
+        (make-immutable dest-medium)
+        ;; We need to close the origial medium, otherwise it would
+        ;; remain registered
+        (.close orig-medium)))
+    ;; if it is not vagrant, then just move the file to the right place
+    (fs/rename orig dest)))
 
 (defn make-temp-dir [image-name]
   (let [tmp (System/getProperty "java.io.tmpdir")
@@ -168,7 +172,7 @@
         (throw+
          {:supplied-options (:meta options)}
          (str "To install vagrant boxes, you must specify os-family, os-version"
-              " and os-64-bit")))
+              " and os-64-bit. Supplied are:" (keys (:meta options)))))
       (update-in options [:meta]
                  #(merge
                    {:username "vagrant"
@@ -187,11 +191,12 @@
         (assoc options :meta (load-string (slurp meta-url)))))))
 
 (defn threaded-register-model
-  [{:keys [image-file model-file vbox model-name] :as options}]
-  (log/infof "%s: Registering image %s as %s in %s"
+  [{:keys [image-file model-file vbox model-name vagrant-box?] :as options}]
+  (log/infof "%s: Registering %s image %s as %s in %s"
+             (if vagrant-box? "Vagrant" "")
              model-name image-file model-file vbox)
   (when-not *dry-run*
-    (register-model image-file model-file vbox))
+    (register-model image-file model-file vbox vagrant-box?))
   options)
 
 (defn threaded-create-meta

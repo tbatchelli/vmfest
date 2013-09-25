@@ -54,7 +54,7 @@ but sticking vmfest in your classpath will suffice.
 Add the following dependencies to your ```project.clj```:
 
 ```clojure
-   [vmfest "0.3.0-beta.1"]
+   [vmfest "0.3.0-beta.2"]
    [org.clojars.tbatchelli/vboxjxpcom "4.2.4"]
 ```
 

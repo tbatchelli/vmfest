@@ -1,4 +1,9 @@
 # Release Notes
+
+## 0.3.0-beta.2
+
+- Fix regression: ~/.vmfest/models not created on first image install.
+
 ## 0.3.0-beta.1
 
 - add clojure 1.5.1 profile

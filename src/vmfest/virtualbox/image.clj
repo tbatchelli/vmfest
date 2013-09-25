@@ -239,6 +239,10 @@
   [image-url vbox & {:as options}]
   (let [job (apply prepare-job image-url vbox (reduce into [] options))]
     (log/info (str "About to execute job \n" (with-out-str (pprint job))))
+    ;; ensure the model path directory exists
+    (when-not (fs/directory? (:model-path job))
+      (log/infof "Creating model directory: %s" (:model-path job))
+      (fs/mkdirs (:model-path job)))
     (if (.exists (File. ^String (:model-file job)))
       (log/errorf
        "The model %s already exists. Manually specifiy another file name with :model-name"

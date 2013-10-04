@@ -1,5 +1,9 @@
 # Release Notes
 
+## 0.3.0-beta.3
+
+- Fix issue images would not install on a non-root filesystem.
+
 ## 0.3.0-beta.2
 
 - Fix regression: ~/.vmfest/models not created on first image install.

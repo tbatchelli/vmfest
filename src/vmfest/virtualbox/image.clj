@@ -59,7 +59,18 @@
         ;; remain registered
         (.close orig-medium)))
     ;; if it is not vagrant, then just move the file to the right place
-    (fs/rename orig dest)))
+    (do
+      (log/infof "register-model: Not a Vagrant image: moving %s to %s" orig dest)
+      (log/infof "register-model: Trying first to rename the file")
+      (fs/rename orig dest)
+      (if (fs/file? dest)
+        (log/infof "register-model: file successfully moved to %s" dest )
+        (do
+          (log/infof "register-model: file move attempt failed. Trying to copy and delete instead.")
+          (log/infof "register-model: copying %s to %s" orig dest)
+          (fs/copy orig dest)
+          (log/infof "register-model: removing %s" orig)
+          (fs/delete orig))))))
 
 (defn make-temp-dir [image-name]
   (let [tmp (System/getProperty "java.io.tmpdir")

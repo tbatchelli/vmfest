@@ -1,4 +1,4 @@
-(defproject vmfest "0.3.0-beta.3"
+(defproject vmfest "0.3.0-rc.1"
   :description "Manage local VMs from the REPL"
   :min-lein-version "2.0.0"
   :dependencies [[org.clojure/clojure "1.2.1"]
@@ -15,7 +15,8 @@
              :ws {:dependencies [[org.clojars.tbatchelli/vboxjws "4.2.4"]]}
              :xpcom {:dependencies [[org.clojars.tbatchelli/vboxjxpcom "4.2.4"]]}
              :dev {:dependencies [[ch.qos.logback/logback-classic "1.0.1"]
-                                  [ch.qos.logback/logback-core "1.0.1"]]}}
+                                  [ch.qos.logback/logback-core "1.0.1"]
+                                  [org.clojure/tools.nrepl "0.2.3"]]}}
   :test-selectors {:default (fn [v] (not (:integration v)))
                    :integration :integration
                    :all (fn [_] true)}

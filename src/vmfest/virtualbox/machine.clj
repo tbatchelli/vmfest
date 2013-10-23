@@ -293,14 +293,18 @@ See IVirtualbox::openRemoteSession for more details"
           (.waitForCompletion progress (Integer. 30000))
           (let [result-code (.getResultCode progress)]
             (log/debugf "start: VM %s started with result code %s"
-                               machine-id
-                               result-code)
+                        machine-id
+                        result-code)
             result-code)))
       (catch Exception e
         (log/error e "Cannot start machine")
         (conditions/wrap-exception
          e
-         {:message "An error occurred while starting machine"})))))
+         {:message "An error occurred while starting machine"}))
+      (finally
+        ;; creating the VM also creates a session with the VM. We need
+        ;; to make sure we don't hold on to this session #67.
+        (.unlockMachine session)))))
 
 
 (defn save-settings [^IMachine machine]

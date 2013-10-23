@@ -1,5 +1,9 @@
 # Release Notes
 
+## 0.3.0-rc.1
+
+- Ensure machine is unlocked once it is started. Fixes #67.
+
 ## 0.3.0-beta.3
 
 - Fix issue images would not install on a non-root filesystem.

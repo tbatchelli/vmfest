@@ -6,7 +6,7 @@ destruction of sessions with the VBox servers"
             [vmfest.virtualbox.model :as model]
             [vmfest.virtualbox.enums :as enums])
   (:use [vmfest.virtualbox.version :only [xpcom? vbox-binding]])
-  (:import [org.virtualbox_4_2
+  (:import [org.virtualbox_4_3
             VirtualBoxManager
             IVirtualBox
             VBoxException
@@ -139,8 +139,8 @@ with a virtualbox.
        with-vbox: Server x [symbol symbol] x body
           -> body"
   ;; {:pre [(model/VirtualBoxManager? server)]}
-  (let [mgr (vary-meta mgr assoc :tag org.virtualbox_4_2.VirtualBoxManager)
-        vbox (vary-meta vbox assoc :tag org.virtualbox_4_2.IVirtualBox)]
+  (let [mgr (vary-meta mgr assoc :tag VirtualBoxManager)
+        vbox (vary-meta vbox assoc :tag IVirtualBox)]
     `(let [[~mgr ~vbox] (create-mgr-vbox ~server)]
        (try
          ~@body

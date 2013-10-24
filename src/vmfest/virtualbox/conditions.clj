@@ -3,7 +3,7 @@
         [slingshot.slingshot :only [try+ throw+]]
         [vmfest.virtualbox.version :only [evaluate-when]])
   (:require [clojure.tools.logging :as log])
-  (:import [org.virtualbox_4_2 VBoxException]))
+  (:import [org.virtualbox_4_3 VBoxException]))
 
 (defn unsigned-int-to-long [ui]
   (bit-and (long ui) 0xffffffff))
@@ -61,14 +61,15 @@
 
 (evaluate-when
  :ws
- (import '[org.virtualbox_4_2.jaxws
+ (import '[org.virtualbox_4_3.jaxws
            InvalidObjectFaultMsg
-           RuntimeFaultMsg])
+           RuntimeFaultMsg
+           RuntimeFault])
  (extend-protocol fault
    RuntimeFaultMsg
    (as-map [this]
      (let [message (.getMessage this)
-           ^org.virtualbox_4_2.jaxws.RuntimeFault info
+           ^RuntimeFault info
            (try (.getFaultInfo this)
                 (catch Exception e)) ;; runtime fault
            interface-id (when info (.getInterfaceID info))

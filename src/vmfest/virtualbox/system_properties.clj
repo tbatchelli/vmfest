@@ -1,5 +1,5 @@
 (ns vmfest.virtualbox.system-properties
-  (:import [org.virtualbox_4_2
+  (:import [org.virtualbox_4_3
             ISystemProperties IMachine IVirtualBox IMediumFormat]))
 
 (defmulti ^ISystemProperties system-properties class)

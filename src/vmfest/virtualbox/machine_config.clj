@@ -9,7 +9,7 @@
             [vmfest.virtualbox.virtualbox :as vbox]
             [vmfest.virtualbox.conditions :as conditions]
             [vmfest.virtualbox.image :as image])
-  (:import [org.virtualbox_4_2 AccessMode VBoxException NetworkAttachmentType
+  (:import [org.virtualbox_4_3 AccessMode VBoxException NetworkAttachmentType
             HostNetworkInterfaceType INetworkAdapter IMedium IMachine
             IHostNetworkInterface INATEngine]))
 

@@ -1,9 +1,11 @@
 (ns vmfest.virtualbox.conditions
-  (:use [clojure.stacktrace :only [root-cause]]
-        [slingshot.slingshot :only [try+ throw+]]
-        [vmfest.virtualbox.version :only [evaluate-when]])
-  (:require [clojure.tools.logging :as log])
-  (:import [org.virtualbox_4_3 VBoxException]))
+  (:require
+   [clojure.pprint :refer [pprint]]
+   [clojure.stacktrace :refer [root-cause]]
+   [clojure.tools.logging :as log]
+   [slingshot.slingshot :refer [try+ throw+]]
+   [vmfest.virtualbox.version :refer [evaluate-when]])
+  (:import [org.virtualbox_4_3 VBoxException IVirtualBoxErrorInfo]))
 
 (defn unsigned-int-to-long [ui]
   (bit-and (long ui) 0xffffffff))
@@ -31,6 +33,20 @@
    2147942487 :E_INVALIDARG,
    2147549183 :E_UNEXPECTED})
 
+
+(defn error-info
+  "Builds an map with the contents of VirtualBoxErrorInfo"
+  [^IVirtualBoxErrorInfo ei]
+  (log/debugf "error-info: ei:%s" ei)
+  {:text (.getText ei)
+   :interface-id (.getIntefaceID ei)
+   :component (.getComponent ei)
+   :typed-wrapped (.getTypedWrapped ei)
+   :result-code (.getResultCode ei)
+   :result-detail (.getResultDetail ei)
+   :next (if-let [next (.getNext ei)]
+           (error-info next))})
+
 (defprotocol fault
   (as-map [this]))
 
@@ -54,10 +70,19 @@
   VBoxException
   (as-map [this]
     (let [message (.getMessage this)
-          wrapped (.getWrapped this)]
-      (merge
-       (when wrapped (as-map wrapped))
-       {:message message}))))
+          result-code (unsigned-int-to-long (.getResultCode this))
+          error-type (if-let [et (get error-code-map result-code)]
+                       et
+                       (do (log/errorf "conditions: Unhandled error type %s does not belong in %s"
+                                       result-code (keys error-code-map))
+                           (get error-code-map 0)))
+          error-info (when-let [ei (.getVirtualBoxErrorInfo this)]
+                       (error-info ei))]
+      {:original-message message
+       :original-error-code result-code
+       :original-error-type error-type
+       :original-error-info error-info})))
+
 
 (evaluate-when
  :ws
@@ -83,7 +108,7 @@
         :origin-id interface-id
         :origin-component component
         :error-code result-code
-        :original-error-type (error-code-map result-code)
+        :original-error-type (get error-code-map result-code)
         :text text}))
    InvalidObjectFaultMsg
    (as-map [this]
@@ -92,13 +117,9 @@
 
 (defn condition-from-exception [^Exception e]
   (try
-    (if-let [cause (try (.getWrapped ^VBoxException e) (catch Exception _))]
-      (let [condition (as-map cause)]
-        (log/debug (format "formatting wrapped exception %s" condition))
-        condition)
-      (let [condition (as-map e)]
-        (log/debug (format "formatting exception %s" condition))
-        condition))
+    (let [condition (as-map e)]
+      (log/debugf "formatting %s as %s" e condition)
+      condition)
     (catch Exception e
       (log/errorf
        "Cannot parse the error since the object is unavailable %s" e)
@@ -109,9 +130,7 @@
     (let [message (or (:message optional-keys) "An exception occurred.")
           full-message (format "%s: %s" message (.getMessage exception))]
       (throw+ (merge {:full-message full-message
-                      :cause exception
-;;                      :stack-trace nil  ;; redundant
-                      }
+                      :cause exception}
                      (condition-from-exception exception)
                      optional-keys)))
     (catch Exception e
@@ -123,12 +142,12 @@
     (let [condition (condition-from-exception e)
           error-type (:original-error-type condition)
           ;; HACK... error type should always exist
-          condition-map (when error-type (error-type error-condition-map))
+          condition-map (when error-type (get error-condition-map error-type))
           merged-condition (merge default-condition-map condition-map)]
       (when-not error-type
-        (log/error
-         (format
-          "conditions: This VBoxException does not have an error type %s" e)))
+        (log/errorf
+         "conditions: This VBoxException does not have an error type %s"
+         condition))
       (wrap-exception e merged-condition))
     (wrap-exception e {})))
 
@@ -187,7 +206,13 @@ e.g:
   `(try
      ~@body
      (catch VBoxException e#
-       (conditions/wrap-vbox-exception
+       ;; (log/debug "####### e:" e#)
+       ;; (log/debug "####### ErrorInfo:" (.getVirtualBoxErrorInfo e#))
+       ;; (log/debug "####### resultCode:" (.getResultCode e#))
+       ;; (log/debug "####### Message:" (.getMessage e#))
+       ;; (log/debug "####### Cause" (.getCause e#))
+       ;; (log/debug "####### error-info:" (error-info (.getVirtualBoxErrorInfo e#)))
+       (wrap-vbox-exception
         e#
         (message-map-to-condition-map ~type-to-condition-map)))))
 

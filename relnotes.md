@@ -1,5 +1,8 @@
 # Release Notes
 
+## 0.3.0
+ (same as 0.3.0-rc.1)
+
 ## 0.3.0-rc.1
 
 - Ensure machine is unlocked once it is started. Fixes #67.

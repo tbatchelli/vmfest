@@ -19,7 +19,7 @@ Can be found [here](relnotes.md).
 
 # Usage
 
-__NOTE:__ VMFest 0.3.0 adds support for XPCOM-based communication with
+__NOTE:__ VMFest 0.3.0 added support for XPCOM-based communication with
 VirtualBox. Using XPCOM only works when VMFest and VirtualBox are in
 the same machine, but it is the easiest setup, and also generally
 faster. VMFest still supports WebServices communication, which is what
@@ -29,16 +29,16 @@ instructions below are for using the new XPCOM communication
 subsystem, and hence, are shorter :). You can still find how to setup
 the webservices communication at the end of this page.
 
-__WARNING: the java/XPCOM bridge seems to be broken for Debian Weezy 
+__WARNING: the java/XPCOM bridge is broken for Debian Weezy 
 and Ubuntu 12.x__ 
 (see [ticket #11232](https://www.virtualbox.org/ticket/11232) for 
 more details. You'll get a nice segmentation fault in those cases. In 
 these cases, please revert  to the WebServices configuration listed at 
 the end of this page.
 
-## Install VirtualBox 4.2.x
+## Install VirtualBox 4.3.x
 
-Download and install [VirtualBox 4.2.x][vbox-download]. It won't work with
+Download and install [VirtualBox 4.3.x][vbox-download]. It won't work with
 any older version.
 
 [vbox-download]: https://www.virtualbox.org/wiki/Downloads
@@ -54,8 +54,8 @@ but sticking vmfest in your classpath will suffice.
 Add the following dependencies to your ```project.clj```:
 
 ```clojure
-   [vmfest "0.3.0"]
-   [org.clojars.tbatchelli/vboxjxpcom "4.2.4"]
+   [vmfest "0.4.0-alpha.1"]
+   [org.clojars.tbatchelli/vboxjxpcom "4.3.4"]
 ```
 
 and tell VMFest where VirtualBox is installed. In OSX this would be:

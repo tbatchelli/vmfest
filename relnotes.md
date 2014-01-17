@@ -1,5 +1,9 @@
 # Release Notes
 
+## 0.4.0-alpha.1
+
+- Add support for VirtualBox 4.3.x
+
 ## 0.3.0
  (same as 0.3.0-rc.1)
 

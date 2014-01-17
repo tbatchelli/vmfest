@@ -11,7 +11,7 @@
             [clojure.string :as string]
             [vmfest.virtualbox.enums :as enums]
             [fs.core :as fs])
-  (:import [org.virtualbox_4_2 DeviceType AccessMode MediumVariant
+  (:import [org.virtualbox_4_3 DeviceType AccessMode MediumVariant
             MediumType IMedium MediumState IProgress IVirtualBox]
            [java.util.zip GZIPInputStream]
            [java.io File]))

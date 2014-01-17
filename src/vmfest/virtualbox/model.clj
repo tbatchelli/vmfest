@@ -1,5 +1,5 @@
 (ns vmfest.virtualbox.model
-  (:import [org.virtualbox_4_2 IVirtualBox IMachine
+  (:import [org.virtualbox_4_3 IVirtualBox IMachine
             ISession VirtualBoxManager IMedium IConsole]))
 
 (defrecord Server [url username password])

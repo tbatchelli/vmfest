@@ -9,7 +9,7 @@
         [vmfest.virtualbox.system-properties :only [system-properties]]
         [clojure.string :only [blank?]]
         [slingshot.slingshot :only [throw+]])
-  (:import [org.virtualbox_4_2 IMachine IConsole VBoxException ISession
+  (:import [org.virtualbox_4_3 IMachine IConsole VBoxException ISession
             VirtualBoxManager IVirtualBox IMedium NetworkAttachmentType
             IStorageController INetworkAdapter IProgress
             IHostNetworkInterface INATEngine ChipsetType]
@@ -549,7 +549,7 @@ See IVirtualbox::openRemoteSession for more details"
      :VBOX_E_IPRT_ERROR
      "Could not delete the settings file."}
     (log/infof "delete: deleting machine %s and it's media" (.getName vb-m))
-    (.delete vb-m media)))
+    (.deleteConfig vb-m media)))
 
 
 (defn state [^IMachine vb-m]

@@ -5,5 +5,9 @@ classes
 docs
 .emacs*
 .lein*
-log
+logs
 src/log4j.xml
+target
+.nrepl-*
+TODO.md
+attic

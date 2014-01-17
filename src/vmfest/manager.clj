@@ -24,17 +24,18 @@ machines are stored in ~/.vmfest/nodes ."
             clojure.set)
   (:use [slingshot.slingshot :only [throw+ try+]]
         [vmfest.virtualbox.version :only (xpcom?)])
-  (:import [org.virtualbox_4_2
+  (:import [org.virtualbox_4_3
             SessionState
             HostNetworkInterfaceType
             HostNetworkInterfaceStatus
             IHostNetworkInterface
-            IVirtualBox]
+            IVirtualBox
+            VBoxException]
            java.io.File
            vmfest.virtualbox.model.Machine)
   (:import [java.net NetworkInterface InetAddress]))
 
-(def supported-api-version "4_2")
+(def supported-api-version "4_3")
 
 (defn check-vbox-api-version
   "Checks whether the underlying VirtualBox system provides an API
@@ -104,7 +105,7 @@ machines are stored in ~/.vmfest/nodes ."
        (format
         "/VirtualBox/GuestInfo/Net/%s/V4/IP"
         slot)))
-    (catch org.virtualbox_4_2.VBoxException e
+    (catch VBoxException e
       (throw (RuntimeException. e)))))
 
 (defn set-extra-data

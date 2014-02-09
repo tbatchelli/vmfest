@@ -354,7 +354,7 @@ VMFest. You can find the tutorial [here][tutorial].
 Replace the `vboxjxpcom` dependency in `project.clj` with this one:
 
 ```clojure
-   [org.clojars.tbatchelli/vboxjws "4.2.4"]
+   [org.clojars.tbatchelli/vboxjws "4.3.4"]
 ```
 
 Start the VirtualBox server (`vboxwebsrv`) by issuing the following on the shell:

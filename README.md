@@ -38,10 +38,12 @@ the end of this page.
 
 ## Install VirtualBox 4.3.x
 
-Download and install [VirtualBox 4.3.x][vbox-download]. It won't work with
-any older version.
+Download and install [VirtualBox 4.3.x][vbox-download]. VMFest 0.4.x
+won't work with any older version.
 
 [vbox-download]: https://www.virtualbox.org/wiki/Downloads
+
+For VirtualBox 4.2.x, use [VMFest 0.3.x][vmfest-0.3.x]
 
 ## Setup VMFest in your project
 
@@ -393,5 +395,7 @@ Distributed under the Eclipse Public License, the same as Clojure.
 [freenode]: http://freenode.net/irc_servers.shtml
 
 [vmfest-issues]: https://github.com/tbatchelli/vmfest/issues
+
+[vmfest-0.3.x]: https://github.com/tbatchelli/vmfest/tree/support/v0.3.x
 
 [palletops-tweet]: https://twitter.com/palletops

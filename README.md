@@ -125,6 +125,7 @@ following will create a VM on the VirtualBox host defined by
 `my-server`.  
 
 ```clojure
+(require '[vmfest.manager :refer [instance]])
 (def my-machine 
      (instance my-server "my-vmfest-vm" 
         {:uuid "/Users/tbatchelli/imgs/vmfest-Debian-6.0.2.1-64bit-v0.3.vdi"}  

@@ -128,7 +128,8 @@
 (defn wrap-exception [^Exception exception optional-keys]
   (try+
     (let [message (or (:message optional-keys) "An exception occurred.")
-          full-message (format "%s: %s" message (.getMessage exception))]
+          full-message (format "%s: %s" message (.getMessage exception))
+          &throw-context {:throwable exception}]
       (throw+ (merge {:full-message full-message
                       :cause exception}
                      (condition-from-exception exception)

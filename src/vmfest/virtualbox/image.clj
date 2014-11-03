@@ -288,16 +288,12 @@
   variants is a sequence of MediumVariant keys
           (see enums/medium-variant-type-to-key-table) "
   [^IMedium medium logical-size variant-seq]
-  (let [ ;; variants are flags. Get all the flags into a single long value
-        variants (long (reduce bit-or 0
-                               (map (comp #(.value ^MediumVariant %)
-                                          enums/key-to-medium-variant)
-                                    (or variant-seq []))))
+  (let [variants (into [] (map enums/key-to-medium-variant variant-seq))
         logical-size (long (* 1024 1024 logical-size))]
     (log/infof
-     "create-base-storage: Creating medium with size %sMB and variants %s"
+     "create-base-storage: Creating medium with size %sB and variants %s"
      logical-size variants)
-    (.createBaseStorage medium (long logical-size) (long variants))))
+    (.createBaseStorage medium (long logical-size) variants)))
 
 (defn create-medium
   "Creates a hard disk in the path described by `location`.
